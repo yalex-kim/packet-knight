@@ -11,6 +11,13 @@ const ALL_MOVE_CODES = new Set(Object.values(MOVE_CODES).flat());
 
 const keys = new Set();
 const joystick = { right: 0, forward: 0, active: false };
+let enabled = true;
+
+/** 오버레이(강의실 등)가 열려 있는 동안 게임 조작을 멈춘다. 키 입력은 오버레이 버튼에 양보한다. */
+export function setInputEnabled(on) {
+  enabled = on;
+  keys.clear();
+}
 
 /**
  * @param {{
@@ -26,6 +33,7 @@ const joystick = { right: 0, forward: 0, active: false };
 export function initInput(h) {
   // ---------- 키보드 ----------
   window.addEventListener("keydown", (e) => {
+    if (!enabled) return;
     if (e.code === "Space") {
       e.preventDefault();
       h.onJump();
@@ -45,7 +53,7 @@ export function initInput(h) {
   document.getElementById("btn-jump").addEventListener("pointerdown", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    h.onJump();
+    if (enabled) h.onJump();
   });
 
   initJoystick();
@@ -54,6 +62,7 @@ export function initInput(h) {
 
 /** 현재 이동 입력 (카메라 기준 right/forward, -1~1). 조이스틱이 키보드보다 우선 */
 export function readMoveInput() {
+  if (!enabled) return { right: 0, forward: 0, joystick: false };
   if (joystick.active) return { right: joystick.right, forward: joystick.forward, joystick: true };
   let right = 0, forward = 0;
   const pressed = (codes) => codes.some((c) => keys.has(c));

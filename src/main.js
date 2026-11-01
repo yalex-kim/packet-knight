@@ -1,5 +1,7 @@
 // Packet Knight — 엔트리: 씬 구성, 게임 상태, 메인 루프
-// PRD.md §7 Stage 3 DoD (scripts/smoke.mjs 로 자동 검증): "큐브가 지형 단차를 오르내리고 건물에 부딪힌다"
+// PRD.md §7 DoD는 scripts/smoke.mjs 로 자동 검증한다.
+//   Stage 3: "큐브가 지형 단차를 오르내리고 건물에 부딪힌다"
+//   Stage 4: "퀴즈 3문제 정답 시 스탯이 오르고 localStorage에 저장된다 (새로고침 후에도 유지)"
 //
 // 계층:  core/ (순수 로직, Node에서 import 가능) → render/ (THREE) · ui/ (DOM) → main.js (조립)
 
@@ -12,8 +14,13 @@ import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/mot
 import * as world from "./render/world.js";
 import * as knightView from "./render/knight.js";
 import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera } from "./render/camera.js";
-import { initInput, readMoveInput } from "./ui/input.js";
+import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
+import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey } from "./ui/library.js";
+import {
+  SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
+} from "./core/progress.js";
+import { CHAPTERS } from "./core/chapters.data.js";
 
 // ---------- 씬 & 렌더러 ----------
 const app = document.getElementById("app");
@@ -34,6 +41,26 @@ scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.55));
 
 scene.add(world.root);
 knightView.addKnightTo(scene);
+
+// ---------- 진행도 (localStorage) ----------
+// 사생활 보호 모드 등에서 localStorage 접근 자체가 예외를 던질 수 있다
+let storage = null;
+try { storage = window.localStorage; } catch { /* 저장 없이 플레이 */ }
+
+const loaded = loadProgress(storage);
+const progress = loaded.progress;
+if (loaded.status === "corrupt") {
+  // 깨진 세이브는 덮어쓰기 전에 보관해 둔다 (수동 복구용)
+  try { storage.setItem(`${SAVE_KEY}.corrupt`, storage.getItem(SAVE_KEY) ?? ""); } catch { /* 무시 */ }
+  console.warn("[PacketKnight] 저장 데이터가 손상되어 새 진행도로 시작합니다.");
+}
+let lastSaveOk = loaded.status !== "unavailable";
+
+function persist() {
+  lastSaveOk = saveProgress(storage, progress);
+  if (!lastSaveOk) hud.setBadge("⚠️ 진행도를 저장할 수 없습니다 (브라우저 저장소 차단)");
+}
+hud.renderStats(effectiveStats(progress), progress.skillSlots);
 
 // ---------- 게임 상태 ----------
 const motor = createMotor(SPAWN_POS);
@@ -102,6 +129,38 @@ function handleTap(clientX, clientY) {
   hud.hideModal();
 }
 
+// ---------- 도서관 강의실 (교육 루프) ----------
+const TEST_MODE = new URLSearchParams(location.search).has("test");
+
+initLibrary({
+  seed: TEST_MODE ? 42 : undefined,
+  getProgress: () => progress,
+  getStats: () => effectiveStats(progress),
+  onQuizFinished: (chapterId, perfect) => {
+    const outcome = applyQuizResult(progress, chapterId, perfect);
+    persist();
+    if (outcome.reward) {
+      const changed = [outcome.reward.stat, ...(outcome.reward.slotUnlocked ? ["slots"] : [])];
+      hud.renderStats(effectiveStats(progress), progress.skillSlots, changed);
+    }
+    return outcome;
+  },
+  onChapterOpen: (chapterId) => { recordChapterOpen(progress, chapterId); persist(); },
+  onOpenChange: (open) => {
+    setInputEnabled(!open);
+    if (open) { clearMoveTarget(); hud.hideModal(); }
+  }
+});
+
+hud.setModalHandlers({
+  action: (id) => { if (id === "library") openLibrary(); },
+  // 모달의 "교과서 챕터 보기" 클릭도 학습 지표로 센다 (PRD §1.3 ②)
+  link: (href) => {
+    const chapter = CHAPTERS.find((c) => href.endsWith(`/${c.file}`));
+    if (chapter) { recordChapterOpen(progress, chapter.id); persist(); }
+  }
+});
+
 initInput({
   surface: app,
   onJump: performJump,
@@ -153,7 +212,6 @@ function simulate(dt) {
 
 // ---------- 메인 루프 ----------
 // ?test 모드: 실시간 루프는 시뮬레이션·렌더를 멈추고, 테스트가 __PK.tick()으로 고정 스텝을 진행 (FPS와 무관한 결정적 테스트)
-const TEST_MODE = new URLSearchParams(location.search).has("test");
 const FIXED_DT = 1 / 60;
 const clock = new THREE.Clock();
 
@@ -185,6 +243,10 @@ window.__PK = {
     x: motor.x, y: motor.y, z: motor.z, rotY: motor.rotY, grounded: motor.grounded, vy: motor.vy,
     badge: hud.getBadge(), modal: hud.openModalTitle()
   }),
+  progress: () => structuredClone(progress),
+  stats: () => effectiveStats(progress),
+  saveStatus: () => ({ load: loaded.status, lastSaveOk }),
+  library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey },
   teleport: (x, z, y) => Object.assign(motor, { x, z, y: y ?? groundHeightAt(x, z), vy: 0, grounded: true }),
   /** 시뮬레이션을 seconds 만큼 고정 스텝으로 진행 (테스트 모드용) */
   tick: (seconds) => {

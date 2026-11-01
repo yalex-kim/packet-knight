@@ -9,7 +9,7 @@ const CHAPTER = (file) => `https://yalex-kim.github.io/connectivityBook/bluetoot
 
 /**
  * @typedef {{ x: number, y: number, z: number }} Vec3
- * @typedef {{ title: string, sub: string, desc: string, lore: string, link: string, walkPos: Vec3 }} LandmarkInfo
+ * @typedef {{ title: string, sub: string, desc: string, lore: string, link: string, walkPos: Vec3, action?: { id: string, label: string } }} LandmarkInfo
  * @typedef {{ id: string, pos: Vec3, info: LandmarkInfo }} Landmark
  */
 
@@ -36,6 +36,7 @@ export const LANDMARKS = [
       desc: "2.4GHz 무선통신의 모든 원리가 기록된 지식의 성소입니다. 챕터 퀴즈를 풀면 스탯(TX 파워, 수신 감도)이 오르고 새로운 스킬 슬롯이 해금됩니다.",
       lore: "무선 통신 교과서 connectivityBook의 Bluetooth 챕터 원문 지식이 인터랙티브하게 보관되어 있습니다.",
       link: CHAPTER("intro.html"),
+      action: { id: "library", label: "📖 강의실 입장" },
       walkPos: { x: -6.6, y: S, z: -1.0 }
     }
   },

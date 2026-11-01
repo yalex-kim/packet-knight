@@ -38,7 +38,7 @@ npm start                # → http://localhost:5173  (Node만 있으면 됨, np
 
 - 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
-- 현재 진행: **Stage 3.5 완료** (무빌드 ESM 모듈 분리 — 기능 변화 없음, 순수 로직 계층은 Node에서 단독 실행) → 다음: Stage 4 교육 루프 v1
+- 현재 진행: **Stage 4 완료** (RF 이론 도서관 강의실: 교과서 레슨 → 3문제 퀴즈 → 첫 만점 시 스탯·스킬 슬롯 영구 상승, localStorage 저장) → 다음: Stage 5 알바 미니게임
 - 빌드 도구 없이 CDN import map + ES 모듈로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
 
 ## 🧱 코드 구조
@@ -53,10 +53,15 @@ src/
     layout.js         랜드마크 위치·문구·충돌 형상 데이터
     collision.js      높이 인식 충돌 (STEP_MAX)
     motor.js          이동·점프·낙하 물리
+    balance.js        밸런스 수치 (PRD §8.4 원본)
+    quiz.js           퀴즈 출제(시드 고정 가능)·채점
+    progress.js       진행도 저장/복원·보상·학습 지표 (저장소 주입)
+    chapters.data.js  교과서 레슨·퀴즈 데이터 (자동 생성)
   render/             THREE 렌더링 — world(지형·건물), knight(기사·이펙트), camera(오빗 카메라)
-  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·모달)
+  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·스탯·모달), library(강의실)
 scripts/
   serve.mjs           무의존 로컬 정적 서버 (npm start)
+  import-chapters.mjs connectivityBook 챕터 → chapters.data.js 생성
   smoke.mjs           DoD 자동 검증 (npm run smoke)
 ```
 
@@ -69,7 +74,7 @@ scripts/
 ```bash
 npm install          # playwright, three(오프라인용 사본)
 npx playwright install chromium   # 최초 1회
-npm run smoke        # → 23/23 통과
+npm run smoke        # → 38/38 통과
 ```
 
 - 게임을 `index.html?test`로 열면 실시간 시뮬레이션이 멈추고, 테스트가 `window.__PK.tick(초)`로 고정 1/60초 스텝을 진행시킵니다. 헤드리스 FPS와 무관하게 결정적으로 검증됩니다.
@@ -88,9 +93,16 @@ npm run smoke        # → 23/23 통과
 
 전체 매핑은 [PRD.md §6](PRD.md)를 참고하세요.
 
+도서관 강의실의 레슨(핵심 정리)과 퀴즈는 교과서 원문 각 챕터의 "핵심 정리"·"확인 퀴즈"를 그대로 가져온 것입니다. 교과서가 바뀌면 다시 생성합니다.
+
+```bash
+git clone --depth 1 https://github.com/yalex-kim/connectivityBook ../connectivityBook
+node scripts/import-chapters.mjs ../connectivityBook   # → src/core/chapters.data.js
+```
+
 ## 🗺️ 로드맵 (요약)
 
-Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
+Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 ✅ → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
 
 각 단계의 완료 기준(DoD)은 [PRD.md §7](PRD.md)에 정의되어 있습니다.
 

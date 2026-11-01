@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 3.5</title>
+<title>Packet Knight — Stage 4</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -124,22 +124,107 @@
     font-family: inherit;
   }
   #info-modal .btn-action:hover { background: #235d9c; }
+  .btn-action.primary, .lib-btn.primary { background: #0e7a5a; border-color: #23b585; }
+  .btn-action.primary:hover, .lib-btn.primary:hover { background: #12946d; }
+  [hidden] { display: none !important; }
+
+  /* 스탯 패널 (우상단 배지 아래) */
+  #stats {
+    position: fixed; right: 14px; top: 56px; z-index: 10;
+    font-size: 11.5px; line-height: 1.5; color: #d9ecff;
+    background: rgba(6, 16, 30, .82); border: 1px solid #1f3a5f;
+    border-radius: 10px; padding: 7px 10px; pointer-events: none;
+    backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    display: grid; grid-template-columns: auto auto; gap: 0 10px;
+  }
+  #stats .stat b { color: #7dd8ff; }
+  #stats .stat.up { animation: statUp 1.6s ease-out; }
+  #stats .slots { grid-column: 1 / -1; border-top: 1px solid #1b3554; margin-top: 3px; padding-top: 3px; color: #9fd6a8; }
+  @keyframes statUp { 0%, 40% { color: #fff36b; text-shadow: 0 0 8px #fff36b; } 100% { color: inherit; text-shadow: none; } }
+
+  /* 도서관 강의실 & 원문 리더 오버레이 */
+  .overlay {
+    position: fixed; inset: 0; z-index: 40;
+    background: rgba(2, 8, 18, 0.62); backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    touch-action: auto; user-select: text; -webkit-user-select: text;
+  }
+  .panel {
+    width: 100%; max-width: 580px; max-height: calc(100vh - 32px); overflow-y: auto;
+    background: rgba(8, 20, 38, 0.97); color: #e2f1ff;
+    border: 1.5px solid #2d5584; border-radius: 14px; padding: 16px 18px 18px;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 24px rgba(57,208,255,0.18);
+    font-size: 13.5px; line-height: 1.6; overscroll-behavior: contain;
+  }
+  .panel h2 { font-size: 16px; margin: 0; color: #7dd8ff; }
+  .panel h3 { font-size: 14px; margin: 14px 0 6px; color: #9fd0ff; }
+  .panel .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid #1b3554; padding-bottom: 9px; margin-bottom: 10px; }
+  .panel .close { background: none; border: none; color: #7c9bba; font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px; font-family: inherit; }
+  .panel .muted { color: #8fb3d6; font-size: 12px; }
+  .panel .npc { background: rgba(14, 34, 60, 0.6); border-left: 3px solid #39d0ff; padding: 7px 11px; border-radius: 4px; color: #bcdaf5; }
+  .panel ol, .panel ul { padding-left: 20px; margin: 6px 0; }
+  .panel li { margin: 4px 0; }
+  .lib-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  .lib-btn {
+    background: #1b4777; color: #e2f1ff; border: 1px solid #2d6fb3; border-radius: 7px;
+    padding: 8px 13px; font-size: 13px; cursor: pointer; font-family: inherit; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px; min-height: 36px;
+  }
+  .lib-btn:hover { background: #235d9c; }
+  .lib-btn:focus-visible, .opt:focus-visible, .course:focus-visible { outline: 2px solid #7dd8ff; outline-offset: 2px; }
+  .course {
+    width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: rgba(14, 34, 60, 0.7); color: #e2f1ff; border: 1px solid #234b78; border-radius: 9px;
+    padding: 10px 12px; margin: 7px 0; cursor: pointer; font-family: inherit; font-size: 13.5px;
+  }
+  .course:hover { border-color: #39d0ff; }
+  .course .meta { font-size: 11.5px; color: #8fb3d6; }
+  .course .tag { font-size: 11.5px; white-space: nowrap; color: #9fd6a8; }
+  .course.done .tag { color: #7dffb5; }
+  .quiz-progress { font-size: 12px; color: #8fb3d6; }
+  .quiz-q { font-size: 14.5px; font-weight: 600; margin: 8px 0 10px; }
+  .opt {
+    display: block; width: 100%; text-align: left; margin: 7px 0; padding: 10px 12px;
+    background: rgba(14, 34, 60, 0.75); color: #e2f1ff; border: 1px solid #234b78; border-radius: 8px;
+    font-family: inherit; font-size: 13.5px; line-height: 1.45; cursor: pointer;
+  }
+  .opt:hover:not(:disabled) { border-color: #39d0ff; }
+  .opt:disabled { cursor: default; }
+  .opt.right { border-color: #23b585; background: rgba(14, 90, 60, 0.55); }
+  .opt.wrong { border-color: #d8443c; background: rgba(110, 24, 20, 0.55); }
+  .explain { margin-top: 8px; padding: 8px 11px; border-radius: 6px; background: rgba(14, 34, 60, 0.6); border-left: 3px solid #f5c542; font-size: 12.5px; color: #d6e6f5; }
+  .result-big { font-size: 18px; font-weight: 700; margin: 6px 0; }
+  .reward { color: #fff36b; font-weight: 700; }
+  .source { margin-top: 14px; font-size: 11px; color: #6f8fb0; }
+  .source a { color: #8fc4ff; }
+  #reader .panel { max-width: 920px; height: calc(100vh - 32px); display: flex; flex-direction: column; padding: 12px; }
+  #reader iframe { flex: 1; width: 100%; border: 0; border-radius: 8px; background: #fff; }
+
+  /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
+  @media (max-width: 640px) {
+    #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
+    #hud .stage-label, #hud .control-desc { display: none; }
+    #badge { max-width: calc(60vw - 40px); font-size: 11.5px; padding: 6px 10px; }
+    #stats { top: 50px; font-size: 11px; }
+  }
 </style>
 </head>
 <body>
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b> — Stage 3.5: 모듈 구조<br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 4: 교육 루프</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
     🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />
-    🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌
+    🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌<br />
+    📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장
   </div>
 </div>
 
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
+<div id="stats" aria-label="기사 스탯"></div>
 
 <!-- 모바일 & 터치 가상 조이스틱 -->
 <div id="joystick-zone">
@@ -164,7 +249,27 @@
   <div class="modal-desc" id="modal-desc">건물 설명이 표시됩니다.</div>
   <div class="modal-lore" id="modal-lore">블루투스 원리 매핑 내용</div>
   <div class="modal-actions">
-    <a href="#" target="_blank" class="btn-action" id="modal-link">📖 교과서 챕터 보기</a>
+    <a href="#" target="_blank" rel="noopener" class="btn-action" id="modal-link">📖 교과서 챕터 보기</a>
+    <button type="button" class="btn-action primary" id="modal-action" hidden></button>
+  </div>
+</div>
+
+<!-- 도서관 강의실 (Stage 4 교육 루프) -->
+<div id="library" class="overlay" role="dialog" aria-modal="true" aria-labelledby="library-title" hidden>
+  <div class="panel" id="library-panel"></div>
+</div>
+
+<!-- 교과서 원문 리더 -->
+<div id="reader" class="overlay" role="dialog" aria-modal="true" aria-label="교과서 원문" hidden>
+  <div class="panel">
+    <div class="head">
+      <h2 id="reader-title">교과서 원문</h2>
+      <div>
+        <a class="lib-btn" id="reader-newtab" href="#" target="_blank" rel="noopener">↗ 새 탭</a>
+        <button type="button" class="close" id="reader-close" aria-label="닫기">&times;</button>
+      </div>
+    </div>
+    <iframe id="reader-frame" title="connectivityBook 챕터 원문" loading="lazy"></iframe>
   </div>
 </div>
 

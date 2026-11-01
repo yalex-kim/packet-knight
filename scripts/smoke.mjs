@@ -44,6 +44,35 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   }
 }
 
+// ---------- Stage 4: 교과서 퀴즈 데이터 & 진행도 로직 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const { CHAPTERS } = await imp("chapters.data.js");
+  const { LIBRARY_COURSES } = await imp("balance.js");
+  const bad = CHAPTERS.flatMap((c) => c.questions
+    .filter((q) => !(Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.options.length && q.options.length >= 2 && q.explain))
+    .map((q) => `${c.id}: ${q.q}`));
+  const thin = CHAPTERS.filter((c) => c.questions.length < 3 || c.keypoints.length === 0).map((c) => c.id);
+  const missing = LIBRARY_COURSES.filter((l) => !CHAPTERS.some((c) => c.id === l.chapter)).map((l) => l.chapter);
+  check("교과서 퀴즈 데이터가 유효하다 (정답 1개·해설·3문항 이상)", bad.length + thin.length + missing.length === 0,
+    [...bad, ...thin, ...missing].join(", ") || `${CHAPTERS.length}챕터 ${CHAPTERS.reduce((n, c) => n + c.questions.length, 0)}문항`);
+
+  const P = await imp("progress.js");
+  const mem = new Map();
+  const st = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const { progress } = P.loadProgress(st);
+  const miss = P.applyQuizResult(progress, "radio", false);
+  const first = P.applyQuizResult(progress, "radio", true);
+  const again = P.applyQuizResult(progress, "radio", true);
+  P.saveProgress(st, progress);
+  const reloaded = P.loadProgress(st);
+  check("만점 첫 이수에만 보상하고 저장·복원된다 (Node)",
+    !miss.reward && first.reward?.stat === "tx" && !again.reward && reloaded.status === "loaded" && P.effectiveStats(reloaded.progress).tx === 11,
+    `TX ${P.effectiveStats(reloaded.progress).tx}, 도전 ${reloaded.progress.metrics.quizAttempts.radio}회`);
+  mem.set(P.SAVE_KEY, "{broken");
+  check("손상된 저장 데이터는 새 진행도로 시작한다 (Node)", P.loadProgress(st).status === "corrupt");
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -247,6 +276,94 @@ await reset();
   await tick(20);
   const s = await state();
   check("클릭 시 화면상 가장 앞의 오브젝트가 선택된다", s.modal?.includes("분수대"), `선택: ${s.modal}`);
+}
+
+// ---------- Stage 4: 교육 루프 (도서관 퀴즈 → 스탯 → localStorage) ----------
+const lib = (sel) => page.locator(`#library-panel ${sel}`);
+const statsNow = () => page.evaluate(() => window.__PK.stats());
+/** 진행 중 퀴즈를 푼다. wrongAt 번째 문제만 일부러 틀린다 */
+async function answerQuiz(wrongAt = -1) {
+  const key = await page.evaluate(() => window.__PK.library.answerKey());
+  for (let i = 0; i < key.length; i++) {
+    const pick = i === wrongAt ? (key[i] + 1) % 4 : key[i];
+    await lib(".opt").nth(pick).click();
+    await lib(".lib-btn.primary").click(); // 다음 문제 / 결과 보기
+  }
+}
+
+await reset();
+{
+  const p = await page.evaluate(() => window.__PK.projectToScreen(-9.0, 4.6, -1.0)); // 도서관 지붕
+  await page.mouse.click(p.x, p.y);
+  await tick(20);
+  const actionVisible = await page.locator("#modal-action").isVisible();
+  check("도서관 모달에 '강의실 입장' 버튼이 있다", actionVisible && (await state()).modal?.includes("도서관"));
+  await page.click("#modal-action");
+  check("강의실이 열린다", await page.evaluate(() => window.__PK.library.isOpen()));
+
+  const a = await state();
+  await hold("KeyW", 300);
+  const b = await state();
+  check("강의실이 열려 있는 동안 기사가 움직이지 않는다", Math.hypot(b.x - a.x, b.z - a.z) < 0.01);
+
+  await lib(".course").first().click();
+  const keypoints = await lib("ol li").count();
+  check("레슨 화면에 교과서 핵심 정리가 보인다", keypoints >= 3, `${keypoints}개`);
+
+  const before = await statsNow();
+  await lib(".lib-btn.primary").click(); // 퀴즈 시작
+  await answerQuiz(0);
+  const missStats = await statsNow();
+  const explains = await lib(".explain").count();
+  const retry = await lib(".lib-btn.primary").textContent();
+  check("한 문제라도 틀리면 보상 없이 해설과 재도전을 준다",
+    missStats.hp === before.hp && explains >= 1 && retry.includes("다시 도전"), `해설 ${explains}개, 버튼 '${retry}'`);
+
+  await lib(".lib-btn.primary").click(); // 새 문제로 다시 도전
+  await answerQuiz();
+  const after = await statsNow();
+  const prog = await page.evaluate(() => window.__PK.progress());
+  const hudText = await page.locator("#stats").textContent();
+  check("3문제 모두 맞히면 스탯이 오르고 스킬 슬롯이 열린다",
+    after.hp === before.hp + 5 && prog.skillSlots === 2 && hudText.includes(`${after.hp}`), `HP ${before.hp} → ${after.hp}, 슬롯 ${prog.skillSlots}`);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
+  check("진행도가 localStorage에 저장된다", Boolean(saved?.cleared?.intro) && saved.bonus.hp === 5 && saved.metrics.quizAttempts.intro === 2);
+}
+
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const s1 = await statsNow();
+  const st = await page.evaluate(() => window.__PK.saveStatus());
+  const hudText = await page.locator("#stats").textContent();
+  check("새로고침 후에도 스탯이 유지된다", s1.hp === 105 && st.load === "loaded" && hudText.includes("105"), `HP ${s1.hp}, ${st.load}`);
+
+  await page.evaluate(() => window.__PK.library.open());
+  const doneTag = await lib(".course").first().textContent();
+  check("이수한 챕터는 목록에 이수 표시된다", doneTag.includes("이수"));
+  await lib(".course").first().click();
+  await lib(".lib-btn.primary").click();
+  await answerQuiz();
+  const s2 = await statsNow();
+  check("이미 이수한 챕터를 다시 만점 받아도 보상이 중복되지 않는다", s2.hp === 105, `HP ${s2.hp}`);
+
+  await page.keyboard.press("Escape");
+  const closed = !(await page.evaluate(() => window.__PK.library.isOpen()));
+  await reset();
+  const a = await state();
+  await hold("KeyS", 300);
+  const b = await state();
+  check("Esc로 강의실을 닫으면 다시 조작할 수 있다", closed && Math.hypot(b.x - a.x, b.z - a.z) > 0.5);
+}
+
+await page.evaluate(() => localStorage.setItem("packetKnight.save", "{not json"));
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const st = await page.evaluate(() => window.__PK.saveStatus());
+  const s3 = await statsNow();
+  const backup = await page.evaluate(() => localStorage.getItem("packetKnight.save.corrupt"));
+  check("손상된 세이브로도 게임이 시작되고 원본은 백업된다", st.load === "corrupt" && s3.hp === 100 && backup === "{not json");
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));
