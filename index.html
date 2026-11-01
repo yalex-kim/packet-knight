@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 5</title>
+<title>Packet Knight — Stage 6</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -140,7 +140,9 @@
   #stats .stat b { color: #7dd8ff; }
   #stats .stat.up { animation: statUp 1.6s ease-out; }
   #stats .slots { grid-column: 1 / -1; border-top: 1px solid #1b3554; margin-top: 3px; padding-top: 3px; color: #9fd6a8; }
-  #stats .coins { color: #ffd76b; border-top: none; margin-top: 0; padding-top: 0; }
+  #stats .coins, #stats .level { border-top: none; margin-top: 0; padding-top: 0; }
+  #stats .coins { color: #ffd76b; }
+  #stats .level { color: #c9b8ff; }
   @keyframes statUp { 0%, 40% { color: #fff36b; text-shadow: 0 0 8px #fff36b; } 100% { color: inherit; text-shadow: none; } }
 
   /* 도서관 강의실 & 원문 리더 오버레이 */
@@ -215,12 +217,49 @@
   .job-confirm { font-size: 15px; padding: 11px 18px; min-height: 46px; }
   .job-confirm:disabled { opacity: 0.45; cursor: default; }
 
+  /* 전투: 발사 버튼, 플레이어 HP 바, 떠오르는 숫자, 토스트 */
+  #btn-fire {
+    position: fixed; right: 16px; bottom: 140px; z-index: 20;
+    width: 64px; height: 64px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #9ff6ff 0%, #22a6c9 65%, #0b5f78 100%);
+    color: #fff; font-weight: 700; font-size: 12px; border: 2px solid rgba(255,255,255,0.5);
+    box-shadow: 0 4px 18px rgba(34,166,201,0.55); cursor: pointer; touch-action: none;
+    font-family: inherit; user-select: none; -webkit-user-select: none;
+  }
+  #btn-fire:active { transform: scale(0.92); }
+  #hp {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10;
+    width: min(280px, 38vw); height: 22px; border-radius: 11px; overflow: hidden; pointer-events: none;
+    background: rgba(26, 8, 8, 0.8); border: 1px solid #6b2a26; box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+  }
+  #hp-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #d8443c, #ff7a70); transition: width 0.15s ease-out; }
+  #hp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: #fff; text-shadow: 0 1px 2px #000; }
+  #hp.low #hp-fill { background: linear-gradient(90deg, #8a1a14, #d8443c); animation: lowPulse 0.8s ease-in-out infinite alternate; }
+  #hp.hurt { animation: hurtShake 0.25s; }
+  @keyframes lowPulse { to { filter: brightness(1.5); } }
+  @keyframes hurtShake { 25% { transform: translateX(calc(-50% - 4px)); } 75% { transform: translateX(calc(-50% + 4px)); } }
+  #fx { position: fixed; inset: 0; z-index: 15; pointer-events: none; overflow: hidden; }
+  .float { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 16px; color: #fff; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,0.6); white-space: nowrap; }
+  .float.crit { color: #fff36b; font-size: 20px; }
+  .float.hurt { color: #ff7a70; }
+  .float.dodge { color: #9fd0ff; font-size: 14px; }
+  .float.loot { color: #ffd76b; font-size: 14px; }
+  #toast {
+    position: fixed; left: 50%; top: 22%; transform: translateX(-50%); z-index: 25; max-width: min(520px, 90vw);
+    background: rgba(8, 20, 38, 0.94); color: #e2f1ff; border: 1.5px solid #39d0ff; border-radius: 10px;
+    padding: 9px 14px; font-size: 13px; line-height: 1.5; text-align: center; pointer-events: none; white-space: pre-line;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.5);
+  }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
     #hud .stage-label, #hud .control-desc { display: none; }
     #badge { max-width: calc(60vw - 40px); font-size: 11.5px; padding: 6px 10px; }
     #stats { top: 50px; font-size: 11px; }
+    /* HP 바는 조이스틱·버튼과 겹치지 않게 좌상단 제목 아래로 */
+    #hp { bottom: auto; top: 50px; left: 14px; transform: none; width: 40vw; }
+    #hp.hurt { animation: none; }
   }
 </style>
 </head>
@@ -228,14 +267,15 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 5: 알바 미니게임</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 6: 첫 전투</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
     🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />
     🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌<br />
     📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
-    📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)
+    📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)<br />
+    ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)
   </div>
 </div>
 
@@ -252,6 +292,12 @@
 <!-- 모바일 점프 버튼 & 리셋 버튼 -->
 <button id="btn-jump" aria-label="점프">🦘 점프</button>
 <button id="btn-reset">📍 시작 위치로</button>
+<button id="btn-fire" aria-label="ADV 패킷 발사">📡 발사</button>
+
+<!-- 전투 HUD -->
+<div id="hp" aria-label="연결 안정성 HP"><div id="hp-fill"></div><div id="hp-text"></div></div>
+<div id="fx" aria-hidden="true"></div>
+<div id="toast" role="status" hidden></div>
 
 <!-- 건물/던전 상호작용 모달 -->
 <div id="info-modal">

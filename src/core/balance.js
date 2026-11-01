@@ -69,3 +69,46 @@ export const RSSI_JOB = Object.freeze({
     { grade: "C", minScore: -Infinity, reward: 2 }
   ])
 });
+
+/** 전투 공식 (PRD §8.4 "전투 공식") */
+export const COMBAT = Object.freeze({
+  CRIT_CHANCE: 0.10,
+  CRIT_MULT: 1.5,
+  SKILL_COEF: Object.freeze({ advPacket: 1.0, connectRush: 1.6 }),
+  // ADV 패킷 발사 (PRD §3.2) — 광고 패킷을 쏘는 원거리 공격
+  ADV_PACKET: Object.freeze({ speed: 16, range: 12, hitRadius: 0.6, cooldown: 0.8, aimConeDeg: 35 }),
+  // 플레이어 HP 회복: 마지막 피격 후 REGEN_DELAY초가 지나면 초당 최대 HP의 REGEN_RATE만큼
+  REGEN_DELAY: 3,
+  REGEN_RATE: 0.12,
+  PICKUP_RADIUS: 1.1,
+  MAGNET_RADIUS: 3.0
+});
+
+/** 레벨업 필요 누적 XP: XP(n) = 50 × n^1.5 (PRD §8.4) — n레벨 → n+1레벨 */
+export const XP_TO_NEXT = (n) => Math.round(50 * n ** 1.5);
+export const STAT_POINTS_PER_LEVEL = 3;
+
+/**
+ * 몬스터 도감 (PRD §8.4 표, §4.3 "몬스터 도감에 실제 스펙 배경 한 줄")
+ * 스펙 문구 출처: connectivityBook advertising.html (GAP 역할, 레거시 광고 PDU 표, 능동/수동 스캔)
+ */
+export const MONSTERS = Object.freeze({
+  trainingBot: Object.freeze({
+    id: "trainingBot",
+    name: "훈련용 비콘 봇",
+    hp: 40, atk: 6, sec: 0,
+    speed: 3.0, aggro: 7, leash: 5,
+    attackRange: 1.5, windup: 0.6, cooldown: 1.4,
+    respawn: 12,
+    xp: 10,
+    drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.35 }]),
+    role: "브로드캐스터 (Broadcaster)",
+    pdu: "ADV_NONCONN_IND",
+    scan: "능동 스캔(SCAN_REQ)을 보내도 응답하지 않는다 — ADV_NONCONN_IND는 연결도 스캔 요청도 받지 않는 순수 방송이라, 수동 스캔으로 광고 데이터만 읽었다.",
+    lore: "광고만 하고 연결은 받지 않는 GAP 브로드캐스터. 광고 이벤트마다 채널 37·38·39에 같은 PDU를 외친다.",
+    chapter: "advertising.html"
+  })
+});
+
+/** 훈련장 (마을 남서쪽 풀밭) */
+export const TRAINING_GROUND = Object.freeze({ x: -9, z: 10, spawns: Object.freeze([[-10, 9], [-8, 11.5]]) });

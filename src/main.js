@@ -3,6 +3,7 @@
 //   Stage 3: "큐브가 지형 단차를 오르내리고 건물에 부딪힌다"
 //   Stage 4: "퀴즈 3문제 정답 시 스탯이 오르고 localStorage에 저장된다 (새로고침 후에도 유지)"
 //   Stage 5: "60초 플레이로 CR2032가 지급되고 잔액이 저장된다"
+//   Stage 6: "몬스터를 처치해 아이템을 얻고, HP가 줄었다가 회복된다"
 //
 // 계층:  core/ (순수 로직, Node에서 import 가능) → render/ (THREE) · ui/ (DOM) → main.js (조립)
 
@@ -26,6 +27,12 @@ import { applyJobResult } from "./core/progress.js";
 import { createRng } from "./core/quiz.js";
 import { createJob, stepJob, confirmMeasurement } from "./core/rssiJob.js";
 import * as jobPanel from "./ui/jobPanel.js";
+import { TRAINING_GROUND, MONSTERS } from "./core/balance.js";
+import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket, revivePlayer } from "./core/battle.js";
+import { recordScan, applyKill, applyPickup } from "./core/progress.js";
+import { levelFromXp } from "./core/combat.js";
+import * as battleView from "./render/battleView.js";
+import * as fx from "./ui/fx.js";
 
 // ---------- 씬 & 렌더러 ----------
 const app = document.getElementById("app");
@@ -45,6 +52,7 @@ scene.add(new THREE.AmbientLight(0xc6e0ff, 0.65));
 scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.55));
 
 scene.add(world.root);
+scene.add(battleView.battleRoot);
 knightView.addKnightTo(scene);
 
 // ---------- 진행도 (localStorage) ----------
@@ -65,11 +73,15 @@ function persist() {
   lastSaveOk = saveProgress(storage, progress);
   if (!lastSaveOk) hud.setBadge("⚠️ 진행도를 저장할 수 없습니다 (브라우저 저장소 차단)");
 }
-const wallet = () => ({ skillSlots: progress.skillSlots, cr2032: progress.cr2032 });
+const wallet = () => ({ skillSlots: progress.skillSlots, cr2032: progress.cr2032, xp: progress.xp, statPoints: progress.statPoints });
 hud.renderStats(effectiveStats(progress), wallet());
 
 // ---------- 게임 상태 ----------
 const motor = createMotor(SPAWN_POS);
+
+// ---------- 전투 (훈련장) ----------
+const battle = createBattle(TRAINING_GROUND.spawns);
+syncPlayerHp(battle, effectiveStats(progress).hp);
 /** @type {{ x: number, y: number, z: number } | null} */
 let moveTarget = null;
 let pendingArrivalLabel = null;
@@ -115,8 +127,16 @@ function handleTap(clientX, clientY) {
   raycaster.setFromCamera(pointer, camera);
 
   // 건물·지형을 한 번에 검사해 화면에서 가장 앞에 있는 대상을 고른다
-  const hits = raycaster.intersectObjects([...world.interactiveObjects, world.terrain, world.sea], true);
+  const hits = raycaster.intersectObjects([...battleView.monsterTargets, ...world.interactiveObjects, world.terrain, world.sea], true);
   if (hits.length === 0) return;
+
+  // 몬스터를 탭하면 그 몬스터를 조준해 발사
+  for (let o = hits[0].object; o; o = o.parent) {
+    if (o.userData.monsterId) {
+      performFire(battle.monsters.find((m) => m.id === o.userData.monsterId));
+      return;
+    }
+  }
 
   const info = findInteractive(hits[0].object);
   if (info) {
@@ -148,15 +168,80 @@ initLibrary({
     if (outcome.reward) {
       const changed = [outcome.reward.stat, ...(outcome.reward.slotUnlocked ? ["slots"] : [])];
       hud.renderStats(effectiveStats(progress), wallet(), changed);
+      syncPlayerHp(battle, effectiveStats(progress).hp); // HP 보너스는 즉시 반영
     }
     return outcome;
   },
   onChapterOpen: (chapterId) => { recordChapterOpen(progress, chapterId); persist(); },
   onOpenChange: (open) => {
     setInputEnabled(!open);
+    inputLocked = open;
     if (open) { clearMoveTarget(); hud.hideModal(); }
   }
 });
+
+// ---------- 전투 이벤트 처리 ----------
+const battleRng = createRng(TEST_MODE ? 11 : Date.now() + 1);
+let inputLocked = false; // 오버레이가 열려 있으면 발사 금지
+
+function performFire(target = null) {
+  if (inputLocked) return;
+  const shot = fireAdvPacket(battle, motor, target);
+  if (shot) clearMoveTarget();
+}
+
+function handleBattleEvents(events) {
+  let dirty = false;
+  const changed = [];
+  for (const e of events) {
+    switch (e.type) {
+      case "hit": {
+        const m = e.monster;
+        fx.floatText(m.x, m.y + 0.6, m.z, `${e.amount}${e.crit ? "!" : ""}`, e.crit ? "crit" : "");
+        if (e.firstScan && recordScan(progress, m.type)) {
+          const def = MONSTERS[m.type];
+          fx.showToast(`🔍 도감 등록 — ${def.name} · ${def.role} · ${def.pdu}\n${def.scan}`, 6);
+          dirty = true;
+        }
+        break;
+      }
+      case "kill": {
+        const m = e.monster;
+        battleView.burstAt(m.x, m.y, m.z);
+        const { level, leveledUp } = applyKill(progress, m.type, e.xp);
+        fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
+        changed.push("xp");
+        if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * 3} (분배는 RF 랩에서, 이후 스테이지)`, 4);
+        dirty = true;
+        break;
+      }
+      case "pickup":
+        applyPickup(progress, e.item, e.count);
+        fx.floatText(motor.x, motor.y + 0.8, motor.z, `🪙 CR2032 +${e.count}`, "loot");
+        changed.push("cr2032");
+        dirty = true;
+        break;
+      case "playerHit":
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, `-${e.amount}`, "hurt");
+        break;
+      case "dodge":
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, "회피!", "dodge");
+        break;
+      case "ko":
+        // 임시 재연결: Stage 8에서 체크포인트 롤백·CR2032 페널티(Connection Timeout)로 확장
+        fx.showToast("📶 Connection Timeout — 시작 지점으로 재연결합니다 (supervision timeout)", 4);
+        resetMotor(motor, SPAWN_POS);
+        resetOrbit(SPAWN_POS.y);
+        clearMoveTarget();
+        revivePlayer(battle);
+        break;
+    }
+  }
+  if (dirty) {
+    persist();
+    hud.renderStats(effectiveStats(progress), wallet(), changed);
+  }
+}
 
 // ---------- 알바: 비콘 신호 측정소 ----------
 const jobRng = createRng(TEST_MODE ? 7 : Date.now());
@@ -181,11 +266,13 @@ jobPanel.initJobPanel({
   onClose: () => {
     job = null; // 측정 도중 닫으면 보수 없이 중단
     setInputEnabled(true);
+    inputLocked = false;
   }
 });
 
 function openJob() {
   setInputEnabled(false);
+  inputLocked = true;
   clearMoveTarget();
   hud.hideModal();
   jobPanel.openJob();
@@ -206,6 +293,7 @@ hud.setModalHandlers({
 initInput({
   surface: app,
   onJump: performJump,
+  onFire: () => performFire(),
   onMoveKey: clearMoveTarget,
   onTap: handleTap,
   onOrbit: rotateOrbit,
@@ -254,8 +342,24 @@ function simulate(dt) {
     hud.setBadge(regionLabel());
   }
 
+  handleBattleEvents(stepBattle(battle, dt, { player: motor, stats: effectiveStats(progress), rng: battleRng }));
+
   knightView.syncKnight(motor, moved > 0.0005, dt);
   updateCamera(motor, dt);
+  fx.updateToast(dt);
+}
+
+// 월드 좌표 → 화면 좌표 (떠오르는 숫자용)
+const projVec = new THREE.Vector3();
+function projectToScreen(x, y, z) {
+  projVec.set(x, y, z).project(camera);
+  return { x: (projVec.x + 1) / 2 * window.innerWidth, y: (1 - projVec.y) / 2 * window.innerHeight, behind: projVec.z > 1 };
+}
+
+function renderFrame(t, dt) {
+  battleView.syncBattle(battle, camera, t, dt);
+  fx.updateFx(projectToScreen, dt);
+  fx.setPlayerHp(battle.player.hp, battle.player.maxHp);
 }
 
 // ---------- 메인 루프 ----------
@@ -270,6 +374,7 @@ function animate() {
 
   simulate(dt);
   const t = clock.elapsedTime;
+  renderFrame(t, dt);
   world.animateWorld(t);
   knightView.animateEffects(t, dt);
   renderer.render(scene, camera);
@@ -295,6 +400,13 @@ window.__PK = {
   stats: () => effectiveStats(progress),
   saveStatus: () => ({ load: loaded.status, lastSaveOk }),
   library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey },
+  battle: {
+    fire: () => performFire(),
+    state: () => ({
+      hp: battle.player.hp, maxHp: battle.player.maxHp, drops: battle.drops.length,
+      monsters: battle.monsters.map((m) => ({ id: m.id, hp: m.hp, state: m.state, x: m.x, z: m.z }))
+    })
+  },
   job: {
     open: openJob,
     isOpen: jobPanel.isJobOpen,
@@ -308,6 +420,7 @@ window.__PK = {
   /** 시뮬레이션을 seconds 만큼 고정 스텝으로 진행 (테스트 모드용) */
   tick: (seconds) => {
     for (let n = Math.round(seconds / FIXED_DT); n > 0; n--) simulate(FIXED_DT);
+    renderFrame(0, seconds);
     scene.updateMatrixWorld(); // 렌더를 생략하므로 레이캐스트용 행렬을 직접 갱신
   },
   projectToScreen: (x, y, z) => {

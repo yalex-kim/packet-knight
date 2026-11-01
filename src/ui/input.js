@@ -23,6 +23,7 @@ export function setInputEnabled(on) {
  * @param {{
  *   surface: HTMLElement,
  *   onJump: () => void,
+ *   onFire: () => void,
  *   onMoveKey: () => void,
  *   onTap: (clientX: number, clientY: number) => void,
  *   onOrbit: (dYaw: number, dPitch: number) => void,
@@ -37,6 +38,11 @@ export function initInput(h) {
     if (e.code === "Space") {
       e.preventDefault();
       h.onJump();
+      return;
+    }
+    if (e.code === "KeyF" || e.code === "KeyJ") {
+      e.preventDefault();
+      if (!e.repeat) h.onFire();
       return;
     }
     if (!ALL_MOVE_CODES.has(e.code)) return;
@@ -54,6 +60,13 @@ export function initInput(h) {
     e.preventDefault();
     e.stopPropagation();
     if (enabled) h.onJump();
+  });
+
+  // ---------- 발사 버튼 ----------
+  document.getElementById("btn-fire").addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (enabled) h.onFire();
   });
 
   initJoystick();

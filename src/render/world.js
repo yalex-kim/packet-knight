@@ -326,6 +326,19 @@ function createStreetLamp(x, z) {
 TREE_POSITIONS.forEach(([tx, tz, s]) => createVoxelTree(tx, tz, s));
 LAMP_POSITIONS.forEach(([lx, lz]) => createStreetLamp(lx, lz));
 
+// ----- ⚔️ 패킷 훈련장 표지판 -----
+const trainingSign = new THREE.Group();
+{
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.5, 0.16), woodMat);
+  post.position.y = 0.75;
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.62, 0.1), woodMat);
+  board.position.y = 1.45;
+  const mark = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.12), cyanEmblem);
+  mark.position.set(0, 1.45, 0.02);
+  trainingSign.add(post, board, mark);
+}
+placeLandmark(trainingSign, "trainingSign");
+
 animated.beacon = tower.userData.beacon;
 animated.rune = fountain.userData.rune;
 animated.portal = dungeonGate.userData.portal;

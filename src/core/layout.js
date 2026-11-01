@@ -91,6 +91,20 @@ export const LANDMARKS = [
   }
 ];
 
+// 훈련장 표지판 (Stage 6) — 위치는 balance.js TRAINING_GROUND 북쪽 가장자리
+LANDMARKS.push({
+  id: "trainingSign",
+  pos: { x: -9.0, y: S, z: 4.6 },
+  info: {
+    title: "⚔️ 패킷 훈련장",
+    sub: "[ADV 패킷 사격 연습 · Lv.1]",
+    desc: "광고만 외치는 훈련용 비콘 봇들이 돌아다니는 연습장입니다. F 키·발사 버튼·몬스터 클릭으로 ADV 패킷을 쏘세요. 봇의 LED가 빨갛게 변하면 공격 예고 — 뒤로 물러나면 피할 수 있습니다. 쓰러뜨리면 경험치와 가끔 CR2032를 떨어뜨립니다.",
+    lore: "LE에서 처음 만나는 두 기기는 대칭이 아닙니다. 한쪽은 외치고(광고), 한쪽은 듣습니다(스캔). 광고만 하고 연결을 받지 않는 기기를 GAP 브로드캐스터라 부릅니다.",
+    link: CHAPTER("advertising.html"),
+    walkPos: { x: -9.0, y: S, z: 3.6 }
+  }
+});
+
 export const landmark = (id) => LANDMARKS.find((l) => l.id === id);
 
 // 스폰은 분수대 충돌 반경(1.85 + 0.42) 바깥이어야 한다 (smoke: "스폰 지점이 충돌 영역 밖이다")
@@ -126,5 +140,6 @@ export const OBSTACLE_CIRCLES = [
   { id: "fountainRim",    x: 0, z: 0, r: 1.85, top: S + FOUNTAIN_RIM_HEIGHT },
   { id: "fountainPillar", x: 0, z: 0, r: 0.45, top: S + 1.7 },
   ...TREE_POSITIONS.map(([x, z, s]) => ({ id: "tree", x, z, r: 0.45, top: groundHeightAt(x, z) + 1.8 * s })),
-  ...LAMP_POSITIONS.map(([x, z]) => ({ id: "lamp", x, z, r: 0.12, top: groundHeightAt(x, z) + 2.0 }))
+  ...LAMP_POSITIONS.map(([x, z]) => ({ id: "lamp", x, z, r: 0.12, top: groundHeightAt(x, z) + 2.0 })),
+  { id: "trainingSign", x: -9.0, z: 4.6, r: 0.25, top: S + 1.8 }
 ];

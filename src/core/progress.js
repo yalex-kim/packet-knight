@@ -1,10 +1,11 @@
 // 진행도 — 퀴즈 보상 스탯, 스킬 슬롯, 학습 지표. 저장소는 주입한다(브라우저 localStorage / Node Map).
 // 순수 로직 (THREE·DOM 의존 없음)
 
-import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES } from "./balance.js";
+import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL } from "./balance.js";
+import { levelFromXp } from "./combat.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 2; // v2: CR2032 잔액·알바 기록 추가 (Stage 5)
+export const SAVE_VERSION = 3; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6)
 
 /**
  * @typedef {{
@@ -14,6 +15,8 @@ export const SAVE_VERSION = 2; // v2: CR2032 잔액·알바 기록 추가 (Stage
  *   cleared: Record<string, string>,
  *   cr2032: number,
  *   job: { runs: number, bestScore: number|null, totalEarned: number },
+ *   xp: number, statPoints: number,
+ *   bestiary: Record<string, { kills: number, firstScan: string }>,
  *   metrics: { quizAttempts: Record<string, number>, quizPerfect: Record<string, number>, chapterOpens: Record<string, number> }
  * }} Progress
  * @typedef {{ getItem(k: string): string|null, setItem(k: string, v: string): void }} StorageLike
@@ -28,6 +31,9 @@ export function createProgress() {
     cleared: {},
     cr2032: 0,
     job: { runs: 0, bestScore: null, totalEarned: 0 },
+    xp: 0,
+    statPoints: 0,
+    bestiary: {},
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
   };
 }
@@ -35,6 +41,7 @@ export function createProgress() {
 /** 구버전 세이브를 현재 버전으로 올린다 (진행도를 잃지 않는 것이 원칙) */
 function migrate(raw) {
   if (raw && raw.v === 1) raw = { ...raw, v: 2, cr2032: 0, job: { runs: 0, bestScore: null, totalEarned: 0 } };
+  if (raw && raw.v === 2) raw = { ...raw, v: 3, xp: 0, statPoints: 0, bestiary: {} };
   return raw;
 }
 
@@ -50,6 +57,8 @@ function validate(raw) {
   if (![m.quizAttempts, m.quizPerfect, m.chapterOpens].every(isCountMap)) return null;
   const j = raw.job;
   if (!Number.isInteger(raw.cr2032) || raw.cr2032 < 0 || !j || !Number.isInteger(j.runs) || !Number.isInteger(j.totalEarned)) return null;
+  if (!Number.isInteger(raw.xp) || raw.xp < 0 || !Number.isInteger(raw.statPoints) || raw.statPoints < 0) return null;
+  if (!raw.bestiary || typeof raw.bestiary !== "object") return null;
   return {
     ...base,
     bonus: { ...base.bonus, ...raw.bonus },
@@ -57,6 +66,9 @@ function validate(raw) {
     cleared: { ...raw.cleared },
     cr2032: raw.cr2032,
     job: { runs: j.runs, bestScore: Number.isFinite(j.bestScore) ? j.bestScore : null, totalEarned: j.totalEarned },
+    xp: raw.xp,
+    statPoints: raw.statPoints,
+    bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };
 }
@@ -141,4 +153,31 @@ export function applyJobResult(progress, result) {
   progress.cr2032 += result.reward;
   progress.job.totalEarned += result.reward;
   return { earned: result.reward, balance: progress.cr2032, newBest };
+}
+
+/** 몬스터 첫 스캔(첫 명중) — 도감 등록 */
+export function recordScan(progress, monsterType, now = new Date()) {
+  if (progress.bestiary[monsterType]) return false;
+  progress.bestiary[monsterType] = { kills: 0, firstScan: now.toISOString() };
+  return true;
+}
+
+/**
+ * 처치 반영 — 도감 처치 수, XP, 레벨업 시 스탯 포인트(PRD §8.4: 레벨당 3)
+ * @returns {{ level: number, leveledUp: number }}
+ */
+export function applyKill(progress, monsterType, xp) {
+  recordScan(progress, monsterType);
+  progress.bestiary[monsterType].kills += 1;
+  const before = levelFromXp(progress.xp).level;
+  progress.xp += xp;
+  const { level } = levelFromXp(progress.xp);
+  const leveledUp = level - before;
+  progress.statPoints += leveledUp * STAT_POINTS_PER_LEVEL;
+  return { level, leveledUp };
+}
+
+/** 아이템 줍기 */
+export function applyPickup(progress, item, count) {
+  if (item === "cr2032") progress.cr2032 += count;
 }

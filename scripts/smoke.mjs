@@ -98,6 +98,38 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("Stage 4 세이브(v1)가 진행도 손실 없이 v2로 마이그레이션된다", loadedV1.status === "loaded" && loadedV1.progress.bonus.hp === 5 && loadedV1.progress.skillSlots === 2 && loadedV1.progress.cr2032 === 0);
 }
 
+// ---------- Stage 6: 전투 공식 & 훈련장 밸런스 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const C = await imp("combat.js");
+  const fixed = (v) => () => v;
+  const normal = C.computeDamage(10, 1.0, 0, fixed(0.5));
+  const crit = C.computeDamage(10, 1.0, 0, fixed(0.0));
+  const floor = C.computeDamage(1, 1.0, 5, fixed(0.5));
+  check("데미지 공식이 PRD §8.4와 일치한다 (TX×계수−SEC, 최소 1, 치명 ×1.5)",
+    normal.amount === 10 && !normal.crit && crit.amount === 15 && crit.crit && floor.amount === 1 && C.levelFromXp(50).level === 2 && C.levelFromXp(49).level === 1,
+    `기본 ${normal.amount} · 치명 ${crit.amount} · 최소 ${floor.amount}`);
+
+  const { execFileSync } = await import("node:child_process");
+  const run = (game) => JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "scripts/simulate.mjs"), `--game=${game}`, "--bots=150", "--json"], { encoding: "utf8" }));
+  const combat = run("combat");
+  const by = Object.fromEntries(combat.strategies.map((x) => [x.name.split(" ")[0], x]));
+  check("봇 시뮬: 제자리 전투에서 피격 후 회복이 일어나고 KO는 없다 (튜토리얼 안전)",
+    by["제자리"].hurtPct >= 90 && by["제자리"].regenPct >= 90 && combat.strategies.every((x) => x.koPct === 0),
+    `피격 ${by["제자리"].hurtPct}% · 회복 ${by["제자리"].regenPct}% · 최저 HP ${by["제자리"].lowestHp}`);
+  check("봇 시뮬: 예고 동작을 보고 피하면 받는 피해가 준다 (실력 보상)", by["회피"].damagePerKill < by["제자리"].damagePerKill * 0.5,
+    `피해/처치 회피 ${by["회피"].damagePerKill} vs 제자리 ${by["제자리"].damagePerKill}`);
+  const job = run("rssi").strategies.find((x) => x.name.startsWith("평균"));
+  const farm = Math.max(...combat.strategies.map((x) => x.cr2032PerMin));
+  check("봇 시뮬: 훈련장 사냥 수입이 알바보다 적다 (알바가 주 수입원)", farm < job.meanCR2032, `사냥 ${farm}/분 < 알바 ${job.meanCR2032}/판(60초)`);
+
+  const P = await imp("progress.js");
+  const v2 = { v: 2, bonus: { hp: 5, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, skillSlots: 2, cleared: {}, cr2032: 8, job: { runs: 1, bestScore: 900, totalEarned: 8 }, metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} } };
+  const mem = new Map([[P.SAVE_KEY, JSON.stringify(v2)]]);
+  const l = P.loadProgress({ getItem: (k) => mem.get(k) ?? null });
+  check("Stage 5 세이브(v2)가 손실 없이 v3로 마이그레이션된다", l.status === "loaded" && l.progress.cr2032 === 8 && l.progress.bonus.hp === 5 && l.progress.xp === 0);
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -438,7 +470,7 @@ await reset();
     result.rounds >= 10 && result.reward >= 2 && prog.cr2032 === result.reward && hudCoins.includes(`${result.reward}`),
     `비콘 ${result.rounds}개 · ${result.score}점 · 등급 ${result.grade} · +${result.reward}`);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
-  check("CR2032 잔액이 localStorage에 저장된다", saved.v === 2 && saved.cr2032 === result.reward && saved.job.runs === 1);
+  check("CR2032 잔액이 localStorage에 저장된다", saved.v >= 2 && saved.cr2032 === result.reward && saved.job.runs === 1);
 
   // 두 번째 판은 도중에 나가면 보수 없음
   await page.locator("#job-panel .lib-btn.primary").click(); // 한 번 더
@@ -454,6 +486,102 @@ await reset();
   const reloaded = await page.evaluate(() => window.__PK.progress());
   const hud2 = await page.locator('#stats [data-stat="cr2032"]').textContent();
   check("새로고침 후에도 CR2032 잔액이 유지된다", reloaded.cr2032 === result.reward && hud2.includes(`${result.reward}`), hud2);
+}
+
+// ---------- Stage 6: 첫 전투 (훈련장) ----------
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+const bState = () => page.evaluate(() => window.__PK.battle.state());
+await reset();
+{
+  await teleport(-9.0, 5.6); // 훈련장 북쪽 입구, 봇들은 남쪽(+z)에 있다 → 기본 방향(+z)으로 조준
+  await tick(100);
+  const before = await bState();
+  await page.keyboard.press("KeyF");
+  await tick(1200);
+  const after = await bState();
+  const damaged = after.monsters.some((m, i) => m.hp < before.monsters[i].hp);
+  check("F 키로 ADV 패킷을 쏘면 조준 보조로 봇에 명중한다", damaged, after.monsters.map((m) => `${m.hp}/40`).join(", "));
+  const toast = await page.locator("#toast").textContent();
+  const prog0 = await page.evaluate(() => window.__PK.progress());
+  check("첫 명중 시 도감에 등록되고 스캔 결과(수동 스캔)를 보여 준다",
+    Boolean(prog0.bestiary.trainingBot) && toast.includes("ADV_NONCONN_IND") && toast.includes("수동 스캔"), toast.slice(0, 40) + "…");
+
+  // 봇처럼 사냥: 가까운 봇 쪽을 보고 쏘고, 떨어진 CR2032는 주우러 간다
+  const hunt = await page.evaluate(() => {
+    const pk = window.__PK;
+    const start = pk.progress();
+    let minHp = Infinity, t = 0;
+    while (t < 90) {
+      pk.battle.fire();
+      pk.tick(0.1);
+      t += 0.1;
+      const s = pk.battle.state();
+      minHp = Math.min(minHp, s.hp);
+      const p = pk.progress();
+      if (p.cr2032 > start.cr2032 && p.bestiary.trainingBot?.kills >= 1) break;
+      // 드롭이 남아 있으면 그 근처로 이동(자석 반경 안)
+      if (s.drops > 0 && t % 2 < 0.1) pk.teleport(-9.0, 9.0);
+    }
+    const end = pk.progress();
+    return { kills: end.bestiary.trainingBot?.kills ?? 0, xp: end.xp, cr: end.cr2032, minHp, t: +t.toFixed(1) };
+  });
+  check("봇을 처치하면 경험치를 얻는다", hunt.kills >= 1 && hunt.xp === hunt.kills * 10, `${hunt.kills}마리 · XP ${hunt.xp}`);
+  check("처치한 봇이 떨어뜨린 CR2032를 주워 잔액이 오른다", hunt.cr >= 1, `CR2032 ${hunt.cr} (${hunt.t}초)`);
+  const hudLv = await page.locator('#stats [data-stat="level"]').textContent();
+  check("HUD에 레벨·경험치가 표시된다", hudLv.includes("Lv") && hudLv.includes(`XP`), hudLv);
+
+  // 가만히 맞아 HP가 줄었다가, 물러나 쉬면 회복된다
+  const hpTest = await page.evaluate(() => {
+    const pk = window.__PK;
+    pk.teleport(-9.0, 3.0); // 리스폰 대기 (훈련장 밖)
+    for (let i = 0; i < 200 && !pk.battle.state().monsters.some((x) => x.state === "idle"); i++) pk.tick(0.1);
+    const m = pk.battle.state().monsters.find((x) => x.state === "idle");
+    pk.teleport(m.x, m.z + 1.0);
+    let lowest = Infinity;
+    for (let i = 0; i < 40; i++) { pk.tick(0.1); lowest = Math.min(lowest, pk.battle.state().hp); }
+    pk.teleport(0, 3); // 마을 광장으로 후퇴
+    pk.tick(8);
+    const s = pk.battle.state();
+    return { lowest, after: s.hp, max: s.maxHp };
+  });
+  check("봇에게 맞으면 HP가 줄었다가, 전투에서 벗어나면 회복된다",
+    hpTest.lowest < hpTest.max && hpTest.after === hpTest.max, `최저 ${Math.round(hpTest.lowest)} → ${Math.round(hpTest.after)}/${hpTest.max}`);
+  const hpText = await page.locator("#hp-text").textContent();
+  check("HP 바가 화면에 표시된다", hpText.includes(`${hpTest.max} / ${hpTest.max}`), hpText);
+
+  // 몬스터를 클릭(탭)하면 그 몬스터를 조준해 쏜다
+  await teleport(-9.0, 5.6);
+  await tick(600);
+  const target = (await bState()).monsters.find((m) => m.state !== "dead");
+  const scr = await page.evaluate(([x, z]) => window.__PK.projectToScreen(x, 2.4, z), [target.x, target.z]);
+  await tick(900); // 쿨다운 해제 대기
+  const hpBefore = (await bState()).monsters.find((m) => m.id === target.id).hp;
+  const scr2 = await page.evaluate((id) => { const m = window.__PK.battle.state().monsters.find((x) => x.id === id); return window.__PK.projectToScreen(m.x, 2.4, m.z); }, target.id);
+  await page.mouse.click(scr2.x, scr2.y);
+  await tick(1200);
+  const hpAfter = (await bState()).monsters.find((m) => m.id === target.id);
+  check("몬스터를 클릭하면 그 몬스터를 조준해 발사한다", hpAfter.hp < hpBefore || hpAfter.state === "dead", `${hpBefore} → ${hpAfter.hp}`);
+
+  // 강의실이 열려 있으면 발사되지 않는다
+  await page.evaluate(() => window.__PK.library.open());
+  await tick(900);
+  const lockBefore = await bState();
+  await page.evaluate(() => window.__PK.battle.fire());
+  await page.keyboard.press("KeyF");
+  await tick(1200);
+  const lockAfter = await bState();
+  await page.keyboard.press("Escape");
+  check("오버레이가 열려 있는 동안에는 발사되지 않는다",
+    lockAfter.monsters.every((m, i) => m.hp >= lockBefore.monsters[i].hp || m.state === "dead" && lockBefore.monsters[i].state === "dead"));
+
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const reloaded = await page.evaluate(() => window.__PK.progress());
+  check("XP·도감·CR2032가 저장되고 새로고침 후 유지된다",
+    saved.v === 3 && reloaded.xp === hunt.xp && reloaded.bestiary.trainingBot?.kills === hunt.kills && reloaded.cr2032 >= 1);
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));
