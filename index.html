@@ -116,7 +116,7 @@
   <div class="control-desc" id="hud-controls">
     🎮 조작: <b>바닥 클릭 / 터치</b> 또는 <b>가상 조이스틱 / WASD</b><br />
     🔄 시점: <b>화면 드래그 / 우클릭</b> 회전 · <b>두 손가락 핀치 / 휠</b> 줌<br />
-    🏛️ <b>마을 건물·던전 입구</b>를 클릭해 역할을 확인하세요!
+    🏛️ <b>마을 건물·분수대·던전</b>을 클릭해 정보를 확인하세요!
   </div>
 </div>
 
@@ -161,8 +161,8 @@ import * as THREE from "three";
 // ============================================================
 // Packet Knight — Stage 2: GATT 빌리지 & 던전 입구
 // PRD.md §7 Stage 2 DoD:
-// "마을 구역이 반듯한 평지로 정리되고, 지하 던전 입구가 생기며,
-//  각 건물과 입구 클릭 시 이름과 블루투스 역할 툴팁이 뜬다"
+// "마을 구역이 넓고 반듯한 평지로 정리되고, 아기자기한 복셀 건물과
+//  지하 던전 입구, 클릭 시 블루투스 역할 툴팁이 뜬다"
 // ============================================================
 
 // ---------- 1. 씬 & 렌더러 ----------
@@ -174,59 +174,66 @@ app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8ec9e8);
-scene.fog = new THREE.Fog(0x8ec9e8, 70, 160);
+scene.fog = new THREE.Fog(0x8ec9e8, 90, 220);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 350);
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 400);
 
 // 조명 (따뜻한 햇살 + 환경광)
-const sun = new THREE.DirectionalLight(0xfff5dd, 1.6);
-sun.position.set(40, 60, 30);
+const sun = new THREE.DirectionalLight(0xfff5dd, 1.65);
+sun.position.set(50, 75, 40);
 scene.add(sun);
 scene.add(new THREE.AmbientLight(0xc6e0ff, 0.65));
-scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.5));
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.55));
 
-// ---------- 2. 지형: 평지 GATT 빌리지 + 지하 던전 계단 + 해안 ----------
-const ISLAND_RADIUS = 16;
-const VILLAGE_RADIUS = 10.5; // 마을 평지 반경
-const VILLAGE_HEIGHT = 2;    // 마을 평지 높이 y = 2
+// ---------- 2. 지형 규격 및 높이 계산 함수 ----------
+// 섬 전체 및 마을 평지 반경을 대폭 확장하여 쾌적한 공간감 조성
+const ISLAND_RADIUS = 26;
+const VILLAGE_RADIUS = 16.5; // 마을 평지 반경 (기존 10.5 -> 16.5)
+const SURFACE_Y = 2.0;       // 마을 평지 표면 높이
+const DUNGEON_PIT_Y = -0.5;  // 지하 던전 바닥 표면 높이
 const SEA_LEVEL = 0;
 
-// 던전 입구 위치 및 계단 범위
-const DUNGEON_X = -4;
-const DUNGEON_Z = -9.5;
+// 던전 입구 위치 및 계단 구역 (북서쪽 외곽)
+const DUNGEON_X = -9.0;
+const DUNGEON_Z = -13.0;
 
+/**
+ * 임의의 (x, z) 위치에서 실제 밟는 지표면(Top Face) 높이 Y를 반환
+ */
 export function groundHeightAt(x, z) {
-  // 1) 던전 계단 및 입구 구역 판정
+  // 1) 던전 계단 및 지하 pit 통로 (x: DUNGEON_X 근방, z: -8 ~ -14)
   const dx = x - DUNGEON_X;
   const dz = z - DUNGEON_Z;
-  if (Math.abs(dx) <= 1.8 && dz >= -3.5 && dz <= 1.5) {
-    // dz: 1.5 (마을 평지 y=2) -> -3.5 (던전 바닥 y=-0.5)
-    const t = THREE.MathUtils.clamp((1.5 - dz) / 5.0, 0, 1);
-    return VILLAGE_HEIGHT - t * 2.5;
+  if (Math.abs(dx) <= 2.2 && z >= -14.5 && z <= -8.0) {
+    // z = -8 (마을 평지 y = 2.0) -> z = -13.5 (던전 바닥 y = -0.5)
+    const t = THREE.MathUtils.clamp((-8.0 - z) / 5.5, 0, 1);
+    return SURFACE_Y - t * (SURFACE_Y - DUNGEON_PIT_Y);
   }
 
-  // 2) 마을 평지 고원
+  // 2) 마을 평지 고원 광장
   const r = Math.hypot(x, z);
   if (r <= VILLAGE_RADIUS) {
-    return VILLAGE_HEIGHT;
+    return SURFACE_Y;
   }
 
-  // 3) 외곽 경사로 & 해안선
-  const drop = Math.min(2.5, (r - VILLAGE_RADIUS) * 0.5);
-  const h = VILLAGE_HEIGHT - drop;
-  return h;
+  // 3) 외곽 완만한 경사로 & 해안 모래사장
+  const drop = Math.min(2.5, (r - VILLAGE_RADIUS) * 0.35);
+  return SURFACE_Y - drop;
 }
 
 // 재질 정의
 const grassMat  = new THREE.MeshLambertMaterial({ color: 0x5ea840 }); // 초록 잔디
-const pathMat   = new THREE.MeshLambertMaterial({ color: 0x8a929b }); // 석판 자갈길
+const pathMat   = new THREE.MeshLambertMaterial({ color: 0x8f98a2 }); // 석판 자갈길
+const plazaMat  = new THREE.MeshLambertMaterial({ color: 0xa8b1bc }); // 중앙 광장 석판
 const sandMat   = new THREE.MeshLambertMaterial({ color: 0xd9c78a }); // 해변 모래
 const dirtMat   = new THREE.MeshLambertMaterial({ color: 0x8a6a45 }); // 흙
 const stoneMat  = new THREE.MeshLambertMaterial({ color: 0x6e737b }); // 석조 돌
 const darkStone = new THREE.MeshLambertMaterial({ color: 0x2b2f36 }); // 던전 흑석
-const waterMat  = new THREE.MeshLambertMaterial({ color: 0x226cb5, transparent: true, opacity: 0.86 });
+const waterMat  = new THREE.MeshLambertMaterial({ color: 0x226cb5, transparent: true, opacity: 0.88 });
 
 // 복셀 레이어 빌더
+// p = [x, y_index, z] 일 때, 1x1x1 박스는 Y: [y_index, y_index + 1]을 차지함.
+// 즉, 최상단 블록의 윗면(Top Face)은 y_index + 1 이 됨.
 function buildVoxelLayer(list, material) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const mesh = new THREE.InstancedMesh(geo, material, list.length);
@@ -239,43 +246,60 @@ function buildVoxelLayer(list, material) {
   return mesh;
 }
 
-const layer = { grass: [], path: [], sand: [], dirt: [], stone: [], darkStone: [] };
+const layer = { grass: [], path: [], plaza: [], sand: [], dirt: [], stone: [], darkStone: [] };
 
 for (let x = -ISLAND_RADIUS; x <= ISLAND_RADIUS; x++) {
   for (let z = -ISLAND_RADIUS; z <= ISLAND_RADIUS; z++) {
     const r = Math.hypot(x, z);
     if (r > ISLAND_RADIUS) continue;
 
-    // 던전 입구 구역 복셀 처리
-    const dx = x - DUNGEON_X;
-    const dz = z - DUNGEON_Z;
-    const isDungeonPit = Math.abs(dx) <= 2 && dz >= -4 && dz <= 2;
+    const surfH = groundHeightAt(x, z);
+    // 지표면 높이 surfH에 윗면이 맞닿도록, 최상단 복셀의 y 인덱스는 Math.round(surfH) - 1
+    const topVoxelY = Math.round(surfH) - 1;
 
-    let h = Math.round(groundHeightAt(x, z));
+    // 던전 통로 판정
+    const dx = x - DUNGEON_X;
+    const isDungeonPit = Math.abs(dx) <= 2.2 && z >= -14.5 && z <= -8.0;
 
     if (isDungeonPit) {
-      // 던전 계단 통로
-      layer.darkStone.push([x, h, z]);
-      for (let y = h - 1; y >= -3; y--) layer.stone.push([x, y, z]);
+      layer.darkStone.push([x, topVoxelY, z]);
+      for (let y = topVoxelY - 1; y >= -4; y--) layer.stone.push([x, y, z]);
       continue;
     }
 
-    // 길(석판) 판정: 마을 중앙 십자로 및 주요 경로
-    const isMainCross = (Math.abs(x) <= 1 && z >= -7 && z <= 5) || (Math.abs(z) <= 1 && x >= -7 && x <= 7);
-    const isDungeonPath = (z <= -6 && Math.abs(x - DUNGEON_X) <= 1);
-    const isPath = r <= VILLAGE_RADIUS && (isMainCross || isDungeonPath);
+    // 도로 및 광장 판정 (쾌적한 보행로 네트워크)
+    // 1) 중앙 광장 원형 석판 (r <= 3.2)
+    const isCentralPlaza = r <= 3.2;
+    // 2) 북쪽 회관 대로 (x: -1..1, z: -9..0)
+    const isNorthAve = Math.abs(x) <= 1 && z >= -9 && z <= 0;
+    // 3) 남쪽 등대 방면 대로 (x: -1..1, z: 0..8)
+    const isSouthAve = Math.abs(x) <= 1 && z >= 0 && z <= 8;
+    // 4) 동서 대로 (도서관 <-> 광장 <-> 대장간)
+    const isEastWestAve = (z >= -2 && z <= 0) && (x >= -10 && x <= 10);
+    // 5) 북서 던전 진입로
+    const isDungeonRoad = (z <= -4 && z >= -8) && Math.abs(x - (DUNGEON_X * ((-4 - z) / 4.0))) <= 1.2;
+    // 6) 동남 등대 진입로
+    const isBeaconRoad = (z >= 4 && z <= 9) && Math.abs(x - (8.0 * ((z - 4) / 4.0))) <= 1.2;
+
+    const isRoad = isNorthAve || isSouthAve || isEastWestAve || isDungeonRoad || isBeaconRoad;
 
     let topType = "grass";
-    if (r > VILLAGE_RADIUS + 2.5) topType = "sand";
-    else if (isPath) topType = "path";
-    else topType = "grass";
+    if (r > VILLAGE_RADIUS + 2.5) {
+      topType = "sand";
+    } else if (isCentralPlaza) {
+      topType = "plaza";
+    } else if (isRoad) {
+      topType = "path";
+    } else {
+      topType = "grass";
+    }
 
-    layer[topType].push([x, h, z]);
+    layer[topType].push([x, topVoxelY, z]);
 
-    // 하부 채우기
+    // 지하 채우기 (흙 & 암반층)
     const depth = topType === "sand" ? 2 : 3;
     for (let d = 1; d <= depth; d++) {
-      const y = h - d;
+      const y = topVoxelY - d;
       if (y < -4) break;
       if (d === depth) layer.stone.push([x, y, z]);
       else layer[topType === "sand" ? "sand" : "dirt"].push([x, y, z]);
@@ -286,6 +310,7 @@ for (let x = -ISLAND_RADIUS; x <= ISLAND_RADIUS; x++) {
 const terrain = new THREE.Group();
 terrain.add(buildVoxelLayer(layer.grass,     grassMat));
 terrain.add(buildVoxelLayer(layer.path,      pathMat));
+terrain.add(buildVoxelLayer(layer.plaza,     plazaMat));
 terrain.add(buildVoxelLayer(layer.sand,      sandMat));
 terrain.add(buildVoxelLayer(layer.dirt,      dirtMat));
 terrain.add(buildVoxelLayer(layer.stone,     stoneMat));
@@ -293,12 +318,12 @@ terrain.add(buildVoxelLayer(layer.darkStone, darkStone));
 scene.add(terrain);
 
 // 바다 (넓은 평면)
-const sea = new THREE.Mesh(new THREE.PlaneGeometry(450, 450), waterMat);
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), waterMat);
 sea.rotation.x = -Math.PI / 2;
-sea.position.y = SEA_LEVEL - 0.25;
+sea.position.y = SEA_LEVEL - 0.2;
 scene.add(sea);
 
-// ---------- 3. 인터랙티브 오브젝트 관리 ----------
+// ---------- 3. 인터랙티브 건물 & 마을 오브젝트 관리 ----------
 const interactiveObjects = [];
 
 function registerInteractive(meshOrGroup, data) {
@@ -306,63 +331,60 @@ function registerInteractive(meshOrGroup, data) {
   interactiveObjects.push(meshOrGroup);
 }
 
-// 공용 건물 복셀 재질
-const woodMat   = new THREE.MeshLambertMaterial({ color: 0x7a4f2b }); // 목재 벽/기둥
+// 공용 복셀 건물 재질
+const woodMat   = new THREE.MeshLambertMaterial({ color: 0x7a4f2b }); // 오크 목재
 const plasterMat= new THREE.MeshLambertMaterial({ color: 0xecf0f2 }); // 회벽
 const redRoof   = new THREE.MeshLambertMaterial({ color: 0xb53c30 }); // 적색 지붕
 const blueRoof  = new THREE.MeshLambertMaterial({ color: 0x24558f }); // 청색 지붕
 const copperRoof= new THREE.MeshLambertMaterial({ color: 0xbf5d28 }); // 대장간 구리 지붕
-const glassMat  = new THREE.MeshBasicMaterial({ color: 0xffea88 });   // 창문 (따뜻한 불빛)
+const glassMat  = new THREE.MeshBasicMaterial({ color: 0xffea88 });   // 창문 따뜻한 불빛
 const cyanEmblem= new THREE.MeshBasicMaterial({ color: 0x39d0ff });   // 블루투스 심볼
 const metalMat  = new THREE.MeshLambertMaterial({ color: 0xb5c1cd });
 
 // ----- 3.1 🏛️ GATT 중앙 회관 (Central Service Hall) -----
+// 땅에 비해 건물이 너무 컸던 비율을 쾌적하고 아기자기한 복셀 비율로 축소 (~55% 축소)
 const hall = new THREE.Group();
 {
-  // 1층 본체 (회벽 + 나무 기둥)
-  const b1 = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 5), plasterMat);
-  b1.position.y = 1.5;
+  // 1층 본체 (회벽)
+  const b1 = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.2, 3.0), plasterMat);
+  b1.position.y = 1.1;
   hall.add(b1);
 
-  // 1층 모서리 기둥 4개
-  const pOff = [[-2.9, -2.4], [2.9, -2.4], [-2.9, 2.4], [2.9, 2.4]];
-  pOff.forEach(([px, pz]) => {
-    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.2, 0.5), woodMat);
-    pillar.position.set(px, 1.6, pz);
+  // 4개 모서리 목재 기둥
+  [[-1.8, -1.4], [1.8, -1.4], [-1.8, 1.4], [1.8, 1.4]].forEach(([px, pz]) => {
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.3, 0.35), woodMat);
+    pillar.position.set(px, 1.15, pz);
     hall.add(pillar);
   });
 
-  // 문 (오크 목재)
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.0, 0.1), woodMat);
-  door.position.set(0, 1.0, 2.55);
+  // 오크 문
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.5, 0.08), woodMat);
+  door.position.set(0, 0.75, 1.52);
   hall.add(door);
 
-  // 정면 창문 2개
-  [-1.8, 1.8].forEach(wx => {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.05), glassMat);
-    win.position.set(wx, 1.8, 2.53);
+  // 전면 창문 2개
+  [-1.1, 1.1].forEach(wx => {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.04), glassMat);
+    win.position.set(wx, 1.25, 1.52);
     hall.add(win);
   });
 
-  // 지붕 (박공 지붕 형태 3단)
-  const r1 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.6, 5.6), redRoof);
-  r1.position.y = 3.3;
+  // 2단 적색 박공 지붕
+  const r1 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.45, 3.4), redRoof);
+  r1.position.y = 2.35;
   hall.add(r1);
 
-  const r2 = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.6, 4.2), redRoof);
-  r2.position.y = 3.8;
+  const r2 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.45, 2.4), redRoof);
+  r2.position.y = 2.75;
   hall.add(r2);
 
-  const r3 = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.6, 2.8), redRoof);
-  r3.position.y = 4.3;
-  hall.add(r3);
-
   // 상단 GATT 룬 심볼
-  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), cyanEmblem);
-  rune.position.set(0, 4.9, 0);
+  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), cyanEmblem);
+  rune.position.set(0, 3.25, 0);
   hall.add(rune);
 }
-hall.position.set(0, VILLAGE_HEIGHT, -3.5);
+// 지표면 SURFACE_Y = 2.0 위에 완벽하게 안착
+hall.position.set(0, SURFACE_Y, -8.5);
 scene.add(hall);
 
 registerInteractive(hall, {
@@ -371,43 +393,46 @@ registerInteractive(hall, {
   desc: "스펙트럼 대륙의 모든 서비스(Service)와 특성(Characteristic)이 등록되는 행정 중앙 회관입니다. 시민 NPC들에게 데이터를 읽기(Read), 쓰기(Write), 알림(Notify) 받는 퀘스트를 수주합니다.",
   lore: "GATT는 BLE 연결 후 데이터를 계층(Profile > Service > Characteristic > Descriptor)으로 주고받는 표준 규격입니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/gatt.html",
-  walkPos: new THREE.Vector3(0, VILLAGE_HEIGHT, -0.5)
+  walkPos: new THREE.Vector3(0, SURFACE_Y, -6.2)
 });
 
 // ----- 3.2 📚 RF 이론 도서관 (Theory Library) -----
 const library = new THREE.Group();
 {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(5, 2.8, 4), plasterMat);
-  b.position.y = 1.4;
+  const b = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.0, 2.6), plasterMat);
+  b.position.y = 1.0;
   library.add(b);
 
-  // 문
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.8, 0.1), woodMat);
-  door.position.set(1.4, 0.9, 2.05);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.08), woodMat);
+  door.position.set(0.8, 0.7, 1.32);
   library.add(door);
 
   // 책 모양 창문
-  [-1.2, 0.2].forEach(wx => {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.1, 0.05), glassMat);
-    win.position.set(wx, 1.5, 2.03);
+  [-0.65, 0.1].forEach(wx => {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.04), glassMat);
+    win.position.set(wx, 1.1, 1.32);
     library.add(win);
   });
 
-  // 청색 지붕
-  const roof1 = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.5, 4.6), blueRoof);
-  roof1.position.y = 3.0;
+  // 청색 지붕 2단
+  const roof1 = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 3.1), blueRoof);
+  roof1.position.y = 2.15;
   library.add(roof1);
 
-  const roof2 = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.5, 3.2), blueRoof);
-  roof2.position.y = 3.45;
+  const roof2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, 2.0), blueRoof);
+  roof2.position.y = 2.5;
   library.add(roof2);
 
-  // 지붕 위 작은 안테나 관측탑
-  const dome = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 1.4), darkStone);
-  dome.position.set(-1.2, 4.0, 0);
+  // 옥상 미니 천문 돔
+  const dome = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), darkStone);
+  dome.position.set(-0.6, 2.85, 0);
   library.add(dome);
+
+  const domeRod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), metalMat);
+  domeRod.position.set(-0.6, 3.3, 0);
+  library.add(domeRod);
 }
-library.position.set(-5.8, VILLAGE_HEIGHT, 0);
+library.position.set(-9.0, SURFACE_Y, -1.0);
 scene.add(library);
 
 registerInteractive(library, {
@@ -416,37 +441,36 @@ registerInteractive(library, {
   desc: "2.4GHz 무선통신의 모든 원리가 기록된 지식의 성소입니다. 챕터 퀴즈를 풀면 스탯(TX 파워, 수신 감도)이 오르고 새로운 스킬 슬롯이 해금됩니다.",
   lore: "무선 통신 교과서 connectivityBook 15개 챕터의 원문 지식이 인터랙티브하게 보관되어 있습니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/intro.html",
-  walkPos: new THREE.Vector3(-4.0, VILLAGE_HEIGHT, 0)
+  walkPos: new THREE.Vector3(-7.2, SURFACE_Y, -1.0)
 });
 
 // ----- 3.3 🔨 패킷 대장간 (Packet Forge & Battery Shop) -----
 const forge = new THREE.Group();
 {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2.6, 4), darkStone);
-  b.position.y = 1.3;
+  const b = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.8, 2.6), darkStone);
+  b.position.y = 0.9;
   forge.add(b);
 
-  // 주황 구리 지붕
-  const r = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.6, 4.5), copperRoof);
-  r.position.y = 2.8;
+  const r = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 3.0), copperRoof);
+  r.position.y = 1.95;
   forge.add(r);
 
   // 돌 굴뚝
-  const chimney = new THREE.Mesh(new THREE.BoxGeometry(1.0, 3.6, 1.0), stoneMat);
-  chimney.position.set(1.5, 2.2, -1.2);
+  const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.65, 2.2, 0.65), stoneMat);
+  chimney.position.set(0.9, 1.7, -0.7);
   forge.add(chimney);
 
-  // 모루 (야외)
-  const anvil = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.4), metalMat);
-  anvil.position.set(-1.6, 0.3, 2.6);
+  // 모루
+  const anvil = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.35, 0.28), metalMat);
+  anvil.position.set(-1.0, 0.18, 1.7);
   forge.add(anvil);
 
   // 화로 불빛
-  const fire = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshBasicMaterial({ color: 0xff6600 }));
-  fire.position.set(0.5, 0.5, 2.05);
+  const fire = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xff6600 }));
+  fire.position.set(0.35, 0.2, 1.4);
   forge.add(fire);
 }
-forge.position.set(5.8, VILLAGE_HEIGHT, 0);
+forge.position.set(9.0, SURFACE_Y, -1.0);
 scene.add(forge);
 
 registerInteractive(forge, {
@@ -455,33 +479,34 @@ registerInteractive(forge, {
   desc: "안테나 사거리를 늘리고, 크리스털 정밀도를 맞추며, 던전 탐험에 필수적인 코인 배터리 CR2032를 장착하고 교체하는 하드웨어 정비소입니다.",
   lore: "저전력 BLE 기기의 수명과 성능을 좌우하는 CR2032 전원 설계 및 RF 매칭 회로를 은유합니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/power.html",
-  walkPos: new THREE.Vector3(4.0, VILLAGE_HEIGHT, 0)
+  walkPos: new THREE.Vector3(7.2, SURFACE_Y, -1.0)
 });
 
 // ----- 3.4 📡 전파의 등대 (Beacon Tower) -----
+// 기존의 거대한 22m 모놀리스를 마을 풍경에 자연스럽게 어울리는 아담하고 세련된 비율(~8.5m)로 조정
 const tower = new THREE.Group();
 {
-  const base = new THREE.Mesh(new THREE.BoxGeometry(3, 1.5, 3), stoneMat);
-  base.position.y = 0.75;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 1.6), stoneMat);
+  base.position.y = 0.4;
   tower.add(base);
 
-  const segs = [[1.2, 5, 0.0], [0.9, 4.5, 5.0], [0.6, 4, 9.5]];
+  const segs = [[0.85, 2.2, 0.0], [0.6, 1.8, 2.2], [0.4, 1.4, 4.0]];
   for (const [w, h, y] of segs) {
     const seg = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), metalMat);
-    seg.position.y = y + 1.5 + h / 2;
+    seg.position.y = y + 0.8 + h / 2;
     tower.add(seg);
   }
 
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8), metalMat);
-  rod.position.y = 19.5;
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 8), metalMat);
+  rod.position.y = 6.8;
   tower.add(rod);
 
-  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.65, 16, 16), new THREE.MeshBasicMaterial({ color: 0x39d0ff }));
-  beacon.position.y = 21.5;
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), new THREE.MeshBasicMaterial({ color: 0x39d0ff }));
+  beacon.position.y = 7.7;
   tower.add(beacon);
   tower.userData.beacon = beacon;
 }
-tower.position.set(0, VILLAGE_HEIGHT, 4.5);
+tower.position.set(8.0, SURFACE_Y, 8.0);
 scene.add(tower);
 
 registerInteractive(tower, {
@@ -490,52 +515,83 @@ registerInteractive(tower, {
   desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 신호를 수신해 RSSI 거리를 측정하는 알바 미니게임을 진행할 수 있습니다.",
   lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/advertising.html",
-  walkPos: new THREE.Vector3(0, VILLAGE_HEIGHT, 2.5)
+  walkPos: new THREE.Vector3(6.6, SURFACE_Y, 6.6)
 });
 
-// ----- 3.5 ⚔️ 37채널 호핑 던전 지하 입구 (Dungeon Portal Gate) -----
+// ----- 3.5 ⛲ 중앙 광장 분수대 (Central Bluetooth Fountain) -----
+const fountain = new THREE.Group();
+{
+  // 석조 수조 (원형/다각형)
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.5, 12), stoneMat);
+  basin.position.y = 0.25;
+  fountain.add(basin);
+
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 0.38, 12), waterMat);
+  water.position.y = 0.32;
+  fountain.add(water);
+
+  // 중앙 석조 기둥
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.9, 8), stoneMat);
+  pillar.position.y = 0.65;
+  fountain.add(pillar);
+
+  // 상단 부유하는 블루투스 룬 심볼
+  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), cyanEmblem);
+  rune.position.y = 1.3;
+  fountain.add(rune);
+  fountain.userData.rune = rune;
+}
+fountain.position.set(0, SURFACE_Y, 0);
+scene.add(fountain);
+
+registerInteractive(fountain, {
+  title: "⛲ GATT 중앙 분수대",
+  sub: "[마을 중앙 만남의 광장]",
+  desc: "스펙트럼 대륙의 모든 패킷 기사들이 모여 정보를 나누고 휴식을 취하는 중앙 광장의 분수대입니다. 중앙 룬에서 은은한 2.4GHz 전파의 파동이 샘솟습니다.",
+  lore: "블루투스 네트워크의 중심 허브(Central Device)처럼 모든 경로가 모이고 갈라지는 중심점입니다.",
+  link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/network.html",
+  walkPos: new THREE.Vector3(0, SURFACE_Y, 2.2)
+});
+
+// ----- 3.6 ⚔️ 37채널 호핑 던전 지하 입구 (Dungeon Portal Gate) -----
 const dungeonGate = new THREE.Group();
 {
-  // 석조 아치 기둥 2개
-  const p1 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.0, 1.0), darkStone);
-  p1.position.set(-1.8, 1.8, 0);
+  const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.8, 0.7), darkStone);
+  p1.position.set(-1.4, 1.4, 0);
   dungeonGate.add(p1);
 
-  const p2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.0, 1.0), darkStone);
-  p2.position.set(1.8, 1.8, 0);
+  const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.8, 0.7), darkStone);
+  p2.position.set(1.4, 1.4, 0);
   dungeonGate.add(p2);
 
-  // 상단 석조 린텔(아치)
-  const arch = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.0, 1.2), darkStone);
-  arch.position.set(0, 4.0, 0);
+  const arch = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.7, 0.8), darkStone);
+  arch.position.set(0, 2.9, 0);
   dungeonGate.add(arch);
 
-  // 룬 조각
-  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.2), new THREE.MeshBasicMaterial({ color: 0xb539ff }));
-  rune.position.set(0, 4.1, 0.65);
+  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.15), new THREE.MeshBasicMaterial({ color: 0xb539ff }));
+  rune.position.set(0, 3.0, 0.45);
   dungeonGate.add(rune);
 
-  // 보라색 포털 소용돌이 면
   const portalPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.6, 3.4),
+    new THREE.PlaneGeometry(2.1, 2.5),
     new THREE.MeshBasicMaterial({ color: 0x7c1bd4, side: THREE.DoubleSide, transparent: true, opacity: 0.88 })
   );
-  portalPlane.position.set(0, 1.7, 0);
+  portalPlane.position.set(0, 1.3, 0);
   dungeonGate.add(portalPlane);
   dungeonGate.userData.portal = portalPlane;
 
-  // 좌우 횃불 화로 2개
-  [-2.6, 2.6].forEach(fx => {
-    const brazier = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.5), stoneMat);
-    brazier.position.set(fx, 0.6, 0.5);
+  // 횃불 화로 2개
+  [-2.1, 2.1].forEach(fx => {
+    const brazier = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.4), stoneMat);
+    brazier.position.set(fx, 0.45, 0.35);
     dungeonGate.add(brazier);
 
-    const flame = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.3), new THREE.MeshBasicMaterial({ color: 0xc855ff }));
-    flame.position.set(fx, 1.4, 0.5);
+    const flame = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.24), new THREE.MeshBasicMaterial({ color: 0xc855ff }));
+    flame.position.set(fx, 1.0, 0.35);
     dungeonGate.add(flame);
   });
 }
-dungeonGate.position.set(DUNGEON_X, -0.5, DUNGEON_Z - 3.2);
+dungeonGate.position.set(DUNGEON_X, DUNGEON_PIT_Y, DUNGEON_Z);
 scene.add(dungeonGate);
 
 registerInteractive(dungeonGate, {
@@ -544,91 +600,102 @@ registerInteractive(dungeonGate, {
   desc: "스펙트럼 대륙 지하 37개 주파수 채널로 이어지는 관문입니다. 패킷 기사는 1600회/초의 호핑 패턴을 밟아가며 Wi-Fi 간섭 몬스터를 격퇴해야 합니다.",
   lore: "데이터 통신 시 외부 간섭을 피하기 위해 37개 데이터 채널(2.404~2.478GHz)을 고속으로 건너뛰는 Frequency Hopping(FHSS) 메커니즘 던전입니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/hopping.html",
-  walkPos: new THREE.Vector3(DUNGEON_X, 1.5, DUNGEON_Z)
+  walkPos: new THREE.Vector3(DUNGEON_X, SURFACE_Y, -8.0)
 });
 
-// ----- 3.6 복셀 나무 & 가로등 데코레이션 -----
+// ----- 3.7 복셀 나무 & 가로등 & 화단 데코레이션 -----
 const treeMatWood  = new THREE.MeshLambertMaterial({ color: 0x5a3d28 });
 const treeMatLeaf1 = new THREE.MeshLambertMaterial({ color: 0x2e7d32 });
 const treeMatLeaf2 = new THREE.MeshLambertMaterial({ color: 0x43a047 });
 
-function createVoxelTree(x, z) {
+function createVoxelTree(x, z, scale = 1.0) {
   const tree = new THREE.Group();
   const y = groundHeightAt(x, z);
 
-  // 줄기
-  const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.4, 0.7), treeMatWood);
-  trunk.position.y = 1.2;
+  const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.5 * scale, 1.8 * scale, 0.5 * scale), treeMatWood);
+  trunk.position.y = 0.9 * scale;
   tree.add(trunk);
 
-  // 나뭇잎 2단
-  const l1 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 2.4), treeMatLeaf1);
-  l1.position.y = 2.8;
+  const l1 = new THREE.Mesh(new THREE.BoxGeometry(1.8 * scale, 1.2 * scale, 1.8 * scale), treeMatLeaf1);
+  l1.position.y = 2.1 * scale;
   tree.add(l1);
 
-  const l2 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.6), treeMatLeaf2);
-  l2.position.y = 4.0;
+  const l2 = new THREE.Mesh(new THREE.BoxGeometry(1.2 * scale, 0.9 * scale, 1.2 * scale), treeMatLeaf2);
+  l2.position.y = 3.0 * scale;
   tree.add(l2);
 
   tree.position.set(x, y, z);
   scene.add(tree);
 }
 
-// 마을 외곽에 나무 배치
+// 마을 외곽과 녹지 공간에 나무 자연스럽게 배치
 [
-  [-8, -5], [-7, 6], [7, -6], [8, 5],
-  [-3, 8], [4, 8], [-8, 2], [8, -2]
-].forEach(([tx, tz]) => createVoxelTree(tx, tz));
+  [-13, -7, 1.1], [-12, 5, 0.9], [12, -7, 1.0], [13, 4, 1.1],
+  [-5, -12, 1.0], [5, -11, 0.95], [-4, 12, 1.1], [4, 12, 1.0],
+  [-11, -1, 0.85], [11, -1, 0.85], [-6, 6, 1.0], [6, 6, 0.9],
+  [-14, 0, 1.2], [14, 0, 1.1]
+].forEach(([tx, tz, s]) => createVoxelTree(tx, tz, s));
 
 // 가로등
 function createStreetLamp(x, z) {
   const lamp = new THREE.Group();
   const y = groundHeightAt(x, z);
 
-  const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.2, 0.2), darkStone);
-  post.position.y = 1.1;
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.8, 0.16), darkStone);
+  post.position.y = 0.9;
   lamp.add(post);
 
-  const light = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), glassMat);
-  light.position.y = 2.3;
+  const light = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), glassMat);
+  light.position.y = 1.85;
   lamp.add(light);
 
   lamp.position.set(x, y, z);
   scene.add(lamp);
 }
-[[-2, 1.5], [2, 1.5], [-2, -2], [2, -2]].forEach(([lx, lz]) => createStreetLamp(lx, lz));
+[
+  [-1.8, 2.5], [1.8, 2.5], [-1.8, -2.5], [1.8, -2.5],
+  [-1.8, -7.0], [1.8, -7.0], [-6.0, -1.8], [6.0, -1.8]
+].forEach(([lx, lz]) => createStreetLamp(lx, lz));
 
 // ---------- 4. 주인공 큐브 나이트 ----------
+// 아기자기한 복셀 영웅 비율: 0.85 x 0.85 x 0.85
+// knight.position.y가 정확히 지표면(SURFACE_Y = 2.0)이며,
+// body.position.y = 0.425 로 설정되어 발바닥이 y = 0 에 정확히 닿아 바닥에 파묻히지 않음!
 const knight = new THREE.Group();
+let knightBody;
 {
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
+  knightBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.85, 0.85, 0.85),
     new THREE.MeshLambertMaterial({ color: 0xd8443c }) // 기사 붉은 갑옷
   );
-  body.position.y = 0.5;
-  knight.add(body);
+  knightBody.position.y = 0.425;
+  knight.add(knightBody);
 
-  const emblem = new THREE.Mesh(
-    new THREE.BoxGeometry(0.2, 0.2, 0.05),
+  // 안면 고글 / 바이저 (청록색 빛)
+  const visor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.18, 0.06),
     new THREE.MeshBasicMaterial({ color: 0x39d0ff })
   );
-  emblem.position.set(0, 0.55, 0.53);
-  knight.add(emblem);
+  visor.position.set(0, 0.52, 0.44);
+  knight.add(visor);
 
+  // 투구 위 RF 안테나
   const antenna = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.04, 0.7, 6), metalMat
+    new THREE.CylinderGeometry(0.035, 0.035, 0.5, 6), metalMat
   );
-  antenna.position.set(0.3, 1.2, 0);
+  antenna.position.set(0.24, 1.05, 0);
   knight.add(antenna);
 }
-const SPAWN_POS = new THREE.Vector3(0, VILLAGE_HEIGHT, 1.0);
+
+// 스폰 위치: 중앙 분수대 남쪽 광장
+const SPAWN_POS = new THREE.Vector3(0, SURFACE_Y, 2.2);
 knight.position.copy(SPAWN_POS);
 scene.add(knight);
 
 // ---------- 5. 클릭/터치 이동 목표 지점 마커 ----------
 const targetMarker = new THREE.Group();
 {
-  const ringGeo = new THREE.RingGeometry(0.35, 0.55, 32);
+  const ringGeo = new THREE.RingGeometry(0.3, 0.48, 32);
   const ringMat = new THREE.MeshBasicMaterial({
     color: 0x39d0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.85
   });
@@ -636,7 +703,7 @@ const targetMarker = new THREE.Group();
   ring.rotation.x = -Math.PI / 2;
   targetMarker.add(ring);
 
-  const dotGeo = new THREE.CircleGeometry(0.12, 16);
+  const dotGeo = new THREE.CircleGeometry(0.1, 16);
   const dotMat = new THREE.MeshBasicMaterial({
     color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.95
   });
@@ -662,9 +729,10 @@ const joystick = { right: 0, forward: 0, active: false };
 
 let cameraYaw = 0;
 let cameraPitch = 0.52;
-let cameraDistance = 14;
+let cameraDistance = 15; // 쾌적한 마을 시야 확보
 
-const SPEED = 6.5;
+const SPEED = 6.2;
+let walkAnimTime = 0;
 
 function moveKnight(dt) {
   let rightInput = 0;
@@ -683,8 +751,10 @@ function moveKnight(dt) {
   }
 
   const inputLen = Math.hypot(rightInput, forwardInput);
+  let isMoving = false;
 
   if (inputLen > 0.05) {
+    isMoving = true;
     const fwdX = -Math.sin(cameraYaw);
     const fwdZ = -Math.cos(cameraYaw);
     const rightX = Math.cos(cameraYaw);
@@ -710,6 +780,7 @@ function moveKnight(dt) {
     const dist = diff.length();
 
     if (dist > 0.25) {
+      isMoving = true;
       diff.normalize();
       knight.position.addScaledVector(diff, SPEED * dt);
       const targetRotY = Math.atan2(diff.x, diff.z);
@@ -720,9 +791,17 @@ function moveKnight(dt) {
     }
   }
 
-  // 지형 스냅 (평지 고원 및 계단 부드럽게 오르내리기)
+  // 지형 스냅: 캐릭터 발바닥이 지표면(groundHeightAt)에 정확히 맞물림
   const targetY = groundHeightAt(knight.position.x, knight.position.z);
-  knight.position.y += (targetY - knight.position.y) * Math.min(1, dt * 12);
+  knight.position.y += (targetY - knight.position.y) * Math.min(1, dt * 14);
+
+  // 귀여운 복셀 걸음 바운스 애니메이션
+  if (isMoving) {
+    walkAnimTime += dt * 14;
+    knightBody.position.y = 0.425 + Math.abs(Math.sin(walkAnimTime)) * 0.06;
+  } else {
+    knightBody.position.y = 0.425;
+  }
 }
 
 // ---------- 7. 카메라 추종 & 회전 ----------
@@ -735,7 +814,7 @@ function updateCamera(dt) {
   const desiredZ = knight.position.z + Math.cos(cameraYaw) * hDist;
 
   camera.position.set(desiredX, desiredY, desiredZ);
-  camera.lookAt(knight.position.x, knight.position.y + 1.2, knight.position.z);
+  camera.lookAt(knight.position.x, knight.position.y + 1.0, knight.position.z);
 }
 
 // ---------- 8. 마우스 클릭 & 터치 인터랙션 ----------
@@ -744,7 +823,7 @@ const pointer = new THREE.Vector2();
 
 const activePointers = new Map();
 let initialPinchDist = 0;
-let initialPinchCamDist = 14;
+let initialPinchCamDist = 15;
 let isPinching = false;
 
 let pointerDownPos = { x: 0, y: 0 };
@@ -782,7 +861,7 @@ window.addEventListener("pointermove", (e) => {
     const curDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     if (curDist > 10 && initialPinchDist > 10) {
       const factor = initialPinchDist / curDist;
-      cameraDistance = Math.max(6, Math.min(32, initialPinchCamDist * factor));
+      cameraDistance = Math.max(6, Math.min(36, initialPinchCamDist * factor));
     }
     return;
   }
@@ -793,7 +872,7 @@ window.addEventListener("pointermove", (e) => {
   const dy = e.clientY - pointerDownPos.y;
   const dist = Math.hypot(dx, dy);
 
-  // 드래그 시점 회전 (위아래는 원래 방향, 좌우는 사용자 반전 방향 반영)
+  // 드래그 시점 회전 (윤배 님의 반전 피드백 유지: 수평 -= dx, 수직 += dy)
   if (dist > 8 || isDraggingCamera) {
     isDraggingCamera = true;
     cameraYaw -= dx * 0.006;
@@ -821,7 +900,7 @@ window.addEventListener("pointerup", handlePointerEnd);
 window.addEventListener("pointercancel", handlePointerEnd);
 
 window.addEventListener("wheel", (e) => {
-  cameraDistance = Math.max(6, Math.min(32, cameraDistance + e.deltaY * 0.015));
+  cameraDistance = Math.max(6, Math.min(36, cameraDistance + e.deltaY * 0.015));
 }, { passive: true });
 
 window.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -880,7 +959,8 @@ function handleClickOrTap(clientX, clientY) {
 
 function setMoveTarget(pos) {
   targetDestination = pos;
-  targetMarker.position.set(pos.x, pos.y + 0.08, pos.z);
+  // 마커를 지표면 살짝 위(0.04)에 띄워 깜빡임 없이 선명하게 표시
+  targetMarker.position.set(pos.x, pos.y + 0.04, pos.z);
   targetMarker.visible = true;
 }
 
@@ -963,6 +1043,9 @@ function animate() {
   const t = clock.elapsedTime;
   // 비콘 점멸
   tower.userData.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3.5));
+  // 분수대 중앙 블루투스 룬 회전
+  fountain.userData.rune.rotation.y = t * 1.5;
+  fountain.userData.rune.position.y = 1.3 + Math.sin(t * 2.5) * 0.08;
   // 포털 소용돌이 맥동
   dungeonGate.userData.portal.scale.set(1 + 0.06 * Math.sin(t * 4), 1 + 0.06 * Math.cos(t * 3), 1);
   sea.position.z = Math.sin(t * 0.3) * 0.4;
