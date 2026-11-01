@@ -37,6 +37,7 @@ open index.html          # macOS (Windows: start index.html)
 
 - 조작: **WASD** / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
+- 현재 진행: **Stage 2 완료** (GATT 빌리지 평지화, 37채널 호핑 던전 지하 계단 입구, 마을 건물 3채, 비콘 타워, 건물 상호작용 툴팁 모달)
 - Stage 1~3은 단일 `index.html`(CDN import map)로 동작하며, Stage 4부터 Vite 프로젝트로 전환됩니다.
 
 ## 📚 connectivityBook 연동
