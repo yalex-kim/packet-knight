@@ -48,10 +48,12 @@ function slideMove(m, stepX, stepZ, { isBlocked }) {
  * 한 스텝 진행
  * @param {MotorState} m @param {MoveIntent} intent @param {number} dt
  * @param {import("./collision.js").CollisionWorld} [world] 기본값은 마을
+ * @param {number} [speed] 이동 속도 m/s (HOP 스탯)
  * @returns {StepResult}
  */
-export function stepMotor(m, intent, dt, world = VILLAGE) {
-  const { SPEED, STEP_MAX, GRAVITY, STEP_SMOOTH, TURN_RATE } = PHYSICS;
+export function stepMotor(m, intent, dt, world = VILLAGE, speed = PHYSICS.SPEED) {
+  const { STEP_MAX, GRAVITY, STEP_SMOOTH, TURN_RATE } = PHYSICS;
+  const SPEED = speed; // HOP 스탯 (m/s) — 기본 6.4
   let moved = 0;
   let landed = false;
 
@@ -96,10 +98,10 @@ export function stepMotor(m, intent, dt, world = VILLAGE) {
  * 클릭 이동 목표를 향한 이동 의도 계산
  * @returns {MoveIntent & { arrived: boolean }}
  */
-export function seekIntent(m, target, dt) {
+export function seekIntent(m, target, dt, speed = PHYSICS.SPEED) {
   const dx = target.x - m.x, dz = target.z - m.z;
   const dist = Math.hypot(dx, dz);
   if (dist <= PHYSICS.ARRIVE_DIST) return { dirX: 0, dirZ: 0, speedScale: 0, arrived: true };
   // 목표 지점을 넘어가지 않게 마지막 스텝은 감속
-  return { dirX: dx / dist, dirZ: dz / dist, speedScale: Math.min(1, dist / (PHYSICS.SPEED * dt)), arrived: false };
+  return { dirX: dx / dist, dirZ: dz / dist, speedScale: Math.min(1, dist / (speed * dt)), arrived: false };
 }

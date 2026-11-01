@@ -93,7 +93,8 @@ export const COMBAT = Object.freeze({
 
 /** 레벨업 필요 누적 XP: XP(n) = 50 × n^1.5 (PRD §8.4) — n레벨 → n+1레벨 */
 export const XP_TO_NEXT = (n) => Math.round(50 * n ** 1.5);
-export const STAT_POINTS_PER_LEVEL = 3;
+// 레벨업 1회 = 스탯 포인트 1점 = 장비 강화 1단계만큼 (Stage 7.5 시뮬레이션: 원안 레벨당 3점·SEC +2/점은 장비보다 6배 강해 던전이 무의미해졌다)
+export const STAT_POINTS_PER_LEVEL = 1;
 
 /**
  * 몬스터 도감 (PRD §8.4 표, §4.3 "몬스터 도감에 실제 스펙 배경 한 줄")
@@ -141,11 +142,23 @@ export const TRAINING_GROUND = Object.freeze({ x: -9, z: 10, spawns: Object.free
  * 장비 (PRD §3.3 "장비는 모두 RF 부품 은유") — 강화 1단계당 스탯 상승. 강화 UI는 RF 랩 단계에서 구현한다.
  */
 export const GEAR = Object.freeze({
-  antenna: Object.freeze({ name: "안테나",        stat: "tx",  per: 2,  note: "안테나 이득 → 송신 세기(공격력)" }),
-  crystal: Object.freeze({ name: "크리스털",      stat: "rx",  per: 2,  note: "기준 주파수 정밀도 → 수신 여유(회피)" }),
-  battery: Object.freeze({ name: "배터리",        stat: "hp",  per: 10, note: "용량 → 연결 유지력(HP)" }),
-  shield:  Object.freeze({ name: "쉴드 캐패시터", stat: "sec", per: 1,  note: "전원 안정화 → 간섭 내성(방어)" })
+  antenna: Object.freeze({ name: "안테나", icon: "📡", stat: "tx", per: 2, note: "안테나 이득 → 송신 세기(공격력)",
+    lore: "링크 버짓: 수신 세기 = 송신 전력 + 안테나 이득 − 경로 손실 − 장애물 손실. 이득이 오르면 같은 전력으로 더 세게 닿는다.", chapter: "radio.html" }),
+  crystal: Object.freeze({ name: "크리스털", icon: "💎", stat: "rx", per: 2, note: "기준 주파수 정밀도 → 수신 여유(회피)",
+    lore: "LE 칩은 32 MHz·32.768 kHz 수정 발진기로 시간을 잰다. 사양의 시계 정확도는 활성 ±50 ppm, 수면 ±500 ppm — 정확할수록 수신 창을 덜 넓혀도 된다.", chapter: "power.html" }),
+  battery: Object.freeze({ name: "배터리", icon: "🔋", stat: "hp", per: 10, note: "용량 → 연결 유지력(HP)",
+    lore: "CR2032 한 알은 약 220 mAh. 송신 전류는 수 mA라 계속 켜 두면 이틀도 못 가지만, 거의 항상 자기 때문에 몇 년을 간다.", chapter: "power.html" }),
+  shield:  Object.freeze({ name: "쉴드 캐패시터", icon: "🛡️", stat: "sec", per: 1, note: "전원 안정화 → 간섭 내성(방어)",
+    lore: "게임 속 은유 장비 — 전원 잡음을 걸러 무선부를 안정시킨다는 뜻으로, 간섭(Wi-Fi 광역 공격) 피해를 줄인다.", chapter: "coexistence.html" })
 });
+
+/**
+ * 레벨업 스탯 포인트 1점당 상승량과 상한 (PRD §8.4 "레벨업 시 분배 포인트" 열).
+ * PWR는 스킬 배터리가 생기기 전까지 효과가 없어 분배를 막는다 (헛투자 방지).
+ */
+export const STAT_POINT_GAIN = Object.freeze({ hp: 10, tx: 2, rx: 2, hop: 0.2, sec: 1, pwr: 5 });
+export const STAT_CAPS = Object.freeze({ rx: 40, hop: 9.0 });
+export const ALLOCATABLE_STATS = Object.freeze(["hp", "tx", "rx", "hop", "sec"]);
 
 /** 강화 (PRD §8.4): 비용 = round(UPGRADE_BASE × 1.4^n), 성공률 = max(30%, 95% − 10%p × n), 실패 시 재료만 소실 */
 export const UPGRADE = Object.freeze({ BASE: 7, GROWTH: 1.3, MAX_LEVEL: 8 });
@@ -161,8 +174,10 @@ export const TIMEOUT_PENALTY = 0.1;
  * HP 0이면 실패(타임아웃). 클리어하면 다음 층이 열린다 (PRD §7 Stage 7 DoD). 입장 1회 = 한 층 도전.
  * (층마다 몬스터 +1마리는 장비 1단계로 메울 수 없는 절벽이었다 — PRD §8.7)
  */
-export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, TIME_LIMIT: 180 });
+export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.1, TIME_LIMIT: 180 });
 export const floorHpScale = (floor) => 1 + DUNGEON.FLOOR_HP_SCALE * (floor - 1);
+/** 층마다 공격력도 오른다 — 체력만 오르면 방어(SEC)만 올려 깊은 층이 무의미해진다 (Stage 7.5 시뮬레이션) */
+export const floorAtkScale = (floor) => 1 + DUNGEON.FLOOR_ATK_SCALE * (floor - 1);
 
 /**
  * 경제 목표 (PRD §8.3·§8.7): 플레이 1시간 = 루프 4회. 중간 전략 플레이어가 1시간에

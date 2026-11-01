@@ -49,6 +49,7 @@ export const LANDMARKS = [
       desc: "안테나 사거리를 늘리고, 크리스털 정밀도를 맞추며, 던전 탐험에 필수적인 코인 배터리 CR2032를 장착하고 교체하는 하드웨어 정비소입니다.",
       lore: "저전력 BLE 기기의 수명과 성능을 좌우하는 CR2032 전원 설계 및 RF 매칭 회로를 은유합니다.",
       link: CHAPTER("power.html"),
+      action: { id: "rflab", label: "🔧 RF 랩 입장" },
       walkPos: { x: 6.6, y: S, z: -1.0 }
     }
   },

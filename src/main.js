@@ -28,7 +28,7 @@ import { applyJobResult, jobChargesAt, startJobCharge } from "./core/progress.js
 import { createRng } from "./core/quiz.js";
 import { createJob, stepJob, confirmMeasurement } from "./core/rssiJob.js";
 import * as jobPanel from "./ui/jobPanel.js";
-import { TRAINING_GROUND, MONSTERS } from "./core/balance.js";
+import { TRAINING_GROUND, MONSTERS, GEAR, STAT_POINTS_PER_LEVEL } from "./core/balance.js";
 import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket, revivePlayer } from "./core/battle.js";
 import { recordScan, applyKill, applyPickup } from "./core/progress.js";
 import { levelFromXp } from "./core/combat.js";
@@ -39,6 +39,8 @@ import { DUNGEON_ROOM, DUNGEON_WORLD, generateFloor, createLinkPuzzle, toggleCha
 import { nextFloor, payDungeonEntry, applyFloorClear, applyTimeoutPenalty } from "./core/progress.js";
 import * as dungeonView from "./render/dungeonView.js";
 import * as dungeonUi from "./ui/dungeonPanel.js";
+import * as rfLab from "./ui/rfLab.js";
+import { upgradeGear, allocatePoint } from "./core/progress.js";
 
 // ---------- 씬 & 렌더러 ----------
 const app = document.getElementById("app");
@@ -249,7 +251,7 @@ function handleBattleEvents(events) {
         const { level, leveledUp } = applyKill(progress, m.type, e.xp);
         fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
         changed.push("xp");
-        if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * 3} (분배는 RF 랩에서, 이후 스테이지)`, 4);
+        if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
         dirty = true;
         break;
       }
@@ -307,7 +309,7 @@ function setAmbience(underground) {
 
 function startFloor(floor) {
   const layout = generateFloor(floor, (dungeonSeedBase += 7919));
-  const b = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale });
+  const b = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
   b.player = battle.player; // HP는 마을과 던전이 공유한다
   run = { floor, layout, battle: b, puzzle: createLinkPuzzle(layout), phase: "combat", observing: true };
   resetMotor(motor, { x: DUNGEON_ROOM.cx, y: DUNGEON_ROOM.floorY, z: DUNGEON_ROOM.cz });
@@ -450,11 +452,44 @@ function openJob() {
   jobPanel.openJob();
 }
 
+// ---------- RF 랩: 장비 강화 · 스탯 분배 (Stage 7.5) ----------
+const labRng = createRng(TEST_MODE ? 31 : Date.now() + 3);
+function refreshStats(changed) {
+  hud.renderStats(effectiveStats(progress), wallet(), changed);
+  syncPlayerHp(battle, effectiveStats(progress).hp); // HP가 오르면 즉시 반영
+}
+rfLab.initRfLab({
+  getProgress: () => progress,
+  getStats: () => effectiveStats(progress),
+  onUpgrade: (piece) => {
+    const before = effectiveStats(progress);
+    const r = upgradeGear(progress, piece, labRng);
+    if (r.ok) { persist(); refreshStats(["cr2032", ...(r.success ? [GEAR[piece].stat] : [])]); }
+    rfLab.showUpgradeResult(piece, r, before, effectiveStats(progress));
+  },
+  onAllocate: (stat) => {
+    const before = effectiveStats(progress);
+    const ok = allocatePoint(progress, stat);
+    if (ok) { persist(); refreshStats([stat, "xp"]); }
+    rfLab.showAllocResult(stat, ok, before, effectiveStats(progress));
+    return ok;
+  },
+  onClose: () => { setInputEnabled(true); inputLocked = false; }
+});
+function openRfLab() {
+  setInputEnabled(false);
+  inputLocked = true;
+  clearMoveTarget();
+  hud.hideModal();
+  rfLab.openRfLab();
+}
+
 hud.setModalHandlers({
   action: (id) => {
     if (id === "library") openLibrary();
     else if (id === "job") openJob();
     else if (id === "dungeon") openDungeonEntry();
+    else if (id === "rflab") openRfLab();
   },
   // 모달의 "교과서 챕터 보기" 클릭도 학습 지표로 센다 (PRD §1.3 ②)
   link: (href) => {
@@ -503,12 +538,12 @@ function simulate(dt) {
     const dir = cameraRelative(input.right * norm, input.forward * norm);
     intent = { dirX: dir.x, dirZ: dir.z, speedScale: Math.min(1, inputLen) };
   } else if (moveTarget) {
-    const seek = seekIntent(motor, moveTarget, dt);
+    const seek = seekIntent(motor, moveTarget, dt, effectiveStats(progress).hop);
     if (seek.arrived) arriveAtTarget();
     else intent = seek;
   }
 
-  const { moved, landed } = stepMotor(motor, intent, dt, currentWorld());
+  const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), effectiveStats(progress).hop);
   // 클릭 이동 중 양 축이 모두 막히면 목표 도달 불가로 취소
   if (moveTarget && inputLen <= 0.05 && intent.speedScale > 0 && moved < 0.0001) clearMoveTarget();
   if (landed) {
@@ -593,6 +628,7 @@ window.__PK = {
       monsters: activeBattle().monsters.map((m) => ({ id: m.id, hp: m.hp, maxHp: m.maxHp, state: m.state, x: m.x, z: m.z, type: m.type }))
     })
   },
+  rflab: { open: openRfLab, isOpen: rfLab.isRfLabOpen },
   dungeon: {
     openEntry: openDungeonEntry,
     enter: enterNextFloor,

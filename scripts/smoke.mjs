@@ -201,6 +201,43 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("Stage 6.5 세이브(v4)가 손실 없이 v5로 마이그레이션된다", l.status === "loaded" && l.progress.cr2032 === 9 && l.progress.dungeon.maxFloor === 0);
 }
 
+// ---------- Stage 7.5: RF 랩 — 장비 강화 · 스탯 분배 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const P = await imp("progress.js");
+  const B = await imp("balance.js");
+  const fixed = (v) => () => v;
+
+  const p = P.createProgress();
+  const broke = P.upgradeGear(p, "antenna", fixed(0));
+  p.cr2032 = 100;
+  const win = P.upgradeGear(p, "antenna", fixed(0));       // 성공 (난수 0 < 성공률)
+  const lose = P.upgradeGear(p, "antenna", fixed(0.999));  // 실패 (난수 0.999 ≥ 성공률)
+  check("강화: 재료가 모자라면 막히고, 성공하면 단계가 오르고, 실패해도 장비는 그대로 재료만 소모",
+    !broke.ok && broke.reason === "funds" && win.success && p.gear.antenna === 1 && !lose.success && lose.level === 1 &&
+    p.cr2032 === 100 - B.upgradeCost(0) - B.upgradeCost(1) && P.effectiveStats(p).tx === B.PLAYER_BASE.tx + B.GEAR.antenna.per,
+    `TX ${P.effectiveStats(p).tx} · CR2032 100 → ${p.cr2032}`);
+  p.gear.antenna = B.UPGRADE.MAX_LEVEL;
+  check("최대 강화 단계에서는 더 강화할 수 없다", P.upgradeGear(p, "antenna", fixed(0)).reason === "max");
+
+  const q = P.createProgress();
+  const none = P.allocatePoint(q, "hp");
+  q.statPoints = 30;
+  const hop = P.allocatePoint(q, "hop");
+  const pwr = P.allocatePoint(q, "pwr");
+  q.bonus.rx = B.STAT_CAPS.rx; // RX 상한
+  const rxCapped = P.allocatePoint(q, "rx");
+  check("스탯 분배: 포인트가 있어야 하고, PWR(효과 없음)·상한 도달 스탯은 막힌다",
+    !none && hop && !pwr && !rxCapped && P.effectiveStats(q).hop === +(B.PLAYER_BASE.hop + B.STAT_POINT_GAIN.hop).toFixed(2) && q.statPoints === 29,
+    `HOP ${P.effectiveStats(q).hop}`);
+  check("유효 스탯 = 기본 + 퀴즈 보너스 + 분배 + 장비, 상한 적용", P.effectiveStats(q).rx === B.STAT_CAPS.rx);
+
+  const v5 = P.createProgress(); delete v5.gear; delete v5.alloc; delete v5.lab; v5.v = 5; v5.cr2032 = 11; v5.dungeon.maxFloor = 2;
+  const mem = new Map([[P.SAVE_KEY, JSON.stringify(v5)]]);
+  const l = P.loadProgress({ getItem: (k) => mem.get(k) ?? null });
+  check("Stage 7 세이브(v5)가 손실 없이 v6로 마이그레이션된다", l.status === "loaded" && l.progress.cr2032 === 11 && l.progress.dungeon.maxFloor === 2 && l.progress.gear.antenna === 0);
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -778,7 +815,66 @@ await reset();
   await page.reload();
   await page.waitForFunction(() => window.__PK);
   const re = await page.evaluate(() => window.__PK.progress());
-  check("던전 기록(최고 층·별점)이 저장되고 새로고침 후 유지된다", re.v === 5 && re.dungeon.maxFloor === 1 && re.dungeon.attempts === 2);
+  check("던전 기록(최고 층·별점)이 저장되고 새로고침 후 유지된다", re.v >= 5 && re.dungeon.maxFloor === 1 && re.dungeon.attempts === 2);
+}
+
+// ---------- Stage 7.5: RF 랩 ----------
+await page.evaluate(() => {
+  const p = window.__PK.progress();
+  Object.assign(p, { cr2032: 40, statPoints: 2 });
+  p.bonus = { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 };
+  localStorage.setItem("packetKnight.save", JSON.stringify(p));
+});
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+await reset();
+{
+  await teleport(6.6, -1.0);
+  await tick(300);
+  const fp = await page.evaluate(() => window.__PK.projectToScreen(9.0, 3.5, -1.0)); // 대장간 지붕
+  await page.mouse.click(fp.x, fp.y);
+  await tick(20);
+  const label = await page.locator("#modal-action").textContent();
+  check("패킷 대장간 모달에 'RF 랩 입장' 버튼이 있다", label.includes("RF 랩"), label);
+  await page.click("#modal-action");
+
+  const tx0 = (await statsNow()).tx;
+  const cr0 = (await page.evaluate(() => window.__PK.progress())).cr2032;
+  await page.locator('#rflab-panel .lab-up[data-piece="antenna"]').click();
+  const res = await page.locator("#rflab-panel .lab-result").textContent();
+  const p1 = await page.evaluate(() => window.__PK.progress());
+  const tx1 = (await statsNow()).tx;
+  const hudTx = await page.locator('#stats [data-stat="tx"]').textContent();
+  check("RF 랩에서 안테나를 강화하면 CR2032가 들고 TX가 오른다 (HUD 반영)",
+    p1.cr2032 === cr0 - 7 && (p1.gear.antenna === 1 ? tx1 === tx0 + 2 && hudTx.includes(`${tx1}`) : tx1 === tx0) && res.length > 0,
+    `${res.slice(0, 34)} · CR2032 ${cr0} → ${p1.cr2032}`);
+
+  // 스탯 분배: HOP → 실제 이동 속도
+  await page.keyboard.press("Escape");
+  await reset();
+  const walk = async () => { const a = await state(); await hold("KeyS", 1000); const b = await state(); return Math.hypot(b.x - a.x, b.z - a.z); };
+  const d0 = await walk();
+  await page.evaluate(() => window.__PK.rflab.open());
+  await page.locator("#rflab-panel .lab-tab").nth(1).click();
+  await page.locator('#rflab-panel .lab-alloc[data-stat="hop"]').click();
+  await page.locator('#rflab-panel .lab-alloc[data-stat="hop"]').click();
+  const noMore = await page.locator('#rflab-panel .lab-alloc[data-stat="hp"]').isDisabled();
+  await page.keyboard.press("Escape");
+  await reset();
+  const d1 = await walk();
+  const hop = (await statsNow()).hop;
+  check("스탯 포인트를 HOP에 분배하면 실제 이동 속도가 빨라지고, 포인트가 떨어지면 버튼이 막힌다",
+    hop === 6.8 && Math.abs(d1 / d0 - 6.8 / 6.4) < 0.02 && noMore, `HOP ${hop} · 1초 이동 ${d0.toFixed(2)} → ${d1.toFixed(2)} m`);
+
+  await page.evaluate(() => { const p = window.__PK.progress(); p.cr2032 = 0; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  await page.evaluate(() => window.__PK.rflab.open());
+  const allDisabled = await page.locator("#rflab-panel .lab-up").evaluateAll((bs) => bs.every((b) => b.disabled));
+  const re = await page.evaluate(() => window.__PK.progress());
+  check("CR2032가 없으면 강화 버튼이 막히고, 장비·분배는 새로고침 후에도 유지된다",
+    allDisabled && re.v === 6 && re.alloc.hop === 2 && re.gear.antenna === p1.gear.antenna);
+  await page.keyboard.press("Escape");
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));

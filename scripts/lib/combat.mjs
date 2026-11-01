@@ -15,7 +15,7 @@ export const COMBAT_STRATEGIES = [
 ];
 
 /** 한 스텝의 봇 조작: 가장 가까운 적을 보고, 전략에 따라 이동, 쿨다운마다 발사 */
-function botStep(battle, pl, mode, dt) {
+function botStep(battle, pl, mode, dt, stats) {
   const world = battle.world ?? VILLAGE;
   battle.sinceHit = (battle.sinceHit ?? 0) + dt;
   const alive = battle.monsters.filter((m) => m.state !== "dead");
@@ -36,7 +36,7 @@ function botStep(battle, pl, mode, dt) {
     }
     pl.rotY = Math.atan2(dx, dz);
   }
-  stepMotor(pl, intent, dt, world);
+  stepMotor(pl, intent, dt, world, stats.hop);
   if (near) fireAdvPacket(battle, pl, near);
 }
 
@@ -49,7 +49,7 @@ export function trainingSession(mode, stats, rng, seconds = 60) {
   const r = { kills: 0, cr2032: 0, xp: 0, damage: 0, hits: 0, ko: 0, lowest: stats.hp, regenObserved: false };
   let wasHurt = false;
   for (let t = 0; t < seconds; t += COMBAT_DT) {
-    botStep(battle, pl, mode, COMBAT_DT);
+    botStep(battle, pl, mode, COMBAT_DT, stats);
     const before = battle.player.hp;
     for (const e of stepBattle(battle, COMBAT_DT, { player: pl, stats, rng })) {
       if (e.type === "hit") battle.sinceHit = 0;
@@ -72,12 +72,12 @@ export function trainingSession(mode, stats, rng, seconds = 60) {
  */
 export function dungeonFloor(mode, stats, rng, floor = 1) {
   const layout = generateFloor(floor, Math.floor(rng() * 2 ** 31));
-  const battle = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale });
+  const battle = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
   syncPlayerHp(battle, stats.hp);
   const pl = createMotor({ x: DUNGEON_ROOM.cx, y: DUNGEON_ROOM.floorY, z: DUNGEON_ROOM.cz });
   const r = { cleared: false, ko: false, time: 0, kills: 0, cr2032: 0, xp: 0, hpLeft: 0 };
   for (let t = 0; t < DUNGEON.TIME_LIMIT; t += COMBAT_DT) {
-    botStep(battle, pl, mode, COMBAT_DT);
+    botStep(battle, pl, mode, COMBAT_DT, stats);
     for (const e of stepBattle(battle, COMBAT_DT, { player: pl, stats, rng })) {
       if (e.type === "hit") battle.sinceHit = 0;
       if (e.type === "kill") { r.kills++; r.xp += e.xp; r.cr2032 += e.drops.reduce((k, d) => k + (d.item === "cr2032" ? d.count : 0), 0); }

@@ -133,6 +133,7 @@ function simulateEconomy(bots, strategies) {
         available: r1(mean(runs.map((r) => r.income.job + r.income.training + r.income.dungeon - r.spend.fee - r.spend.penalty))),
         surplusVsTarget: pct(mean(runs.map((r) => r.income.job + r.income.training + r.income.dungeon - r.spend.fee - r.spend.penalty)) / target.total - 1),
         upgradesSucceeded: r1(mean(runs.map((r) => r.upgrades.success))),
+        level: r1(mean(runs.map((r) => r.level))),
         dungeonAttempts: r1(mean(runs.map((r) => r.dungeon.attempts))),
         dungeonClearPct: pct(mean(runs.map((r) => r.dungeon.clears)) / Math.max(1e-9, mean(runs.map((r) => r.dungeon.attempts)))),
         reachedClearPct: pct(firstClear.length / bots),
@@ -163,7 +164,7 @@ function judge(econ, quiz) {
     { id: "quizSpeedup", label: "퀴즈 보너스로 던전 클리어가 빨라지는 정도 (같은 장비, 기대 소요 시간, 첫 클리어가 일어나는 장비 +1·+2 평균)", target: "≥ 20%",
       value: `평균 ${r1(mean(speedups))}% (+1: ${speedups[0]}%, +2: ${speedups[1]}%)`, pass: speedups.length > 0 && mean(speedups) >= 20 },
     { id: "quizWorthIt", label: "공부한 시간까지 따져도 퀴즈가 이득 (중간 전략 1시간: 첫 클리어 시간 퀴즈 O / 퀴즈 X)", target: "≤ 0.8배",
-      value: `${bal.firstClearMin}분 / ${balNoQuiz.firstClearMin}분 = ${(bal.firstClearMin / balNoQuiz.firstClearMin).toFixed(2)}배`,
+      value: `첫 클리어 ${bal.firstClearMin}분 / ${balNoQuiz.firstClearMin}분 = ${(bal.firstClearMin / balNoQuiz.firstClearMin).toFixed(2)}배 · 도달 층 ${bal.floorsCleared} / ${balNoQuiz.floorsCleared} = ${(bal.floorsCleared / balNoQuiz.floorsCleared).toFixed(2)}배`,
       pass: bal.firstClearMin <= 0.8 * balNoQuiz.firstClearMin, gating: false,
       note: "관찰 지표(Stage 6.5 추가, 합격 판정 제외) — 공부 시간의 기회비용까지 따진 학습 인센티브. 목표치는 PRD §8.7 결정 대기" }
   ];

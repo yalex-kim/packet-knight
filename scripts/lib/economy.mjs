@@ -9,7 +9,10 @@
 import {
   PLAYER_BASE, QUIZ_BONUS, LIBRARY_COURSES, GEAR, UPGRADE, DUNGEON, ECONOMY, TIMEOUT_PENALTY, upgradeCost
 } from "../../src/core/balance.js";
-import { applyGear, emptyGear, tryUpgrade, expectedCostTo } from "../../src/core/gear.js";
+import { emptyGear, tryUpgrade, expectedCostTo } from "../../src/core/gear.js";
+import { effectiveStats } from "../../src/core/progress.js";
+import { levelFromXp } from "../../src/core/combat.js";
+import { STAT_POINTS_PER_LEVEL, STAT_CAPS, STAT_POINT_GAIN } from "../../src/core/balance.js";
 import { rssiSession } from "./rssi.mjs";
 import { fullCharges, useCharge } from "../../src/core/jobCharges.js";
 import { trainingSession, dungeonFloor } from "./combat.mjs";
@@ -28,11 +31,12 @@ export const TIME = Object.freeze({
  *   jobs: 루프 시작 알바 횟수(측정기 배터리 한도 안) · trainMin: 훈련장 분 · 나머지 시간 = 던전
  *   dungeonMode: 던전 전투 방식 · rssiN: 알바에서 평균 내는 패킷 수
  *   retryAfterFail: 실패한 층에 장비를 올리지 않고 곧바로 재도전하는가 (공격형만 그렇다)
+ *   alloc: 레벨업 스탯 포인트를 이 순서로 돌아가며 분배 (Stage 7.5 RF 랩)
  */
 export const PLAYER_STRATEGIES = [
-  { id: "aggressive", name: "공격형", jobs: 1, trainMin: 0, dungeonMode: "rush",  rssiN: 6,  retryAfterFail: true },
-  { id: "balanced",   name: "균형형 (중간 전략)", jobs: 3, trainMin: 1, dungeonMode: "kite",  rssiN: 10, retryAfterFail: false },
-  { id: "collector",  name: "수집형", jobs: 6, trainMin: 2, dungeonMode: "stand", rssiN: 10, retryAfterFail: false }
+  { id: "aggressive", name: "공격형", jobs: 1, trainMin: 0, dungeonMode: "rush",  rssiN: 6,  retryAfterFail: true,  alloc: ["tx"] },
+  { id: "balanced",   name: "균형형 (중간 전략)", jobs: 3, trainMin: 1, dungeonMode: "kite",  rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec", "tx"] },
+  { id: "collector",  name: "수집형", jobs: 6, trainMin: 2, dungeonMode: "stand", rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec"] }
 ];
 
 // ---------- 결과 풀 ----------
@@ -64,6 +68,13 @@ export function statsWithQuiz(base, coursesDone) {
   return s;
 }
 
+/** 게임과 같은 effectiveStats로 계산 (퀴즈 보너스 + 스탯 분배 + 장비) */
+function botStats(st) {
+  const bonus = { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 };
+  for (const c of LIBRARY_COURSES.slice(0, st.courses)) bonus[c.reward] += QUIZ_BONUS[c.reward];
+  return effectiveStats({ bonus, alloc: st.alloc, gear: st.gear });
+}
+
 /** 다음에 강화할 장비: 가장 낮은 레벨(동률이면 정의 순서) — 고르게 키우는 일반적 플레이 */
 function nextGear(gear) {
   return Object.keys(GEAR).reduce((a, b) => (gear[b] < gear[a] ? b : a));
@@ -76,7 +87,7 @@ function nextGear(gear) {
 export function playHour(strategy, pools, { quiz = true } = {}) {
   const rng = pools.rng;
   const st = {
-    cr: 0, gear: emptyGear(), courses: 0, xp: 0,
+    cr: 0, gear: emptyGear(), courses: 0, xp: 0, level: 1, alloc: { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, allocTurn: 0,
     income: { job: 0, training: 0, dungeon: 0 }, spend: { fee: 0, upgrade: 0, penalty: 0 },
     upgrades: { tries: 0, success: 0 }, dungeon: { floor: 1, attempts: 0, clears: 0, kos: 0, kosBeforeFirstClear: 0, firstClearAt: null, clearTimes: [] },
     timeline: []
@@ -98,7 +109,21 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     st.cr += r.cr2032; st.income.training += r.cr2032; st.xp += r.xp;
   }
 
+  /** XP가 쌓이면 레벨업 → 스탯 포인트를 전략 순서대로 분배 */
+  function levelUp() {
+    const lv = levelFromXp(st.xp).level;
+    let points = (lv - st.level) * STAT_POINTS_PER_LEVEL;
+    st.level = lv;
+    while (points > 0) {
+      const stat = strategy.alloc[st.allocTurn++ % strategy.alloc.length];
+      const capped = STAT_CAPS[stat] !== undefined && botStats(st)[stat] + STAT_POINT_GAIN[stat] > STAT_CAPS[stat];
+      if (!capped) st.alloc[stat] += 1;
+      points--;
+    }
+  }
+
   function shop() {
+    levelUp();
     // 던전 입장료는 남겨 두고 살 수 있는 만큼 강화
     for (;;) {
       const g = nextGear(st.gear);
@@ -132,7 +157,7 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
       const power = Object.values(st.gear).reduce((a, b) => a + b, 0) * 10 + st.courses;
       const canDungeon = st.cr >= DUNGEON.ENTRY_FEE && (strategy.retryAfterFail || power !== lastFailPower);
       if (canDungeon) {
-        const stats = applyGear(statsWithQuiz(PLAYER_BASE, st.courses), st.gear);
+        const stats = botStats(st);
         st.cr -= DUNGEON.ENTRY_FEE; st.spend.fee += DUNGEON.ENTRY_FEE;
         const r = dungeonOutcome(pools, strategy.dungeonMode, stats, st.dungeon.floor); // 아직 못 깬 가장 깊은 층
         st.dungeon.attempts++;

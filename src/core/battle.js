@@ -24,9 +24,9 @@ import { VILLAGE } from "./collision.js";
 let nextId = 1;
 
 /** @param {import("./collision.js").CollisionWorld} [world] 전투가 벌어지는 맵 (기본값 마을) */
-export function createBattle(spawns, type = "trainingBot", world = VILLAGE, { hpScale = 1 } = {}) {
+export function createBattle(spawns, type = "trainingBot", world = VILLAGE, { hpScale = 1, atkScale = 1 } = {}) {
   const monsters = spawns.map(([x, z]) => spawnMonster(type, x, z, world));
-  for (const m of monsters) { m.maxHp = Math.round(MONSTERS[type].hp * hpScale); m.hp = m.maxHp; }
+  for (const m of monsters) { m.maxHp = Math.round(MONSTERS[type].hp * hpScale); m.hp = m.maxHp; m.atk = Math.round(MONSTERS[type].atk * atkScale); }
   return {
     world,
     monsters,
@@ -167,7 +167,7 @@ function stepMonster(battle, m, dt, ctx, events) {
       m.t -= dt;
       if (m.t <= 0) {
         const fresh = spawnMonster(m.type, m.home.x + (ctx.rng() - 0.5) * 2, m.home.z + (ctx.rng() - 0.5) * 2, battle.world);
-        Object.assign(m, fresh, { id: m.id, home: m.home, maxHp: m.maxHp, hp: m.maxHp });
+        Object.assign(m, fresh, { id: m.id, home: m.home, maxHp: m.maxHp, hp: m.maxHp, atk: m.atk });
         events.push({ type: "respawn", monster: m });
       }
       return;
@@ -210,7 +210,7 @@ function stepMonster(battle, m, dt, ctx, events) {
           if (!def.aoe && rollDodge(ctx.stats.rx, ctx.rng)) { // 광역 공격은 회피 불가 (PRD §8.4)
             events.push({ type: "dodge", monster: m });
           } else {
-            const { amount, crit } = computeDamage(def.atk, 1, ctx.stats.sec, ctx.rng);
+            const { amount, crit } = computeDamage(m.atk ?? def.atk, 1, ctx.stats.sec, ctx.rng);
             p.hp = Math.max(0, p.hp - amount);
             p.sinceHit = 0;
             events.push({ type: "playerHit", monster: m, amount, crit });

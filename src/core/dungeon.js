@@ -4,7 +4,7 @@
 // 층마다 시드로 hopIncrement·숨은 Wi-Fi 간섭원·몬스터 배치가 달라진다 ("매번 다른 채널 배치").
 // 전투 수치는 Stage 6.5 시뮬레이션의 던전 가정치 그대로 (balance.js DUNGEON, PRD §8.7).
 
-import { DUNGEON, floorHpScale } from "./balance.js";
+import { DUNGEON, floorHpScale, floorAtkScale } from "./balance.js";
 import { createRng } from "./quiz.js";
 import { createArena } from "./arena.js";
 import {
@@ -47,7 +47,7 @@ export function pickWifiChannels(count, rng) {
 /**
  * 층 생성
  * @returns {{ floor: number, seed: number, hopIncrement: number, wifi: number[], blocked: Set<number>,
- *   spawns: Array<[number, number]>, hpScale: number }}
+ *   spawns: Array<[number, number]>, hpScale: number, atkScale: number }}
  */
 export function generateFloor(floor, seed) {
   const rng = createRng((seed ^ Math.imul(floor, 0x9e3779b1)) >>> 0);
@@ -59,7 +59,7 @@ export function generateFloor(floor, seed) {
     const a = base + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.5;
     return [DUNGEON_ROOM.cx + Math.cos(a) * 7, DUNGEON_ROOM.cz + Math.sin(a) * 7];
   });
-  return { floor, seed, hopIncrement, wifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor) };
+  return { floor, seed, hopIncrement, wifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor), atkScale: floorAtkScale(floor) };
 }
 
 /** 링크 퍼즐 상태 */

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 7</title>
+<title>Packet Knight — Stage 7.5</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -282,6 +282,22 @@
   .ch-status.bad { color: #ff9a90; }
   .dungeon-enter:disabled, .link-test:disabled { opacity: 0.45; cursor: default; }
 
+  /* RF 랩 */
+  .lab-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .lab-tab { flex: 1; background: rgba(14, 34, 60, 0.7); color: #c4dcf5; border: 1px solid #234b78; border-radius: 8px; padding: 7px; font: inherit; font-size: 13px; cursor: pointer; }
+  .lab-tab.on { background: #1b4777; color: #fff; border-color: #39d0ff; }
+  .lab-result { padding: 8px 11px; border-radius: 6px; margin: 6px 0 8px; font-size: 13px; }
+  .lab-result.ok { background: rgba(14, 90, 60, 0.55); color: #c9ffe4; }
+  .lab-result.bad { background: rgba(110, 24, 20, 0.5); color: #ffd6d2; }
+  .gear-card { background: rgba(14, 34, 60, 0.6); border: 1px solid #234b78; border-radius: 9px; padding: 9px 11px; margin: 8px 0; }
+  .gear-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .gear-lore { font-size: 11.5px; color: #8fb3d6; margin-top: 5px; }
+  .gear-lore a { text-decoration: none; }
+  .margin { display: block; font-size: 12px; color: #b5f07d; margin-top: 4px; }
+  .margin-cells { letter-spacing: 1px; }
+  .alloc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #1b3554; font-size: 13px; }
+  .lab-up:disabled, .lab-alloc:disabled { opacity: 0.45; cursor: default; }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
@@ -300,7 +316,7 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 7: 호핑 던전</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 7.5: RF 랩</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
@@ -309,7 +325,8 @@
     📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
     📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)<br />
     ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
-    🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전
+    🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
+    🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)
   </div>
 </div>
 
@@ -365,6 +382,11 @@
   <div class="panel" id="dungeon-panel"></div>
 </div>
 <div id="dungeon-hud" hidden><span class="dh-text"></span><button type="button" class="dh-leave">🏃 귀환</button></div>
+
+<!-- RF 랩: 장비 강화 · 스탯 분배 (Stage 7.5) -->
+<div id="rflab" class="overlay" role="dialog" aria-modal="true" aria-label="RF 랩" hidden>
+  <div class="panel" id="rflab-panel"></div>
+</div>
 
 <!-- 교과서 원문 리더 -->
 <div id="reader" class="overlay" role="dialog" aria-modal="true" aria-label="교과서 원문" hidden>

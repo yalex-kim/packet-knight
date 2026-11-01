@@ -1,12 +1,16 @@
 // 진행도 — 퀴즈 보상 스탯, 스킬 슬롯, 학습 지표. 저장소는 주입한다(브라우저 localStorage / Node Map).
 // 순수 로직 (THREE·DOM 의존 없음)
 
-import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY } from "./balance.js";
+import {
+  PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
+  GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS
+} from "./balance.js";
+import { applyGear, emptyGear, tryUpgrade } from "./gear.js";
 import { levelFromXp } from "./combat.js";
 import { fullCharges, useCharge, chargesAt } from "./jobCharges.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 5; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7)
+export const SAVE_VERSION = 6; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7) · v6: 장비·스탯 분배 (Stage 7.5)
 
 /**
  * @typedef {{
@@ -18,6 +22,8 @@ export const SAVE_VERSION = 5; // v2: CR2032·알바 기록 (Stage 5) · v3: XP�
  *   job: { runs: number, bestScore: number|null, totalEarned: number, charges: import("./jobCharges.js").Charges },
  *   xp: number, statPoints: number,
  *   dungeon: { maxFloor: number, attempts: number, clears: number, kos: number, stars: Record<string, number> },
+ *   gear: Record<string, number>, alloc: Record<string, number>,
+ *   lab: { tries: number, success: number, spent: number },
  *   bestiary: Record<string, { kills: number, firstScan: string }>,
  *   metrics: { quizAttempts: Record<string, number>, quizPerfect: Record<string, number>, chapterOpens: Record<string, number> }
  * }} Progress
@@ -37,11 +43,15 @@ export function createProgress() {
     statPoints: 0,
     bestiary: {},
     dungeon: emptyDungeon(),
+    gear: emptyGear(),
+    alloc: emptyAlloc(),
+    lab: { tries: 0, success: 0, spent: 0 },
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
   };
 }
 
 const emptyDungeon = () => ({ maxFloor: 0, attempts: 0, clears: 0, kos: 0, stars: {} });
+const emptyAlloc = () => ({ hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 });
 
 /** 구버전 세이브를 현재 버전으로 올린다 (진행도를 잃지 않는 것이 원칙) */
 function migrate(raw) {
@@ -49,6 +59,7 @@ function migrate(raw) {
   if (raw && raw.v === 2) raw = { ...raw, v: 3, xp: 0, statPoints: 0, bestiary: {} };
   if (raw && raw.v === 3) raw = { ...raw, v: 4, job: { ...raw.job, charges: fullCharges(0) } };
   if (raw && raw.v === 4) raw = { ...raw, v: 5, dungeon: emptyDungeon() };
+  if (raw && raw.v === 5) raw = { ...raw, v: 6, gear: emptyGear(), alloc: emptyAlloc(), lab: { tries: 0, success: 0, spent: 0 } };
   return raw;
 }
 
@@ -68,6 +79,9 @@ function validate(raw) {
   if (!raw.bestiary || typeof raw.bestiary !== "object") return null;
   const d = raw.dungeon;
   if (!d || ![d.maxFloor, d.attempts, d.clears, d.kos].every((n) => Number.isInteger(n) && n >= 0) || !isCountMap(d.stars ?? {})) return null;
+  const intMap = (o, keys) => o && keys.every((k) => Number.isInteger(o[k] ?? 0) && (o[k] ?? 0) >= 0);
+  if (!intMap(raw.gear, Object.keys(GEAR)) || Object.keys(GEAR).some((k) => (raw.gear[k] ?? 0) > UPGRADE.MAX_LEVEL)) return null;
+  if (!intMap(raw.alloc, Object.keys(STAT_POINT_GAIN)) || !intMap(raw.lab, ["tries", "success", "spent"])) return null;
   return {
     ...base,
     bonus: { ...base.bonus, ...raw.bonus },
@@ -81,6 +95,9 @@ function validate(raw) {
     xp: raw.xp,
     statPoints: raw.statPoints,
     dungeon: { maxFloor: d.maxFloor, attempts: d.attempts, clears: d.clears, kos: d.kos, stars: { ...(d.stars ?? {}) } },
+    gear: { ...emptyGear(), ...raw.gear },
+    alloc: { ...emptyAlloc(), ...raw.alloc },
+    lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };
@@ -118,11 +135,18 @@ export function saveProgress(storage, progress) {
   }
 }
 
-/** 기본 스탯 + 영구 보너스 */
+/** 기본 스탯 + 퀴즈 보너스 + 스탯 포인트 분배 + 장비 강화 (상한 적용) */
 export function effectiveStats(progress) {
   const out = {};
-  for (const k of Object.keys(PLAYER_BASE)) out[k] = +(PLAYER_BASE[k] + (progress.bonus[k] ?? 0)).toFixed(2);
-  return out;
+  for (const k of Object.keys(PLAYER_BASE)) {
+    out[k] = PLAYER_BASE[k] + (progress.bonus[k] ?? 0) + (progress.alloc?.[k] ?? 0) * STAT_POINT_GAIN[k];
+  }
+  const geared = applyGear(out, progress.gear ?? emptyGear());
+  for (const k of Object.keys(geared)) {
+    if (STAT_CAPS[k] !== undefined) geared[k] = Math.min(STAT_CAPS[k], geared[k]);
+    geared[k] = +geared[k].toFixed(2);
+  }
+  return geared;
 }
 
 export const courseFor = (chapterId) => LIBRARY_COURSES.find((c) => c.chapter === chapterId);
@@ -233,4 +257,34 @@ export function applyTimeoutPenalty(progress) {
   progress.cr2032 -= lost;
   progress.dungeon.kos += 1;
   return lost;
+}
+
+// ---------- RF 랩 (Stage 7.5) ----------
+/**
+ * 장비 강화 1회 시도 (PRD §4.4) — 실패해도 장비는 그대로, 재료(CR2032)만 소모
+ * @returns {{ ok: false, reason: "max"|"funds" } | { ok: true, success: boolean, cost: number, level: number }}
+ */
+export function upgradeGear(progress, piece, rng) {
+  const level = progress.gear[piece];
+  const attempt = tryUpgrade(level, rng);
+  if (!attempt) return { ok: false, reason: "max" };
+  if (progress.cr2032 < attempt.cost) return { ok: false, reason: "funds" };
+  progress.cr2032 -= attempt.cost;
+  progress.lab.tries += 1;
+  progress.lab.spent += attempt.cost;
+  if (attempt.success) { progress.gear[piece] += 1; progress.lab.success += 1; }
+  return { ok: true, success: attempt.success, cost: attempt.cost, level: progress.gear[piece] };
+}
+
+/** 스탯이 상한에 닿았는지 */
+export function statCapped(progress, stat) {
+  return STAT_CAPS[stat] !== undefined && effectiveStats(progress)[stat] >= STAT_CAPS[stat];
+}
+
+/** 스탯 포인트 1점 분배 — 성공하면 true */
+export function allocatePoint(progress, stat) {
+  if (!ALLOCATABLE_STATS.includes(stat) || progress.statPoints <= 0 || statCapped(progress, stat)) return false;
+  progress.statPoints -= 1;
+  progress.alloc[stat] += 1;
+  return true;
 }
