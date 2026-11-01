@@ -86,12 +86,39 @@ function makeRouter(g) {
   return { rig, bodyMat, ledMat, aoe, aoeFill };
 }
 
+/** "Wi-Fi N" 이름표 텍스처 (채널별 캐시) — 스캔으로 대역이 드러난 몬스터 위에 뜬다 */
+const tagTextures = new Map();
+function tagTexture(w) {
+  if (!tagTextures.has(w)) {
+    const c = document.createElement("canvas");
+    c.width = 128; c.height = 40;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "rgba(120, 20, 14, 0.85)";
+    ctx.fillRect(0, 0, 128, 40);
+    ctx.fillStyle = "#ffd6d2";
+    ctx.font = "bold 24px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`Wi-Fi ${w}`, 64, 21);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tagTextures.set(w, tex);
+  }
+  return tagTextures.get(w);
+}
+
 function makeMonster(m) {
   const g = new THREE.Group();
   if (m.type === "wifiInterferer") {
     const parts = makeRouter(g);
     const bar = makeBar(g, 1.7);
-    g.userData = { monsterId: m.id, ...parts, ...bar };
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+    tag.scale.set(1.1, 0.34, 1);
+    tag.position.y = 2.05;
+    tag.visible = false;
+    tag.renderOrder = 11;
+    g.add(tag);
+    g.userData = { monsterId: m.id, ...parts, ...bar, tag, tagWifi: null };
     battleRoot.add(g);
     monsterTargets.push(g);
     monsterMeshes.set(m.id, g);
@@ -157,6 +184,15 @@ export function syncBattle(battle, camera, t, dt) {
     const { rig, bodyMat, ledMat, bar, fg, aoe, aoeFill } = g.userData;
     g.visible = m.state !== "dead";
     if (!g.visible) continue;
+    const { tag } = g.userData;
+    if (tag) {
+      tag.visible = Boolean(m.revealed && m.wifi);
+      if (tag.visible && g.userData.tagWifi !== m.wifi) {
+        tag.material.map = tagTexture(m.wifi);
+        tag.material.needsUpdate = true;
+        g.userData.tagWifi = m.wifi;
+      }
+    }
     if (aoe) {
       // 광역 공격 예고: 바닥에 공격 범위가 차오른다 → 원 밖으로 피하라
       const on = m.state === "windup";

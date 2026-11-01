@@ -16,6 +16,11 @@ export const STAT_META = Object.freeze({
   pwr: { icon: "🔋", label: "PWR", name: "배터리 효율", unit: "" }
 });
 
+/** 스탯이 아닌 기술 보상 (강좌 reward 키) */
+export const SKILL_REWARDS = Object.freeze({
+  afh: Object.freeze({ icon: "📶", label: "AFH 스킬", name: "간섭 채널 자동 빼기", desc: "던전 전투 중 스캔한 Wi-Fi 대역을 버튼 하나로 채널맵에서 뺀다 (적응형 주파수 도약)" })
+});
+
 /**
  * 퀴즈 만점 보너스 크기 (PRD §8.4 "퀴즈 만점 보너스" 열) — 강좌 하나 = 장비 강화 1단계와 같은 가치.
  * (Stage 6.5 시뮬레이션: 원안 HP+5·TX+1·RX+1·PWR+5로는 퀴즈를 건너뛰고 알바한 쪽이 더 빨리 성장했다 — PRD §8.7)
@@ -36,6 +41,8 @@ export const QUIZ = Object.freeze({
  */
 export const LIBRARY_COURSES = Object.freeze([
   { chapter: "intro",       reward: "hp"  }, // 블루투스의 큰 그림 → 연결 안정성
+  // Stage 8: 스탯이 아니라 "기술"을 준다 — 스캔한 간섭 대역을 버튼 하나로 채널맵에서 빼는 AFH (배우지 않으면 HUD에서 손으로)
+  { chapter: "hopping",     reward: "afh" },
   { chapter: "radio",       reward: "tx"  }, // 전파·데시벨 → 송신 출력
   { chapter: "phy",         reward: "rx"  }, // PHY·변조 → 수신 감도(회피)
   { chapter: "advertising", reward: "sec" }  // 광고 채널 3개로 간섭을 견딘다 → 간섭 내성(방어). PWR는 스킬 배터리가 생기면 다시 검토
@@ -121,7 +128,7 @@ export const MONSTERS = Object.freeze({
   wifiInterferer: Object.freeze({
     id: "wifiInterferer",
     name: "Wi-Fi 간섭 몬스터",
-    hp: 90, atk: 12, sec: 2,
+    hp: 90, atk: 32, sec: 2,
     speed: 2.6, aggro: 14, leash: 30,
     attackRange: 3.0, aoe: true, windup: 0.8, cooldown: 1.8,
     respawn: Infinity,
@@ -174,7 +181,7 @@ export const TIMEOUT_PENALTY = 0.1;
  * HP 0이면 실패(타임아웃). 클리어하면 다음 층이 열린다 (PRD §7 Stage 7 DoD). 입장 1회 = 한 층 도전.
  * (층마다 몬스터 +1마리는 장비 1단계로 메울 수 없는 절벽이었다 — PRD §8.7)
  */
-export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.1, TIME_LIMIT: 180 });
+export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.15, TIME_LIMIT: 180 });
 export const floorHpScale = (floor) => 1 + DUNGEON.FLOOR_HP_SCALE * (floor - 1);
 /** 층마다 공격력도 오른다 — 체력만 오르면 방어(SEC)만 올려 깊은 층이 무의미해진다 (Stage 7.5 시뮬레이션) */
 export const floorAtkScale = (floor) => 1 + DUNGEON.FLOOR_ATK_SCALE * (floor - 1);

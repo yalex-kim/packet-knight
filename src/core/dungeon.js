@@ -7,6 +7,7 @@
 import { DUNGEON, floorHpScale, floorAtkScale } from "./balance.js";
 import { createRng } from "./quiz.js";
 import { createArena } from "./arena.js";
+import { createBattle } from "./battle.js";
 import {
   DATA_CHANNELS, HOP_MIN, HOP_MAX, MIN_USED_CHANNELS, allChannelsMap, usedChannels,
   wifiBlockedChannels, csa1Sequence, linkTest, dataChannelFreq
@@ -47,7 +48,7 @@ export function pickWifiChannels(count, rng) {
 /**
  * 층 생성
  * @returns {{ floor: number, seed: number, hopIncrement: number, wifi: number[], blocked: Set<number>,
- *   spawns: Array<[number, number]>, hpScale: number, atkScale: number }}
+ *   spawns: Array<[number, number]>, monsterWifi: number[], hpScale: number, atkScale: number }}
  */
 export function generateFloor(floor, seed) {
   const rng = createRng((seed ^ Math.imul(floor, 0x9e3779b1)) >>> 0);
@@ -59,7 +60,40 @@ export function generateFloor(floor, seed) {
     const a = base + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.5;
     return [DUNGEON_ROOM.cx + Math.cos(a) * 7, DUNGEON_ROOM.cz + Math.sin(a) * 7];
   });
-  return { floor, seed, hopIncrement, wifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor), atkScale: floorAtkScale(floor) };
+  // 몬스터마다 자기 Wi-Fi 채널 (전투 중 간섭 대역 — Stage 8). 벽 속 숨은 공유기(wifi)와는 별개
+  const monsterWifi = spawns.map(() => 1 + Math.floor(rng() * 13));
+  return { floor, seed, hopIncrement, wifi, monsterWifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor), atkScale: floorAtkScale(floor) };
+}
+
+/**
+ * 자동 채널 선택(ACS) 주기 — 3층부터 Wi-Fi 몬스터가 주기적으로 채널을 옮긴다 (초, 없으면 null).
+ * 대역이 고정이면 AFH 한 번으로 영구히 안 맞게 되어(Stage 8 시뮬레이션) 깊은 층이 무의미했다.
+ */
+export const acsPeriodFor = (floor) => (floor < 3 ? null : Math.max(6, 12 - floor));
+
+/** ACS 진행: 주기가 되면 몬스터가 다른 Wi-Fi 채널로 옮긴다 (드러난 대역은 새 채널로 바로 보인다 — 바뀐 걸 알아채고 다시 AFH해야 한다) */
+export function stepAcs(battle, floor, dt, rng) {
+  const period = acsPeriodFor(floor);
+  const events = [];
+  if (!period) return events;
+  for (const m of battle.monsters) {
+    if (m.state === "dead") continue;
+    m.acsT = (m.acsT ?? period * (0.5 + rng() * 0.5)) - dt;
+    if (m.acsT > 0) continue;
+    m.acsT = period;
+    let w = m.wifi;
+    while (Math.abs(w - m.wifi) < 4) w = 1 + Math.floor(rng() * 13); // 겹치지 않는 먼 채널로
+    events.push({ type: "acs", monster: m, from: m.wifi, to: w });
+    m.wifi = w;
+  }
+  return events;
+}
+
+/** 층의 전투 생성 — 몬스터마다 Wi-Fi 채널(m.wifi)을 붙인다. 체크포인트 롤백은 같은 layout으로 다시 만든다 */
+export function createFloorBattle(layout) {
+  const battle = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
+  battle.monsters.forEach((m, i) => { m.wifi = layout.monsterWifi[i]; m.revealed = false; });
+  return battle;
 }
 
 /** 링크 퍼즐 상태 */

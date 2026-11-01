@@ -3,6 +3,7 @@
 import * as THREE from "three";
 import { DUNGEON_ROOM } from "../core/dungeon.js";
 import { DATA_CHANNELS } from "../core/hopping.js";
+import { monsterBand } from "../core/link.js";
 
 const { cx, cz, radius, floorY } = DUNGEON_ROOM;
 export const dungeonRoot = new THREE.Group();
@@ -81,6 +82,22 @@ export const dungeonTargets = [consoleMesh, portalMesh];
 export function syncDungeon(run, t) {
   dungeonRoot.visible = Boolean(run);
   if (!run) return;
+  // 전투 중: 기둥 = 기사 링크 (지금 채널·뺀 채널·드러난 Wi-Fi 대역) — Stage 8
+  if (run.phase === "combat" && run.link) {
+    const band = new Set();
+    for (const m of run.battle.monsters) if (m.state !== "dead" && m.revealed) for (const c of monsterBand(m)) band.add(c);
+    for (let c = 0; c < DATA_CHANNELS; c++) {
+      const p = pillars[c];
+      const now = run.link.channel === c;
+      const used = run.link.map[c];
+      let color = used ? 0x2b6cff : 0x1a1f2a;
+      if (band.has(c)) color = used ? 0xff3b30 : 0x5a1a16;
+      if (now) color = band.has(c) ? 0xffb36b : 0x7dffb5;
+      p.material.color.setHex(color);
+      p.scale.y = now ? 2.4 : used ? 1.4 : 0.6;
+      p.position.y = floorY + p.scale.y / 2;
+    }
+  } else {
   const puzzle = run.puzzle;
   const recent = puzzle?.log.at(-1);
   for (let c = 0; c < DATA_CHANNELS; c++) {
@@ -95,6 +112,7 @@ export function syncDungeon(run, t) {
     p.material.color.setHex(color);
     p.scale.y = active ? 2.2 : used ? 1.4 : 0.6;
     p.position.y = floorY + p.scale.y / 2;
+  }
   }
   const open = run.phase === "open";
   const film = portalMesh.userData.film;

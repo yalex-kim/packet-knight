@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 7.5</title>
+<title>Packet Knight — Stage 8</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -298,6 +298,26 @@
   .alloc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #1b3554; font-size: 13px; }
   .lab-up:disabled, .lab-alloc:disabled { opacity: 0.45; cursor: default; }
 
+  /* 전투 채널맵 HUD (Stage 8) */
+  #chmap {
+    position: fixed; left: 50%; bottom: 52px; transform: translateX(-50%); z-index: 12; width: min(620px, 62vw);
+    background: rgba(6, 12, 24, 0.9); border: 1px solid #2d5584; border-radius: 10px; padding: 6px 8px; color: #d6e6f5;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45); font-size: 11.5px;
+  }
+  #chmap .cm-cells { display: grid; grid-template-columns: repeat(37, 1fr); gap: 2px; }
+  #chmap .cm { height: 22px; padding: 0; border: 1px solid #2d6fb3; border-radius: 3px; background: #1b4777; cursor: pointer; touch-action: none; }
+  #chmap .cm.band { background: #a8261d; border-color: #ff5a4e; }
+  #chmap .cm.off { background: #0b0f16; border-color: #2a2f3a; }
+  #chmap .cm.off.band { background: #3a1210; }
+  #chmap .cm.pend { background-image: repeating-linear-gradient(45deg, rgba(255,215,107,0.55) 0 3px, transparent 3px 6px); }
+  #chmap .cm.now { outline: 2px solid #7dffb5; outline-offset: 1px; position: relative; z-index: 1; }
+  #chmap .cm-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+  #chmap .cm-info { flex: 1; min-width: 200px; }
+  #chmap .cm-info.danger { color: #ff9a90; }
+  #chmap .cm-btn { background: #1b4777; color: #e2f1ff; border: 1px solid #2d6fb3; border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 11.5px; cursor: pointer; touch-action: none; }
+  #chmap .cm-afh { background: #0e7a5a; border-color: #23b585; }
+  #chmap .cm-btn:disabled { opacity: 0.55; cursor: default; }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
@@ -309,6 +329,10 @@
     #hp.hurt { animation: none; }
     /* 던전 바는 HP 바 아래 왼쪽 (오른쪽은 스탯 패널) */
     #dungeon-hud { top: 80px; left: 14px; transform: none; max-width: 55vw; font-size: 11.5px; flex-wrap: wrap; gap: 4px; }
+    #chmap { top: 180px; bottom: auto; left: 8px; right: 8px; width: auto; transform: none; padding: 5px; font-size: 10.5px; }
+    #toast { top: 46%; }
+    #chmap .cm { height: 26px; border-radius: 2px; }
+    #chmap .cm-cells { gap: 1px; }
   }
 </style>
 </head>
@@ -316,7 +340,7 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 7.5: RF 랩</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 8: 간섭 전투</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
@@ -382,6 +406,10 @@
   <div class="panel" id="dungeon-panel"></div>
 </div>
 <div id="dungeon-hud" hidden><span class="dh-text"></span><button type="button" class="dh-leave">🏃 귀환</button></div>
+<div id="chmap" hidden aria-label="실시간 채널맵 (칸을 눌러 채널맵에서 빼기/넣기)">
+  <div class="cm-cells"></div>
+  <div class="cm-row"><span class="cm-info"></span><span><button type="button" class="cm-btn cm-reset">↩ 전체 사용</button> <button type="button" class="cm-btn cm-afh"></button></span></div>
+</div>
 
 <!-- RF 랩: 장비 강화 · 스탯 분배 (Stage 7.5) -->
 <div id="rflab" class="overlay" role="dialog" aria-modal="true" aria-label="RF 랩" hidden>

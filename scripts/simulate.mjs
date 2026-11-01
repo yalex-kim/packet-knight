@@ -103,7 +103,7 @@ function quizContribution(samples = 300) {
     for (const [label, courses] of [["without", 0], ["with", LIBRARY_COURSES.length]]) {
       const rng = createRng(SEED + 100 + lv);
       const stats = applyGear(statsWithQuiz(PLAYER_BASE, courses), gear);
-      const rr = Array.from({ length: samples }, () => dungeonFloor("kite", stats, rng));
+      const rr = Array.from({ length: samples }, () => dungeonFloor("kite", stats, rng, 1, { afh: courses ? "button" : "manual" }));
       const clears = rr.filter((r) => r.cleared).length;
       const totalTime = rr.reduce((a, r) => a + r.time + 40, 0); // 입장 오버헤드 포함
       row[label] = { clearPct: pct(clears / samples), expectedTimePerClear: clears ? Math.round(totalTime / clears) : Infinity };
@@ -140,6 +140,7 @@ function simulateEconomy(bots, strategies) {
         floorsCleared: r1(mean(runs.map((r) => r.dungeon.floor - 1))),
         firstClearMin: r1(mean(firstClear) / 60),
         kosBeforeFirstClear: r1(mean(runs.filter((r) => r.dungeon.firstClearAt !== null).map((r) => r.dungeon.kosBeforeFirstClear))),
+        rollbacksPerClear: r1(mean(runs.flatMap((r) => r.dungeon.rollbacksPerClear))),
         endBalance: r1(mean(runs.map((r) => r.cr)))
       });
     }
@@ -160,13 +161,14 @@ function judge(econ, quiz) {
     { id: "surplus", label: "CR2032 수지 ((수급 − 입장료 − 페널티) / 목표 강화 비용 − 1, 중간 전략)", target: `+${ECONOMY.SURPLUS_MIN * 100}~+${ECONOMY.SURPLUS_MAX * 100}%`, value: `${bal.surplusVsTarget >= 0 ? "+" : ""}${bal.surplusVsTarget}%`,
       pass: within(bal.surplusVsTarget, ECONOMY.SURPLUS_MIN * 100, ECONOMY.SURPLUS_MAX * 100) },
     { id: "timeouts", label: "첫 클리어 전 타임아웃(KO) 횟수 평균 (중간 전략)", target: "≤ 3회", value: `${bal.kosBeforeFirstClear}회`, pass: bal.kosBeforeFirstClear <= 3 },
+    { id: "rollbacks", label: "층(퀘스트) 하나 깨는 동안 체크포인트 롤백 횟수 평균 (중간 전략, Stage 8 DoD)", target: "≤ 3회", value: `${bal.rollbacksPerClear}회`, pass: bal.rollbacksPerClear <= 3 },
     { id: "quizOptional", label: "퀴즈 보너스 없이도 클리어 가능 (중간 전략, 퀴즈 생략 시 1시간 내 첫 클리어 도달률)", target: "≥ 80%", value: `${balNoQuiz.reachedClearPct}%`, pass: balNoQuiz.reachedClearPct >= 80 },
     { id: "quizSpeedup", label: "퀴즈 보너스로 던전 클리어가 빨라지는 정도 (같은 장비, 기대 소요 시간, 첫 클리어가 일어나는 장비 +1·+2 평균)", target: "≥ 20%",
       value: `평균 ${r1(mean(speedups))}% (+1: ${speedups[0]}%, +2: ${speedups[1]}%)`, pass: speedups.length > 0 && mean(speedups) >= 20 },
-    { id: "quizWorthIt", label: "공부한 시간까지 따져도 퀴즈가 이득 (중간 전략 1시간: 첫 클리어 시간 퀴즈 O / 퀴즈 X)", target: "≤ 0.8배",
-      value: `첫 클리어 ${bal.firstClearMin}분 / ${balNoQuiz.firstClearMin}분 = ${(bal.firstClearMin / balNoQuiz.firstClearMin).toFixed(2)}배 · 도달 층 ${bal.floorsCleared} / ${balNoQuiz.floorsCleared} = ${(bal.floorsCleared / balNoQuiz.floorsCleared).toFixed(2)}배`,
-      pass: bal.firstClearMin <= 0.8 * balNoQuiz.firstClearMin, gating: false,
-      note: "관찰 지표(Stage 6.5 추가, 합격 판정 제외) — 공부 시간의 기회비용까지 따진 학습 인센티브. 목표치는 PRD §8.7 결정 대기" }
+    { id: "quizWorthIt", label: "공부한 시간까지 따져도 퀴즈가 이득 (중간 전략 1시간 도달 층: 퀴즈 O / 퀴즈 X)", target: "≥ 1.2배",
+      value: `도달 층 ${bal.floorsCleared} / ${balNoQuiz.floorsCleared} = ${(bal.floorsCleared / balNoQuiz.floorsCleared).toFixed(2)}배 (참고: 첫 클리어 ${bal.firstClearMin}분 / ${balNoQuiz.firstClearMin}분)`,
+      pass: bal.floorsCleared >= 1.2 * balNoQuiz.floorsCleared,
+      note: "Stage 8에서 합격 판정에 포함 (사용자 결정: 도달 층 기준) — 공부 시간의 기회비용까지 따진 학습 인센티브" }
   ];
 }
 
@@ -253,7 +255,7 @@ if (args.json) {
       + `${String(r.upgradesSucceeded).padStart(6)}  ${String(r.dungeonAttempts).padStart(7)}  ${(r.dungeonClearPct + "%").padStart(7)}  ${(Number.isNaN(r.firstClearMin) ? "-" : r.firstClearMin + "분").padStart(7)}  ${String(r.kosBeforeFirstClear).padStart(6)}  ${String(r.floorsCleared).padStart(10)}`);
   }
   if (report.quizContribution) {
-    console.log("\n■ 퀴즈 보너스 기여도 (회피 전투, 같은 장비, 기대 클리어 소요 시간)");
+    console.log("\n■ 퀴즈 보너스 기여도 (회피 전투, 같은 장비, 기대 클리어 소요 시간 — 보너스 없음 = AFH 수동, 있음 = AFH 스킬)");
     for (const q of report.quizContribution) {
       console.log(`  장비 +${q.gear}: 보너스 없음 ${q.without.expectedTimePerClear}s (클리어 ${q.without.clearPct}%) → 있음 ${q.with.expectedTimePerClear}s (클리어 ${q.with.clearPct}%) · ${q.speedup ?? "-"}% 단축`);
     }

@@ -135,7 +135,9 @@ function stepProjectiles(battle, dt, ctx, events) {
       pr.traveled += step / sub;
       for (const m of battle.monsters) {
         if (alive(m) && dist2D(pr, m) < hitRadius && Math.abs(pr.y - (m.y + 0.4)) < 1.0) {
-          damageMonster(battle, m, ctx, events);
+          // 간섭 채널 위에서 보낸 패킷은 깨진다 (Stage 8 — ctx.interference가 있을 때만)
+          if (ctx.interference?.packetLost(battle)) events.push({ type: "packetLost", monster: m });
+          else damageMonster(battle, m, ctx, events);
           return false;
         }
       }
@@ -209,6 +211,8 @@ function stepMonster(battle, m, dt, ctx, events) {
         if (d <= def.attackRange + 0.4 && p.hp > 0) {
           if (!def.aoe && rollDodge(ctx.stats.rx, ctx.rng)) { // 광역 공격은 회피 불가 (PRD §8.4)
             events.push({ type: "dodge", monster: m });
+          } else if (ctx.interference && !ctx.interference.playerHit(m)) {
+            events.push({ type: "outOfBand", monster: m }); // 간섭 채널 밖 → 피해 0 (PRD §8.4)
           } else {
             const { amount, crit } = computeDamage(m.atk ?? def.atk, 1, ctx.stats.sec, ctx.rng);
             p.hp = Math.max(0, p.hp - amount);

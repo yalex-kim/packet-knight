@@ -50,7 +50,7 @@ export function createProgress() {
   };
 }
 
-const emptyDungeon = () => ({ maxFloor: 0, attempts: 0, clears: 0, kos: 0, stars: {} });
+const emptyDungeon = () => ({ maxFloor: 0, attempts: 0, clears: 0, kos: 0, rollbacks: 0, stars: {} });
 const emptyAlloc = () => ({ hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 });
 
 /** 구버전 세이브를 현재 버전으로 올린다 (진행도를 잃지 않는 것이 원칙) */
@@ -94,7 +94,7 @@ function validate(raw) {
     },
     xp: raw.xp,
     statPoints: raw.statPoints,
-    dungeon: { maxFloor: d.maxFloor, attempts: d.attempts, clears: d.clears, kos: d.kos, stars: { ...(d.stars ?? {}) } },
+    dungeon: { maxFloor: d.maxFloor, attempts: d.attempts, clears: d.clears, kos: d.kos, rollbacks: Number.isInteger(d.rollbacks) ? d.rollbacks : 0, stars: { ...(d.stars ?? {}) } },
     gear: { ...emptyGear(), ...raw.gear },
     alloc: { ...emptyAlloc(), ...raw.alloc },
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
@@ -171,8 +171,8 @@ export function applyQuizResult(progress, chapterId, perfect, now = new Date()) 
   progress.cleared[chapterId] = now.toISOString();
   const course = courseFor(chapterId);
   if (!course) return { firstClear: true, reward: null };
-  const amount = QUIZ_BONUS[course.reward] ?? 0;
-  progress.bonus[course.reward] = (progress.bonus[course.reward] ?? 0) + amount;
+  const amount = QUIZ_BONUS[course.reward] ?? 0; // 기술 보상(afh 등)은 스탯 0 — 이수 기록(cleared)이 곧 보유 여부
+  if (amount) progress.bonus[course.reward] = (progress.bonus[course.reward] ?? 0) + amount;
   const slotUnlocked = progress.skillSlots < QUIZ.MAX_SKILL_SLOTS;
   if (slotUnlocked) progress.skillSlots += 1;
   return { firstClear: true, reward: { stat: course.reward, amount, slotUnlocked } };
@@ -288,3 +288,6 @@ export function allocatePoint(progress, stat) {
   progress.alloc[stat] += 1;
   return true;
 }
+
+/** AFH 스킬 보유 — 도서관 "주파수 도약과 공존" 강좌 이수 (Stage 8) */
+export const hasAfhSkill = (progress) => Boolean(progress.cleared.hopping);

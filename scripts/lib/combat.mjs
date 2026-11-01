@@ -2,7 +2,8 @@
 import { MONSTERS, TRAINING_GROUND, DUNGEON } from "../../src/core/balance.js";
 import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket } from "../../src/core/battle.js";
 import { createMotor, stepMotor } from "../../src/core/motor.js";
-import { DUNGEON_WORLD, DUNGEON_ROOM, generateFloor } from "../../src/core/dungeon.js";
+import { DUNGEON_ROOM, generateFloor, createFloorBattle, stepAcs } from "../../src/core/dungeon.js";
+import { createLink, stepLink, applyAfh, interferenceFor } from "../../src/core/link.js";
 import { VILLAGE } from "../../src/core/collision.js";
 import { REACTION } from "./rssi.mjs";
 
@@ -70,16 +71,38 @@ export function trainingSession(mode, stats, rng, seconds = 60) {
  * 링크 퍼즐(채널맵)은 전투력과 무관하므로 경제 모델에서 시간(TIME.LINK_PUZZLE)으로만 반영한다.
  * (처음엔 마을 지형을 빌렸으나 나무 뒤에 몬스터가 걸리는 인공물로 "장비가 좋을수록 클리어율 하락"이 나왔다 — PRD §8.7)
  */
-export function dungeonFloor(mode, stats, rng, floor = 1) {
+/** 대역을 본 뒤 채널맵 갱신을 요청하기까지 (초): AFH 스킬 버튼 한 번 vs HUD 칸을 손으로 하나씩 */
+export const AFH_DELAY = Object.freeze({ button: 1.5, manual: 6 });
+
+/**
+ * @param {{ afh?: false|"button"|"manual" }} opts 스캔한 몬스터 대역을 채널맵에서 빼는가, 어떻게 (Stage 8)
+ */
+export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush" ? false : "button" } = {}) {
   const layout = generateFloor(floor, Math.floor(rng() * 2 ** 31));
-  const battle = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
+  const battle = createFloorBattle(layout);
   syncPlayerHp(battle, stats.hp);
   const pl = createMotor({ x: DUNGEON_ROOM.cx, y: DUNGEON_ROOM.floorY, z: DUNGEON_ROOM.cz });
-  const r = { cleared: false, ko: false, time: 0, kills: 0, cr2032: 0, xp: 0, hpLeft: 0 };
+  const link = createLink(layout.hopIncrement);
+  const interference = interferenceFor(link);
+  let afhAt = Infinity; // 다음 "간섭 채널 빼기" 누를 시각
+  const r = { cleared: false, ko: false, time: 0, kills: 0, cr2032: 0, xp: 0, hpLeft: 0, packetLost: 0, outOfBand: 0, damage: 0 };
   for (let t = 0; t < DUNGEON.TIME_LIMIT; t += COMBAT_DT) {
+    stepLink(link, COMBAT_DT);
+    if (t >= afhAt) { applyAfh(link, battle); afhAt = Infinity; }
+    for (const e of stepAcs(battle, floor, COMBAT_DT, rng)) if (afh && e.monster.revealed) afhAt = Math.min(afhAt, t + AFH_DELAY[afh]);
     botStep(battle, pl, mode, COMBAT_DT, stats);
-    for (const e of stepBattle(battle, COMBAT_DT, { player: pl, stats, rng })) {
-      if (e.type === "hit") battle.sinceHit = 0;
+    for (const e of stepBattle(battle, COMBAT_DT, { player: pl, stats, rng, interference })) {
+      if (e.type === "hit") {
+        battle.sinceHit = 0;
+        if (!e.monster.revealed) { e.monster.revealed = true; if (afh) afhAt = Math.min(afhAt, t + AFH_DELAY[afh]); }
+      }
+      if (e.type === "packetLost") {
+        r.packetLost++;
+        battle.sinceHit = 0; // 쏘고는 있다 (다가갈 필요 없음)
+        if (!e.monster.revealed) { e.monster.revealed = true; if (afh) afhAt = Math.min(afhAt, t + AFH_DELAY[afh]); }
+      }
+      if (e.type === "outOfBand") r.outOfBand++;
+      if (e.type === "playerHit") r.damage += e.amount;
       if (e.type === "kill") { r.kills++; r.xp += e.xp; r.cr2032 += e.drops.reduce((k, d) => k + (d.item === "cr2032" ? d.count : 0), 0); }
       if (e.type === "ko") { r.ko = true; r.time = t; return r; }
     }

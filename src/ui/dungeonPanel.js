@@ -12,12 +12,12 @@ const HOPPING_URL = "https://yalex-kim.github.io/connectivityBook/bluetooth/chap
 /**
  * @type {{
  *   onEnter: () => void, onLeave: () => void, onClose: () => void,
- *   onToggle: (ch: number) => void, onReset: () => void, onTest: () => void, onObserve: (on: boolean) => void,
+ *   onToggle: (ch: number) => void, onReset: () => void, onTest: () => void, onObserve: (on: boolean) => void, onRollback: () => void,
  *   getProgress: () => any
  * }}
  */
 let hooks;
-let mode = null; // "entry" | "console" | "portal"
+let mode = null; // "entry" | "console" | "portal" | "timeout"
 let consoleView = null;
 
 function el(tag, props = {}, ...children) {
@@ -70,6 +70,22 @@ export function openEntry({ floor, fromPortal }) {
     el("div", { class: "lib-actions" },
       button(fromPortal ? "🏃 마을로 귀환" : "닫기", fromPortal ? () => { close(); hooks.onLeave(); } : close),
       enter
+    )
+  );
+}
+
+// ---------- Connection Timeout (Stage 8) ----------
+/** @param {{ floor: number, lost: number, rollbacks: number }} info */
+export function openTimeout({ floor, lost, rollbacks }) {
+  mode = "timeout";
+  overlay.hidden = false;
+  render(
+    el("div", { class: "head" }, el("div", {}, el("h2", { textContent: "📶 Connection Timeout" }), el("div", { class: "muted", textContent: "supervision timeout — 연결 감독 시간 안에 패킷이 오가지 않았다" }))),
+    el("p", { class: "npc", textContent: `${floor}층에서 연결이 끊겼네. 게임오버는 없다 — 마지막으로 연결이 안정적이던 순간(층 시작 체크포인트)으로 재연결할 수 있지. 전력 누수로 CR2032 ${lost}개를 잃었다네.` }),
+    el("p", { class: "muted", textContent: `BLE에서도 감독 타임아웃(100 ms ~ 32 s) 동안 응답이 없으면 연결이 끊긴 것으로 보고 다시 연결한다. 이번 층 롤백 ${rollbacks}회.` }),
+    el("div", { class: "lib-actions" },
+      button("🏃 마을로", () => { close(); }),
+      button("🔁 체크포인트에서 재연결", () => hooks.onRollback(), "lib-btn primary timeout-rollback")
     )
   );
 }
@@ -158,7 +174,9 @@ export function updateHud(run) {
   hudBar.hidden = !run;
   if (!run) return;
   const alive = run.battle.monsters.filter((m) => m.state !== "dead").length;
-  const step = run.phase === "combat" ? `간섭 몬스터 ${alive}/${run.battle.monsters.length}` : run.phase === "link" ? "📡 북쪽 링크 콘솔에서 채널맵 정비" : "🌀 남쪽 포털 열림";
+  const step = run.phase === "combat" ? `간섭 몬스터 ${alive}/${run.battle.monsters.length}${run.rollbacks ? ` · 롤백 ${run.rollbacks}` : ""}`
+    : run.phase === "timeout" ? "📶 Connection Timeout"
+    : run.phase === "link" ? "📡 북쪽 링크 콘솔에서 채널맵 정비" : "🌀 남쪽 포털 열림";
   hudBar.querySelector(".dh-text").textContent = `⚔️ 호핑 던전 ${run.floor}층 · ${step}`;
 }
 

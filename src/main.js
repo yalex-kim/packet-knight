@@ -5,6 +5,7 @@
 //   Stage 5: "60초 플레이로 CR2032가 지급되고 잔액이 저장된다"
 //   Stage 6: "몬스터를 처치해 아이템을 얻고, HP가 줄었다가 회복된다"
 //   Stage 7: "던전이 매번 다른 채널 배치로 생성되고 클리어 시 다음 층이 열린다"
+//   Stage 8: "HP 0 시 체크포인트 롤백이 기록대로 동작한다" + 간섭 채널 밖이면 피해 0 (실시간 채널맵)
 //
 // 계층:  core/ (순수 로직, Node에서 import 가능) → render/ (THREE) · ui/ (DOM) → main.js (조립)
 
@@ -35,7 +36,11 @@ import { levelFromXp } from "./core/combat.js";
 import * as battleView from "./render/battleView.js";
 import * as fx from "./ui/fx.js";
 import { VILLAGE } from "./core/collision.js";
-import { DUNGEON_ROOM, DUNGEON_WORLD, generateFloor, createLinkPuzzle, toggleChannel, resetMap, observe, runLinkTest } from "./core/dungeon.js";
+import { DUNGEON_ROOM, DUNGEON_WORLD, generateFloor, createLinkPuzzle, toggleChannel, resetMap, observe, runLinkTest, createFloorBattle, stepAcs } from "./core/dungeon.js";
+import { createLink, stepLink, toggleLinkChannel, applyAfh, requestMap, interferenceFor } from "./core/link.js";
+import { allChannelsMap } from "./core/hopping.js";
+import { hasAfhSkill } from "./core/progress.js";
+import * as chmap from "./ui/chmap.js";
 import { nextFloor, payDungeonEntry, applyFloorClear, applyTimeoutPenalty } from "./core/progress.js";
 import * as dungeonView from "./render/dungeonView.js";
 import * as dungeonUi from "./ui/dungeonPanel.js";
@@ -237,6 +242,7 @@ function handleBattleEvents(events) {
     switch (e.type) {
       case "hit": {
         const m = e.monster;
+        if (m.wifi && !m.revealed) m.revealed = true; // 스캔 = 대역 판명
         fx.floatText(m.x, m.y + 0.6, m.z, `${e.amount}${e.crit ? "!" : ""}`, e.crit ? "crit" : "");
         if (e.firstScan && recordScan(progress, m.type)) {
           const def = MONSTERS[m.type];
@@ -267,14 +273,27 @@ function handleBattleEvents(events) {
       case "dodge":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, "회피!", "dodge");
         break;
+      case "packetLost": {
+        // 간섭 채널 위에서 쏜 패킷이 깨졌다 — 이 몬스터의 대역이 드러난다(채널 분류)
+        const m = e.monster;
+        if (!m.revealed) { m.revealed = true; fx.showToast(`🔍 Wi-Fi ${m.wifi}번 대역 발견 — 채널 ${run?.link?.channel}에서 패킷이 깨졌다. 채널맵에서 빼면 피할 수 있다`, 3.5); }
+        fx.floatText(m.x, m.y + 0.8, m.z, `패킷 손실 ✗ch${run?.link?.channel ?? "?"}`, "dodge");
+        break;
+      }
+      case "outOfBand":
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, `간섭 밖 ch${run?.link?.channel ?? "?"} — 피해 0`, "dodge");
+        break;
       case "ko":
         if (run) {
-          // 던전 KO = Connection Timeout: 마을로 재연결, 보유 CR2032 10% 손실 (PRD §5 — 체크포인트 롤백은 Stage 8)
+          // 던전 KO = Connection Timeout: CR2032 10% 손실 → 체크포인트(층 시작)로 롤백하거나 마을로 (PRD §5, Stage 8)
           const lost = applyTimeoutPenalty(progress);
-          fx.showToast(`📶 Connection Timeout — ${run.floor}층에서 연결이 끊겨 마을로 재연결합니다 (CR2032 −${lost})`, 5);
           changed.push("cr2032");
           dirty = true;
-          leaveDungeon(true);
+          run.phase = "timeout";
+          clearMoveTarget();
+          setInputEnabled(false);
+          inputLocked = true;
+          dungeonUi.openTimeout({ floor: run.floor, lost, rollbacks: run.rollbacks });
         } else {
           // 훈련장 KO: 페널티 없이 시작 지점으로 (Stage 8에서 체크포인트 롤백으로 확장)
           fx.showToast("📶 Connection Timeout — 시작 지점으로 재연결합니다 (supervision timeout)", 4);
@@ -307,14 +326,23 @@ function setAmbience(underground) {
   world.root.visible = !underground;
 }
 
-function startFloor(floor) {
-  const layout = generateFloor(floor, (dungeonSeedBase += 7919));
-  const b = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
+/** 체크포인트 = 층 시작 순간: 같은 layout으로 전투·링크·위치를 다시 만든다 (PRD §5 Connection Timeout 롤백) */
+function placeAtCheckpoint() {
+  const b = createFloorBattle(run.layout);
   b.player = battle.player; // HP는 마을과 던전이 공유한다
-  run = { floor, layout, battle: b, puzzle: createLinkPuzzle(layout), phase: "combat", observing: true };
+  run.battle = b;
+  run.link = createLink(run.layout.hopIncrement);
+  run.phase = "combat";
   resetMotor(motor, { x: DUNGEON_ROOM.cx, y: DUNGEON_ROOM.floorY, z: DUNGEON_ROOM.cz });
   resetOrbit(DUNGEON_ROOM.floorY);
   clearMoveTarget();
+}
+
+function startFloor(floor) {
+  const layout = generateFloor(floor, (dungeonSeedBase += 7919));
+  run = { floor, layout, battle: null, link: null, puzzle: createLinkPuzzle(layout), phase: "combat", observing: true, rollbacks: 0 };
+  placeAtCheckpoint();
+  const b = run.battle;
   setAmbience(true);
   hud.hideModal();
   hud.setBadge(`⚔️ 호핑 던전 ${floor}층`);
@@ -384,13 +412,38 @@ function onCombatCleared() {
   fx.showToast("✅ 간섭 몬스터 소탕! 북쪽 📡 링크 콘솔에서 채널맵을 정비해 연결을 안정시키세요", 5);
 }
 
+/** 롤백 선택: 체크포인트에서 재연결 */
+function rollbackToCheckpoint() {
+  if (!run) return;
+  run.rollbacks += 1;
+  progress.dungeon.rollbacks = (progress.dungeon.rollbacks ?? 0) + 1;
+  persist();
+  revivePlayer(battle);
+  placeAtCheckpoint();
+  fx.showToast(`🔁 ${run.floor}층 체크포인트로 재연결 (롤백 ${run.rollbacks}회째) — 채널맵을 다시 정비하세요`, 3);
+}
+
+chmap.initChmap({
+  hasAfh: () => hasAfhSkill(progress),
+  onToggle: (ch) => { if (run?.link && !toggleLinkChannel(run.link, ch)) fx.showToast("채널맵은 최소 2채널을 써야 합니다", 2); },
+  onAfh: () => {
+    if (!run?.link || !hasAfhSkill(progress)) return;
+    if (!run.battle.monsters.some((m) => m.state !== "dead" && m.revealed)) { fx.showToast("아직 드러난 간섭 대역이 없습니다 — 몬스터를 맞혀 스캔하세요", 2.5); return; }
+    if (applyAfh(run.link, run.battle)) fx.showToast(`📶 AFH: 채널맵 갱신 요청 — 이벤트 #${run.link.pending.instant}부터 적용`, 2.5);
+  },
+  onReset: () => { if (run?.link) requestMap(run.link, allChannelsMap()); }
+});
+
 dungeonUi.initDungeonPanel({
+  // 롤백을 먼저(phase가 combat으로 돌아감) 하고 창을 닫는다 — 반대 순서면 닫기 처리가 "마을로"로 판단한다
+  onRollback: () => { rollbackToCheckpoint(); dungeonUi.closeDungeonPanel(); },
   getProgress: () => progress,
   onEnter: enterNextFloor,
   onLeave: () => leaveDungeon(false),
   onClose: (mode) => {
     setInputEnabled(true);
     inputLocked = false;
+    if (mode === "timeout" && run?.phase === "timeout") leaveDungeon(true); // 롤백을 고르지 않고 닫으면 마을로
     if (mode === "console") consoleCooldown = 3;
     if (mode === "portal") portalCooldown = 3;
   },
@@ -551,7 +604,18 @@ function simulate(dt) {
     hud.setBadge(regionLabel());
   }
 
-  handleBattleEvents(stepBattle(activeBattle(), dt, { player: motor, stats: effectiveStats(progress), rng: battleRng }));
+  // 던전 전투: 링크 도약 · ACS · 간섭 판정 (Stage 8)
+  let interference = null;
+  if (run?.phase === "combat") {
+    stepLink(run.link, dt);
+    for (const e of stepAcs(run.battle, run.floor, dt, dungeonRng)) {
+      if (e.monster.revealed) fx.floatText(e.monster.x, e.monster.y + 1.2, e.monster.z, `ACS: Wi-Fi ${e.from}→${e.to}`, "crit");
+    }
+    interference = interferenceFor(run.link);
+  }
+  if (run?.phase !== "timeout") {
+    handleBattleEvents(stepBattle(activeBattle(), dt, { player: motor, stats: effectiveStats(progress), rng: battleRng, interference }));
+  }
   if (run) {
     if (run.phase === "combat" && run.battle.monsters.every((m) => m.state === "dead")) onCombatCleared();
     if (run.phase === "link" && run.observing && dungeonUi.dungeonPanelMode() === "console") {
@@ -561,6 +625,7 @@ function simulate(dt) {
     checkDungeonProximity(dt);
   }
   dungeonUi.updateHud(run);
+  chmap.updateChmap(run);
 
   knightView.syncKnight(motor, moved > 0.0005, dt);
   updateCamera(motor, dt);
@@ -635,8 +700,11 @@ window.__PK = {
     leave: () => leaveDungeon(false),
     openConsole: openLinkConsole,
     /** 테스트용 관찰: 진행 중인 층 (정답인 막힌 채널 포함) */
+    rollback: rollbackToCheckpoint,
+    link: () => run?.link && { event: run.link.event, channel: run.link.channel, map: [...run.link.map], pending: run.link.pending && { instant: run.link.pending.instant, map: [...run.link.pending.map] } },
+    monsters: () => run?.battle.monsters.map((m) => ({ id: m.id, wifi: m.wifi, revealed: m.revealed, hp: m.hp, maxHp: m.maxHp, x: m.x, z: m.z, state: m.state })),
     state: () => run && {
-      floor: run.floor, phase: run.phase, hopIncrement: run.layout.hopIncrement, wifi: run.layout.wifi,
+      floor: run.floor, phase: run.phase, rollbacks: run.rollbacks, spawns: run.layout.spawns, hopIncrement: run.layout.hopIncrement, wifi: run.layout.wifi, monsterWifi: run.layout.monsterWifi,
       blocked: [...run.layout.blocked].sort((a, b) => a - b), map: [...run.puzzle.map], solved: run.puzzle.solved,
       observed: run.puzzle.stats.map((s) => ({ ...s })), event: run.puzzle.event
     },

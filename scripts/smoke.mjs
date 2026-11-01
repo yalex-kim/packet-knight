@@ -238,6 +238,54 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("Stage 7 세이브(v5)가 손실 없이 v6로 마이그레이션된다", l.status === "loaded" && l.progress.cr2032 === 11 && l.progress.dungeon.maxFloor === 2 && l.progress.gear.antenna === 0);
 }
 
+// ---------- Stage 8: 링크 · 간섭 판정 · ACS (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const K = await imp("link.js");
+  const H = await imp("hopping.js");
+  const link = K.createLink(7);
+  const ch0 = link.channel;
+  K.stepLink(link, K.LINK_COMBAT.INTERVAL * 3);
+  const map = H.allChannelsMap(); for (const c of H.wifiBlockedChannels([6])) map[c] = false;
+  K.requestMap(link, map);
+  const pendingAt = link.pending.instant;
+  K.stepLink(link, K.LINK_COMBAT.INTERVAL * (K.LINK_COMBAT.INSTANT_DELAY - 1));
+  const notYet = link.pending !== null && link.map.every(Boolean);
+  K.stepLink(link, K.LINK_COMBAT.INTERVAL);
+  check("채널맵 갱신은 instant(지금 + 6 이벤트)에 정확히 적용된다 (LL_CHANNEL_MAP_IND)",
+    ch0 === 7 && pendingAt === 3 + K.LINK_COMBAT.INSTANT_DELAY && notYet && link.pending === null && link.map[15] === false && link.event === pendingAt, `instant #${pendingAt}`);
+
+  const m = { wifi: 6, state: "chase" };
+  const battle = { monsters: [m] };
+  const inBand = { channel: 15 }, outBand = { channel: 30 };
+  const I1 = K.interferenceFor(inBand), I2 = K.interferenceFor(outBand);
+  check("간섭 판정: 대역 안 채널이면 내 패킷 손실·피격, 밖이면 패킷 성공·피해 0",
+    I1.packetLost(battle) && I1.playerHit(m) && !I2.packetLost(battle) && !I2.playerHit(m));
+
+  const B = await imp("battle.js");
+  const D = await imp("dungeon.js");
+  const lay = D.generateFloor(4, 99);
+  const bb = D.createFloorBattle(lay);
+  B.syncPlayerHp(bb, 100);
+  const before = bb.monsters.map((x) => x.wifi).join();
+  const { createRng } = await imp("quiz.js");
+  const rng = createRng(1);
+  let acs = [];
+  for (let t = 0; t < 20; t += 0.1) acs = acs.concat(D.stepAcs(bb, 4, 0.1, rng));
+  const none = D.stepAcs(D.createFloorBattle(D.generateFloor(2, 99)), 2, 30, rng);
+  check("3층부터 Wi-Fi 몬스터가 자동 채널 선택(ACS)으로 채널을 옮긴다 (1~2층은 고정)",
+    acs.length >= 3 && bb.monsters.map((x) => x.wifi).join() !== before && acs.every((e) => Math.abs(e.to - e.from) >= 4) && none.length === 0 && D.acsPeriodFor(3) !== null,
+    `4층 20초 동안 ${acs.length}회 · 주기 ${D.acsPeriodFor(4)}초`);
+
+  const P = await imp("progress.js");
+  const { LIBRARY_COURSES } = await imp("balance.js");
+  const p = P.createProgress();
+  const no = P.hasAfhSkill(p);
+  const r = P.applyQuizResult(p, "hopping", true);
+  check("도서관 '주파수 도약과 공존' 만점 = AFH 스킬 (스탯 보너스 없음)",
+    LIBRARY_COURSES.some((c) => c.chapter === "hopping" && c.reward === "afh") && !no && P.hasAfhSkill(p) && r.reward?.stat === "afh" && Object.values(p.bonus).every((v) => v === 0));
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -797,25 +845,105 @@ await reset();
   check("클리어하면 다음 층(2층)이 열리고 새 채널 배치로 생성된다", s5.floor === 2 && s5.phase === "combat" && !sameLayout,
     `1층 hop ${s3.hopIncrement}·Wi-Fi ${s3.wifi} → 2층 hop ${s5.hopIncrement}·Wi-Fi ${s5.wifi}`);
 
-  // 던전에서 쓰러지면 Connection Timeout: 마을로, CR2032 10% 손실
+  // ---------- Stage 8: 전투 중 채널맵 · 간섭 판정 · 체크포인트 롤백 ----------
+  const L0 = await page.evaluate(() => window.__PK.dungeon.link());
+  await tick(1000); // 연결 간격 0.5초 → 이벤트 2개
+  const L1 = await page.evaluate(() => window.__PK.dungeon.link());
+  const { csa1Sequence } = await import(pathToFileURL(path.join(ROOT, "src/core/hopping.js")).href);
+  const expectCh = csa1Sequence(s5.hopIncrement, L1.map, 1, L1.event)[0].channel;
+  const hudCells = await page.locator("#chmap .cm").count();
+  const nowCell = await page.locator("#chmap .cm.now").getAttribute("data-ch");
+  check("던전 전투 중 실시간 채널맵 HUD(37칸)가 뜨고, 링크가 연결 이벤트마다 CSA #1로 도약한다",
+    hudCells === 37 && L1.event === L0.event + 2 && L1.channel === expectCh && nowCell === String(L1.channel), `이벤트 #${L0.event}→#${L1.event}, 채널 ${L1.channel}`);
+
+  // 쏘면 몬스터가 스캔되어 Wi-Fi 대역이 HUD에 드러난다
+  await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 60 && !pk.dungeon.monsters().some((m) => m.revealed); i++) { pk.battle.fire(); pk.tick(0.1); } });
+  const scanned = await page.evaluate(() => window.__PK.dungeon.monsters());
+  const bandCells = await page.locator("#chmap .cm.band").count();
+  check("몬스터를 맞히면(스캔) 그 Wi-Fi 대역이 채널맵에 표시된다", scanned.some((m) => m.revealed) && bandCells >= 9, `대역 칸 ${bandCells}개`);
+
+  // AFH 버튼 (호핑 강좌 이수자만) → 6 이벤트 뒤에 적용, 이후 드러난 대역으로 도약하지 않는다
+  const afhLocked = await page.locator("#chmap .cm-afh").isDisabled();
+  await page.evaluate(() => { const p = window.__PK.progress(); p.cleared.hopping = "2026-11-01"; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+  check("AFH 버튼은 도서관 '주파수 도약' 강좌를 이수해야 열린다", afhLocked);
+}
+// AFH 스킬을 가진 세이브로 다시 시작해 2층을 이어서 검증
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  await page.evaluate(() => window.__PK.dungeon.enter());
+  await tick(50);
+  const sA = await dState();
+  await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 80 && !pk.dungeon.monsters().some((m) => m.revealed); i++) { pk.battle.fire(); pk.tick(0.1); } });
+  await page.locator("#chmap .cm-afh").click();
+  const L2 = await page.evaluate(() => window.__PK.dungeon.link());
+  check("AFH 버튼을 누르면 채널맵 갱신이 instant(6 이벤트 뒤)로 예약된다", L2.pending && L2.pending.instant === L2.event + 6, `#${L2.event} → instant #${L2.pending?.instant}`);
+  await tick(3500); // 7 이벤트
+  const after = await page.evaluate(() => {
+    const pk = window.__PK;
+    const bands = new Set();
+    const L = pk.dungeon.link();
+    const seen = [];
+    for (let i = 0; i < 8; i++) { pk.tick(0.5); seen.push(pk.dungeon.link().channel); }
+    return { map: L.map, pending: L.pending, seen };
+  });
+  const { wifiBlockedChannels } = await import(pathToFileURL(path.join(ROOT, "src/core/hopping.js")).href);
+  const revealed = (await page.evaluate(() => window.__PK.dungeon.monsters())).filter((m) => m.revealed && m.state !== "dead");
+  const band = new Set(revealed.flatMap((m) => [...wifiBlockedChannels([m.wifi])]));
+  const excluded = [...band].every((c) => after.map[c] === false);
+  const avoided = after.seen.every((c) => !band.has(c));
+  check("instant이 지나면 새 채널맵이 적용되어 드러난 간섭 대역으로 도약하지 않는다 (AFH)", !after.pending && excluded && avoided,
+    `대역 ${[...band].sort((a, b) => a - b)[0]}~… · 이후 채널 ${after.seen.join(",")}`);
+
+  // HP 0 → Connection Timeout 창 → 체크포인트 롤백
   const crBefore = (await page.evaluate(() => window.__PK.progress())).cr2032;
   await page.evaluate(() => {
     const pk = window.__PK;
-    const m = pk.battle.state().monsters[0];
-    pk.teleport(m.x + 0.5, m.z);
-    pk.battle.setHp(1);
-    for (let i = 0; i < 100 && pk.dungeon.state(); i++) pk.tick(0.1);
+    pk.dungeon.link(); // 간섭 판정을 위해 채널맵을 초기화해 대역 안에 걸리게 한다
+    document.querySelector("#chmap .cm-reset").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    for (let i = 0; i < 400 && pk.dungeon.state()?.phase !== "timeout"; i++) {
+      const m = pk.dungeon.monsters().find((x) => x.state !== "dead");
+      pk.teleport(m.x + 0.5, m.z);
+      pk.battle.setHp(1);
+      pk.tick(0.1);
+    }
   });
+  const tState = await dState();
   const afterKo = await page.evaluate(() => window.__PK.progress());
-  const ko = await state();
-  check("던전에서 쓰러지면 Connection Timeout — 마을 관문으로 돌아오고 CR2032 10%를 잃는다",
-    (await dState()) === null && afterKo.cr2032 === crBefore - Math.floor(crBefore * 0.1) && afterKo.dungeon.kos === 1 && Math.hypot(ko.x + 9, ko.z + 7.6) < 1,
+  check("던전에서 HP 0이 되면 Connection Timeout 창이 뜨고 CR2032 10%를 잃는다",
+    tState?.phase === "timeout" && (await page.evaluate(() => window.__PK.dungeon.panelMode())) === "timeout" && afterKo.cr2032 === crBefore - Math.floor(crBefore * 0.1),
     `CR2032 ${crBefore} → ${afterKo.cr2032}`);
+  await page.locator("#dungeon-panel .timeout-rollback").click();
+  const rb = await dState(); // 진행시키지 않고 롤백 직후 상태를 그대로 본다 (몬스터는 곧바로 추격을 시작한다)
+  const rbMons = await page.evaluate(() => window.__PK.dungeon.monsters());
+  const me = await state();
+  const sameSpawns = rbMons.every((m, i) => Math.hypot(m.x - rb.spawns[i][0], m.z - rb.spawns[i][1]) < 0.05 && m.hp === m.maxHp && !m.revealed);
+  check("체크포인트 롤백: 같은 층 시작 순간(몬스터 배치·체력, 기사 위치, 채널맵)으로 기록대로 돌아간다",
+    rb.floor === sA.floor && rb.phase === "combat" && rb.rollbacks === 1 && sameSpawns &&
+    Math.hypot(me.x - 0, me.z - 400) < 0.1 && (await page.evaluate(() => window.__PK.dungeon.link().map.every(Boolean))) &&
+    (await page.evaluate(() => window.__PK.battle.state().hp)) === (await page.evaluate(() => window.__PK.battle.state().maxHp)),
+    `${rb.floor}층 · 롤백 ${rb.rollbacks}회`);
+
+  // 다시 쓰러지고 이번엔 마을로
+  await page.evaluate(() => {
+    const pk = window.__PK;
+    for (let i = 0; i < 400 && pk.dungeon.state()?.phase !== "timeout"; i++) {
+      const m = pk.dungeon.monsters().find((x) => x.state !== "dead");
+      pk.teleport(m.x + 0.5, m.z);
+      pk.battle.setHp(1);
+      pk.tick(0.1);
+    }
+  });
+  await page.locator("#dungeon-panel button", { hasText: "마을로" }).click();
+  await tick(50);
+  const ko = await state();
+  const p2 = await page.evaluate(() => window.__PK.progress());
+  check("Connection Timeout 창에서 '마을로'를 고르면 던전 관문으로 돌아온다", (await dState()) === null && Math.hypot(ko.x + 9, ko.z + 7.6) < 1 && p2.dungeon.kos >= 2 && p2.dungeon.rollbacks === 1);
 
   await page.reload();
   await page.waitForFunction(() => window.__PK);
   const re = await page.evaluate(() => window.__PK.progress());
-  check("던전 기록(최고 층·별점)이 저장되고 새로고침 후 유지된다", re.v >= 5 && re.dungeon.maxFloor === 1 && re.dungeon.attempts === 2);
+  check("던전 기록(최고 층·별점·롤백)이 저장되고 새로고침 후 유지된다", re.v >= 5 && re.dungeon.maxFloor === 1 && re.dungeon.attempts === 3 && re.dungeon.rollbacks === 1);
 }
 
 // ---------- Stage 7.5: RF 랩 ----------

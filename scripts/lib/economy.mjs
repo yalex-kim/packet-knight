@@ -22,6 +22,7 @@ export const TIME = Object.freeze({
   JOB_SESSION: 60 + 20,    // 알바 60초 + 등대 왕복·정산
   COURSE: 4 * 60,          // 레슨 읽기 + 퀴즈 (오답 재도전 포함 평균)
   DUNGEON_OVERHEAD: 40,    // 입장·이동·정산
+  ROLLBACK: 8,             // Connection Timeout 연출(감독 타임아웃) + 체크포인트 재연결
   LINK_PUZZLE: 60,         // 전투 클리어 뒤 링크 정비 콘솔(관찰 + 채널맵 수정 + 테스트) — Stage 7
   UPGRADE: 10              // 강화 1회 시도
 });
@@ -32,11 +33,13 @@ export const TIME = Object.freeze({
  *   dungeonMode: 던전 전투 방식 · rssiN: 알바에서 평균 내는 패킷 수
  *   retryAfterFail: 실패한 층에 장비를 올리지 않고 곧바로 재도전하는가 (공격형만 그렇다)
  *   alloc: 레벨업 스탯 포인트를 이 순서로 돌아가며 분배 (Stage 7.5 RF 랩)
+ *   rollbacks: 던전에서 쓰러졌을 때 체크포인트(층 시작)에서 입장료 없이 다시 하는 최대 횟수 (Stage 8)
+ *   던전 전투 방식이 rush가 아니면 스캔한 몬스터 대역을 채널맵에서 뺀다(AFH) — scripts/lib/combat.mjs
  */
 export const PLAYER_STRATEGIES = [
-  { id: "aggressive", name: "공격형", jobs: 1, trainMin: 0, dungeonMode: "rush",  rssiN: 6,  retryAfterFail: true,  alloc: ["tx"] },
-  { id: "balanced",   name: "균형형 (중간 전략)", jobs: 3, trainMin: 1, dungeonMode: "kite",  rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec", "tx"] },
-  { id: "collector",  name: "수집형", jobs: 6, trainMin: 2, dungeonMode: "stand", rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec"] }
+  { id: "aggressive", name: "공격형", jobs: 1, trainMin: 0, dungeonMode: "rush",  rssiN: 6,  retryAfterFail: true,  alloc: ["tx"],             rollbacks: 3 },
+  { id: "balanced",   name: "균형형 (중간 전략)", jobs: 3, trainMin: 1, dungeonMode: "kite",  rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec", "tx"], rollbacks: 1 },
+  { id: "collector",  name: "수집형", jobs: 6, trainMin: 2, dungeonMode: "stand", rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec"],       rollbacks: 0 }
 ];
 
 // ---------- 결과 풀 ----------
@@ -51,11 +54,12 @@ export function buildPools(rng, size = 300) {
 }
 
 /** 스탯 조합별 던전 결과 풀 (지연 생성·캐시) */
-function dungeonOutcome(pools, mode, stats, floor) {
-  const key = `${mode}|${floor}|${stats.hp}|${stats.tx}|${stats.rx}|${stats.sec}`;
+function dungeonOutcome(pools, mode, stats, floor, afh) {
+  // 키에 결과를 바꾸는 스탯만: 광역 공격이라 RX(회피)는 무관, HOP는 봇이 투자하지 않아 늘 기본값 (Stage 8: 키가 많아 1분 초과)
+  const key = `${mode}|${floor}|${afh}|${stats.hp}|${stats.tx}|${stats.sec}|${stats.hop}`;
   let p = pools.dungeon.get(key);
   if (!p) {
-    p = pool(60, () => dungeonFloor(mode, stats, pools.rng, floor));
+    p = pool(32, () => dungeonFloor(mode, stats, pools.rng, floor, { afh })); // 조합당 32판 — 1000명이 표본을 공유하므로 충분 (1분 제한)
     pools.dungeon.set(key, p);
   }
   return pick(p, pools.rng);
@@ -64,14 +68,14 @@ function dungeonOutcome(pools, mode, stats, floor) {
 /** 퀴즈 보너스를 받은 스탯 */
 export function statsWithQuiz(base, coursesDone) {
   const s = { ...base };
-  for (const c of LIBRARY_COURSES.slice(0, coursesDone)) s[c.reward] = +(s[c.reward] + QUIZ_BONUS[c.reward]).toFixed(2);
+  for (const c of LIBRARY_COURSES.slice(0, coursesDone)) if (QUIZ_BONUS[c.reward]) s[c.reward] = +(s[c.reward] + QUIZ_BONUS[c.reward]).toFixed(2);
   return s;
 }
 
 /** 게임과 같은 effectiveStats로 계산 (퀴즈 보너스 + 스탯 분배 + 장비) */
 function botStats(st) {
   const bonus = { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 };
-  for (const c of LIBRARY_COURSES.slice(0, st.courses)) bonus[c.reward] += QUIZ_BONUS[c.reward];
+  for (const c of LIBRARY_COURSES.slice(0, st.courses)) if (QUIZ_BONUS[c.reward]) bonus[c.reward] += QUIZ_BONUS[c.reward];
   return effectiveStats({ bonus, alloc: st.alloc, gear: st.gear });
 }
 
@@ -89,7 +93,7 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
   const st = {
     cr: 0, gear: emptyGear(), courses: 0, xp: 0, level: 1, alloc: { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, allocTurn: 0,
     income: { job: 0, training: 0, dungeon: 0 }, spend: { fee: 0, upgrade: 0, penalty: 0 },
-    upgrades: { tries: 0, success: 0 }, dungeon: { floor: 1, attempts: 0, clears: 0, kos: 0, kosBeforeFirstClear: 0, firstClearAt: null, clearTimes: [] },
+    upgrades: { tries: 0, success: 0 }, dungeon: { floor: 1, attempts: 0, clears: 0, kos: 0, kosBeforeFirstClear: 0, firstClearAt: null, clearTimes: [], rollbacks: 0, rollbacksPerClear: [] , floorRollbacks: 0 },
     timeline: []
   };
   const loopLen = ECONOMY.HOUR / ECONOMY.LOOPS;
@@ -159,25 +163,34 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
       if (canDungeon) {
         const stats = botStats(st);
         st.cr -= DUNGEON.ENTRY_FEE; st.spend.fee += DUNGEON.ENTRY_FEE;
-        const r = dungeonOutcome(pools, strategy.dungeonMode, stats, st.dungeon.floor); // 아직 못 깬 가장 깊은 층
         st.dungeon.attempts++;
-        t += r.time + TIME.DUNGEON_OVERHEAD;
-        st.cr += r.cr2032; st.income.dungeon += r.cr2032; st.xp += r.xp;
-        if (r.cleared) {
-          st.dungeon.clears++;
-          st.dungeon.clearTimes.push(r.time);
-          st.dungeon.floor++;
-          t += TIME.LINK_PUZZLE;
-          lastFailPower = null;
-          if (st.dungeon.firstClearAt === null) st.dungeon.firstClearAt = loop * loopLen + t;
-        } else {
-          lastFailPower = power; // 장비·퀴즈 보너스가 오르기 전까지 같은 층 재도전 안 함
+        // 한 번 입장 = 층 도전. 쓰러지면 Connection Timeout → 체크포인트(층 시작)에서 입장료 없이 롤백 재도전 (Stage 8)
+        for (let retry = 0; ; retry++) {
+          // AFH: 돌격형은 안 쓰고, 나머지는 호핑 강좌를 이수했으면 버튼, 아니면 HUD에서 손으로
+          const afh = strategy.dungeonMode === "rush" ? false : LIBRARY_COURSES.slice(0, st.courses).some((c) => c.reward === "afh") ? "button" : "manual";
+          const r = dungeonOutcome(pools, strategy.dungeonMode, stats, st.dungeon.floor, afh); // 아직 못 깬 가장 깊은 층
+          t += r.time + (retry === 0 ? TIME.DUNGEON_OVERHEAD : TIME.ROLLBACK);
+          st.cr += r.cr2032; st.income.dungeon += r.cr2032; st.xp += r.xp;
+          if (r.cleared) {
+            st.dungeon.clears++;
+            st.dungeon.clearTimes.push(r.time);
+            st.dungeon.rollbacksPerClear.push(st.dungeon.floorRollbacks);
+            st.dungeon.floorRollbacks = 0;
+            st.dungeon.floor++;
+            t += TIME.LINK_PUZZLE;
+            lastFailPower = null;
+            if (st.dungeon.firstClearAt === null) st.dungeon.firstClearAt = loop * loopLen + t;
+            break;
+          }
           if (r.ko) {
             st.dungeon.kos++;
             if (st.dungeon.firstClearAt === null) st.dungeon.kosBeforeFirstClear++;
             const lost = Math.floor(st.cr * TIMEOUT_PENALTY); // Connection Timeout 페널티
             st.cr -= lost; st.spend.penalty += lost;
+            if (retry < strategy.rollbacks && t < loopLen) { st.dungeon.rollbacks++; st.dungeon.floorRollbacks++; continue; }
           }
+          lastFailPower = power; // 장비·보너스가 오르기 전까지 같은 층 재입장 안 함
+          break;
         }
       } else if (t + TIME.JOB_SESSION <= loopLen && doJob(loop * loopLen + t)) {
         t += TIME.JOB_SESSION;

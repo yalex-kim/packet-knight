@@ -1,7 +1,7 @@
 // 도서관 강의실 UI — 강좌 목록 → 레슨(핵심 정리) → 3문제 퀴즈 → 결과 (PRD §4.1)
 // 콘텐츠는 connectivityBook 원문에서 가져온 데이터(core/chapters.data.js)이므로 textContent로만 넣는다.
 
-import { LIBRARY_COURSES, QUIZ_BONUS, STAT_META, QUIZ } from "../core/balance.js";
+import { LIBRARY_COURSES, QUIZ_BONUS, STAT_META, QUIZ, SKILL_REWARDS } from "../core/balance.js";
 import { CHAPTERS, CHAPTER_SOURCE } from "../core/chapters.data.js";
 import { chapterById, drawQuiz, gradeQuiz, createRng } from "../core/quiz.js";
 
@@ -61,7 +61,9 @@ function header(title, sub) {
   );
 }
 
-const rewardText = (stat) => `${STAT_META[stat].icon} ${STAT_META[stat].label} +${QUIZ_BONUS[stat]}${STAT_META[stat].unit}`;
+const rewardText = (stat) => SKILL_REWARDS[stat]
+  ? `${SKILL_REWARDS[stat].icon} ${SKILL_REWARDS[stat].label}`
+  : `${STAT_META[stat].icon} ${STAT_META[stat].label} +${QUIZ_BONUS[stat]}${STAT_META[stat].unit}`;
 
 function sourceNote(chapter) {
   return el("div", { class: "source" },
@@ -176,8 +178,13 @@ function finishQuiz() {
     body.push(el("div", { class: "result-big", textContent: `🎉 만점! ${result.score} / ${result.total}` }));
     if (outcome.reward) {
       const { stat, slotUnlocked } = outcome.reward;
-      const m = STAT_META[stat];
-      body.push(el("p", { class: "reward", textContent: `${m.icon} ${m.label}(${m.name}) ${before[stat]}${m.unit} → ${after[stat]}${m.unit}` }));
+      const skill = SKILL_REWARDS[stat];
+      if (skill) {
+        body.push(el("p", { class: "reward", textContent: `${skill.icon} ${skill.label} 습득 — ${skill.desc}` }));
+      } else {
+        const m = STAT_META[stat];
+        body.push(el("p", { class: "reward", textContent: `${m.icon} ${m.label}(${m.name}) ${before[stat]}${m.unit} → ${after[stat]}${m.unit}` }));
+      }
       if (slotUnlocked) body.push(el("p", { class: "reward", textContent: `🔓 스킬 슬롯 해금! (${progress.skillSlots}/${QUIZ.MAX_SKILL_SLOTS})` }));
       body.push(el("p", { class: "npc", textContent: "훌륭하네! 이 지식은 이제 자네 갑옷의 일부일세." }));
     } else {

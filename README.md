@@ -38,7 +38,7 @@ npm start                # → http://localhost:5173  (Node만 있으면 됨, np
 
 - 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
-- 현재 진행: **Stage 7.5 완료** (패킷 대장간 RF 랩: CR2032로 장비 4종 강화, 레벨업 스탯 포인트 분배 — HOP는 이동 속도) → 다음: Stage 8 간섭 전투와 Connection Timeout
+- 현재 진행: **Stage 8 완료** (간섭 전투: 링크가 채널을 도약하고 Wi-Fi 대역 안에서만 맞는다 — 실시간 채널맵에서 AFH로 대역을 빼라. 쓰러지면 Connection Timeout → 체크포인트 롤백) → 다음: Stage 9 퀘스트 ↔ 교과서 연동
 - 지금 할 수 있는 것: 📚 도서관 퀴즈로 스탯 올리기 · 📡 등대 알바로 CR2032 벌기(측정기 배터리 3칸, 5분마다 충전) · ⚔️ 훈련장에서 봇 사냥 · 🌀 북서쪽 관문에서 호핑 던전 도전(입장료 CR2032 3개) · 🔨 패킷 대장간 RF 랩에서 장비 강화·스탯 분배 (진행도는 브라우저에 자동 저장)
 - 전투: **F/J 키 · 📡 발사 버튼 · 몬스터 클릭** → ADV 패킷 발사. 봇의 LED가 빨개지면 공격 예고 — 뒤로 물러나면 피합니다.
 - 빌드 도구 없이 CDN import map + ES 모듈로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
@@ -79,11 +79,12 @@ src/
     arena.js          장애물 없는 원형 방 충돌 세계 (던전 층 템플릿)
     jobCharges.js     측정기 배터리 (알바 횟수 제한, 실시간 충전)
     hopping.js        LE 채널 선택 알고리즘 #1·채널맵·Wi-Fi 간섭 (교과서 hopping.html과 일치)
-    dungeon.js        호핑 던전: 층 절차 생성·링크 퍼즐 상태
+    dungeon.js        호핑 던전: 층 절차 생성·링크 퍼즐·ACS·층 전투 생성
+    link.js           전투 중 링크: 연결 이벤트 도약·채널맵 instant 갱신·간섭 판정·AFH
   render/             THREE 렌더링 — world(지형·건물), knight(기사·이펙트), camera(오빗 카메라)
   render/battleView   봇·Wi-Fi 몬스터·광역 예고·투사체·드롭·HP 바 렌더링
   render/dungeonView  지하 방·채널 기둥 37개·링크 콘솔·포털
-  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·스탯·모달), library(강의실), jobPanel(알바), dungeonPanel(던전 입장·채널맵 콘솔), rfLab(장비 강화·스탯 분배), fx(데미지 숫자·토스트·HP 바)
+  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·스탯·모달), library(강의실), jobPanel(알바), dungeonPanel(던전 입장·채널맵 콘솔·Connection Timeout), chmap(전투 실시간 채널맵), rfLab(장비 강화·스탯 분배), fx(데미지 숫자·토스트·HP 바)
 scripts/
   serve.mjs           무의존 로컬 정적 서버 (npm start)
   import-chapters.mjs connectivityBook 챕터 → chapters.data.js 생성
@@ -102,7 +103,7 @@ scripts/
 ```bash
 npm install          # playwright, three(오프라인용 사본)
 npx playwright install chromium   # 최초 1회
-npm run smoke        # → 98/98 통과
+npm run smoke        # → 109/109 통과
 ```
 
 - 게임을 `index.html?test`로 열면 실시간 시뮬레이션이 멈추고, 테스트가 `window.__PK.tick(초)`로 고정 1/60초 스텝을 진행시킵니다. 헤드리스 FPS와 무관하게 결정적으로 검증됩니다.
@@ -130,7 +131,7 @@ node scripts/import-chapters.mjs ../connectivityBook   # → src/core/chapters.d
 
 ## 🗺️ 로드맵 (요약)
 
-Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 ✅ → Stage 5 알바 미니게임 ✅ → Stage 6 첫 전투 ✅ → Stage 6.5 봇 시뮬레이션 v1 ✅ → Stage 7 호핑 던전 ✅ → Stage 7.5 RF 랩 ✅ → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
+Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 ✅ → Stage 5 알바 미니게임 ✅ → Stage 6 첫 전투 ✅ → Stage 6.5 봇 시뮬레이션 v1 ✅ → Stage 7 호핑 던전 ✅ → Stage 7.5 RF 랩 ✅ → Stage 8 간섭 전투 ✅ → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
 
 각 단계의 완료 기준(DoD)은 [PRD.md §7](PRD.md)에 정의되어 있습니다.
 
