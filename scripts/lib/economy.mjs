@@ -19,6 +19,7 @@ export const TIME = Object.freeze({
   JOB_SESSION: 60 + 20,    // 알바 60초 + 등대 왕복·정산
   COURSE: 4 * 60,          // 레슨 읽기 + 퀴즈 (오답 재도전 포함 평균)
   DUNGEON_OVERHEAD: 40,    // 입장·이동·정산
+  LINK_PUZZLE: 60,         // 전투 클리어 뒤 링크 정비 콘솔(관찰 + 채널맵 수정 + 테스트) — Stage 7
   UPGRADE: 10              // 강화 1회 시도
 });
 
@@ -141,6 +142,7 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
           st.dungeon.clears++;
           st.dungeon.clearTimes.push(r.time);
           st.dungeon.floor++;
+          t += TIME.LINK_PUZZLE;
           lastFailPower = null;
           if (st.dungeon.firstClearAt === null) st.dungeon.firstClearAt = loop * loopLen + t;
         } else {

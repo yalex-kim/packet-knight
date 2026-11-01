@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 6.5</title>
+<title>Packet Knight — Stage 7</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -252,6 +252,36 @@
     box-shadow: 0 8px 26px rgba(0,0,0,0.5);
   }
 
+  /* 호핑 던전: 상단 바, 채널맵 콘솔 */
+  #dungeon-hud {
+    position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 12;
+    display: flex; align-items: center; gap: 10px; max-width: min(560px, 60vw);
+    background: rgba(30, 10, 46, 0.88); border: 1px solid #6b3fa0; color: #f0e6ff;
+    border-radius: 10px; padding: 6px 8px 6px 12px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+  }
+  #dungeon-hud .dh-leave { background: #3a2456; color: #f0e6ff; border: 1px solid #8a5cc4; border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 4px; margin: 8px 0; }
+  .ch {
+    position: relative; height: 44px; border-radius: 6px; border: 1px solid #2d6fb3; background: #12345a; color: #e2f1ff;
+    font: inherit; font-size: 11px; cursor: pointer; overflow: hidden; padding: 2px 0 0;
+  }
+  .ch-n { position: relative; z-index: 1; }
+  .ch-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(255, 59, 48, 0.75); transition: height 0.2s; }
+  .ch.off { background: #0b0f16; border-color: #2a2f3a; color: #5d6b7c; text-decoration: line-through; }
+  .ch.off .ch-bar { opacity: 0.18; }
+  .ch.off::after { content: "✕"; position: absolute; left: 0; right: 0; bottom: 3px; font-size: 13px; color: #8b97a8; text-decoration: none; }
+  .ch.bad { border-color: #ff5a4e; }
+  .ch.now { outline: 2px solid #7dffb5; outline-offset: 1px; }
+  .ch-legend { font-size: 11.5px; color: #8fb3d6; }
+  .ch-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ch-ticker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; font-size: 11px; min-height: 22px; }
+  .tk { padding: 1px 5px; border-radius: 4px; background: rgba(14, 90, 60, 0.55); }
+  .tk.lost { background: rgba(110, 24, 20, 0.7); }
+  .ch-status { margin-top: 8px; font-size: 12.5px; min-height: 18px; }
+  .ch-status.ok { color: #7dffb5; }
+  .ch-status.bad { color: #ff9a90; }
+  .dungeon-enter:disabled, .link-test:disabled { opacity: 0.45; cursor: default; }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
@@ -261,6 +291,8 @@
     /* HP 바는 조이스틱·버튼과 겹치지 않게 좌상단 제목 아래로 */
     #hp { bottom: auto; top: 50px; left: 14px; transform: none; width: 40vw; }
     #hp.hurt { animation: none; }
+    /* 던전 바는 HP 바 아래 왼쪽 (오른쪽은 스탯 패널) */
+    #dungeon-hud { top: 80px; left: 14px; transform: none; max-width: 55vw; font-size: 11.5px; flex-wrap: wrap; gap: 4px; }
   }
 </style>
 </head>
@@ -268,7 +300,7 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 6.5: 밸런스 보정</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 7: 호핑 던전</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
@@ -276,7 +308,8 @@
     🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌<br />
     📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
     📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)<br />
-    ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)
+    ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
+    🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전
   </div>
 </div>
 
@@ -326,6 +359,12 @@
 <div id="job" class="overlay" role="dialog" aria-modal="true" aria-label="비콘 신호 측정소 알바" hidden>
   <div class="panel" id="job-panel"></div>
 </div>
+
+<!-- 37채널 호핑 던전 (Stage 7) -->
+<div id="dungeon" class="overlay" role="dialog" aria-modal="true" aria-label="호핑 던전" hidden>
+  <div class="panel" id="dungeon-panel"></div>
+</div>
+<div id="dungeon-hud" hidden><span class="dh-text"></span><button type="button" class="dh-leave">🏃 귀환</button></div>
 
 <!-- 교과서 원문 리더 -->
 <div id="reader" class="overlay" role="dialog" aria-modal="true" aria-label="교과서 원문" hidden>

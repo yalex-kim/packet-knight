@@ -59,22 +59,24 @@ const dist2D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const alive = (m) => m.state !== "dead";
 
 /**
- * 조준 보조: 바라보는 방향 ±aimCone 안, 사거리 안의 가장 가까운 살아 있는 몬스터
+ * 조준 보조: 바라보는 방향 ±aimCone 안의 가장 가까운 몬스터, 없으면 사거리 안의 가장 가까운 몬스터.
+ * (사방에서 다가오는 던전 방에서 발사 버튼이 엉뚱한 벽을 쏘지 않도록 — Stage 7)
  * @param {{x:number,z:number,rotY:number}} shooter
  */
 export function autoAimTarget(battle, shooter) {
   const { range, aimConeDeg } = COMBAT.ADV_PACKET;
   const cone = (aimConeDeg * Math.PI) / 180;
-  let best = null, bestD = Infinity;
+  let inCone = null, inConeD = Infinity, nearest = null, nearestD = Infinity;
   for (const m of battle.monsters) {
     if (!alive(m)) continue;
     const d = dist2D(m, shooter);
     if (d > range) continue;
+    if (d < nearestD) { nearest = m; nearestD = d; }
     const ang = Math.atan2(m.x - shooter.x, m.z - shooter.z);
     const diff = Math.abs(Math.atan2(Math.sin(ang - shooter.rotY), Math.cos(ang - shooter.rotY)));
-    if (diff <= cone && d < bestD) { best = m; bestD = d; }
+    if (diff <= cone && d < inConeD) { inCone = m; inConeD = d; }
   }
-  return best;
+  return inCone ?? nearest;
 }
 
 /**

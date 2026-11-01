@@ -1,8 +1,8 @@
 // 전투 봇 — 게임과 같은 core/battle.js를 돌린다 (훈련장 · 던전 층)
-import { MONSTERS, TRAINING_GROUND, DUNGEON, floorHpScale } from "../../src/core/balance.js";
+import { MONSTERS, TRAINING_GROUND, DUNGEON } from "../../src/core/balance.js";
 import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket } from "../../src/core/battle.js";
 import { createMotor, stepMotor } from "../../src/core/motor.js";
-import { createArena } from "../../src/core/arena.js";
+import { DUNGEON_WORLD, DUNGEON_ROOM, generateFloor } from "../../src/core/dungeon.js";
 import { VILLAGE } from "../../src/core/collision.js";
 import { REACTION } from "./rssi.mjs";
 
@@ -64,21 +64,17 @@ export function trainingSession(mode, stats, rng, seconds = 60) {
 }
 
 /**
- * 던전 한 층 (Stage 7 가정치): 반경 10 m 원형 방(장애물 없음, core/arena.js) 중앙에서 시작,
- * Wi-Fi 간섭 몬스터 FLOOR_MONSTERS마리가 사방 7 m에서 다가온다.
- * 모두 쓰러뜨리면 클리어, HP 0이면 실패(Connection Timeout). 드롭은 처치 즉시 획득으로 본다.
+ * 던전 한 층의 전투 — 게임과 같은 core/dungeon.js generateFloor·DUNGEON_WORLD (Stage 7 구현).
+ * 방 중앙에서 시작, Wi-Fi 간섭 몬스터 FLOOR_MONSTERS마리가 사방 7 m에서 다가온다.
+ * 모두 쓰러뜨리면 전투 클리어, HP 0이면 실패(Connection Timeout). 드롭은 처치 즉시 획득으로 본다.
+ * 링크 퍼즐(채널맵)은 전투력과 무관하므로 경제 모델에서 시간(TIME.LINK_PUZZLE)으로만 반영한다.
  * (처음엔 마을 지형을 빌렸으나 나무 뒤에 몬스터가 걸리는 인공물로 "장비가 좋을수록 클리어율 하락"이 나왔다 — PRD §8.7)
  */
-const ARENA = createArena({ radius: 10 });
 export function dungeonFloor(mode, stats, rng, floor = 1) {
-  const n = DUNGEON.FLOOR_MONSTERS;
-  const spawns = Array.from({ length: n }, (_, i) => {
-    const a = (i / n) * Math.PI * 2 + rng() * 0.5;
-    return [Math.cos(a) * 7, Math.sin(a) * 7];
-  });
-  const battle = createBattle(spawns, "wifiInterferer", ARENA, { hpScale: floorHpScale(floor) });
+  const layout = generateFloor(floor, Math.floor(rng() * 2 ** 31));
+  const battle = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale });
   syncPlayerHp(battle, stats.hp);
-  const pl = createMotor({ x: 0, y: 0, z: 0 });
+  const pl = createMotor({ x: DUNGEON_ROOM.cx, y: DUNGEON_ROOM.floorY, z: DUNGEON_ROOM.cz });
   const r = { cleared: false, ko: false, time: 0, kills: 0, cr2032: 0, xp: 0, hpLeft: 0 };
   for (let t = 0; t < DUNGEON.TIME_LIMIT; t += COMBAT_DT) {
     botStep(battle, pl, mode, COMBAT_DT);
@@ -87,7 +83,7 @@ export function dungeonFloor(mode, stats, rng, floor = 1) {
       if (e.type === "kill") { r.kills++; r.xp += e.xp; r.cr2032 += e.drops.reduce((k, d) => k + (d.item === "cr2032" ? d.count : 0), 0); }
       if (e.type === "ko") { r.ko = true; r.time = t; return r; }
     }
-    if (r.kills === n) { r.cleared = true; r.time = t; r.hpLeft = battle.player.hp; return r; }
+    if (r.kills === battle.monsters.length) { r.cleared = true; r.time = t; r.hpLeft = battle.player.hp; return r; }
   }
   r.time = DUNGEON.TIME_LIMIT;
   return r;

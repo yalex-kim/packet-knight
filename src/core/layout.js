@@ -86,6 +86,7 @@ export const LANDMARKS = [
       desc: "스펙트럼 대륙 지하 37개 데이터 채널로 이어지는 관문입니다. 패킷 기사는 연결 이벤트마다 바뀌는 호핑 패턴을 밟아가며 Wi-Fi 간섭 몬스터를 격퇴해야 합니다.",
       lore: "BLE 연결은 연결 이벤트(연결 간격 375µs~4s, Core 6.2+)마다 채널 선택 알고리즘(CSA #1/#2)으로 37개 데이터 채널(2404~2478MHz) 중 다음 채널로 건너뜁니다. 간섭이 심한 채널은 채널맵에서 빼는 적응형 호핑(AFH)입니다. (초당 1600회 호핑은 BR/EDR Classic의 이야기!)",
       link: CHAPTER("hopping.html"),
+      action: { id: "dungeon", label: "⚔️ 던전 입장" },
       walkPos: { x: WORLD.DUNGEON_X, y: S, z: -7.6 }
     }
   }

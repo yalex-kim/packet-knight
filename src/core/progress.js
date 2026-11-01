@@ -1,12 +1,12 @@
 // 진행도 — 퀴즈 보상 스탯, 스킬 슬롯, 학습 지표. 저장소는 주입한다(브라우저 localStorage / Node Map).
 // 순수 로직 (THREE·DOM 의존 없음)
 
-import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL } from "./balance.js";
+import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY } from "./balance.js";
 import { levelFromXp } from "./combat.js";
 import { fullCharges, useCharge, chargesAt } from "./jobCharges.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 4; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5)
+export const SAVE_VERSION = 5; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7)
 
 /**
  * @typedef {{
@@ -17,6 +17,7 @@ export const SAVE_VERSION = 4; // v2: CR2032·알바 기록 (Stage 5) · v3: XP�
  *   cr2032: number,
  *   job: { runs: number, bestScore: number|null, totalEarned: number, charges: import("./jobCharges.js").Charges },
  *   xp: number, statPoints: number,
+ *   dungeon: { maxFloor: number, attempts: number, clears: number, kos: number, stars: Record<string, number> },
  *   bestiary: Record<string, { kills: number, firstScan: string }>,
  *   metrics: { quizAttempts: Record<string, number>, quizPerfect: Record<string, number>, chapterOpens: Record<string, number> }
  * }} Progress
@@ -35,15 +36,19 @@ export function createProgress() {
     xp: 0,
     statPoints: 0,
     bestiary: {},
+    dungeon: emptyDungeon(),
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
   };
 }
+
+const emptyDungeon = () => ({ maxFloor: 0, attempts: 0, clears: 0, kos: 0, stars: {} });
 
 /** 구버전 세이브를 현재 버전으로 올린다 (진행도를 잃지 않는 것이 원칙) */
 function migrate(raw) {
   if (raw && raw.v === 1) raw = { ...raw, v: 2, cr2032: 0, job: { runs: 0, bestScore: null, totalEarned: 0 } };
   if (raw && raw.v === 2) raw = { ...raw, v: 3, xp: 0, statPoints: 0, bestiary: {} };
   if (raw && raw.v === 3) raw = { ...raw, v: 4, job: { ...raw.job, charges: fullCharges(0) } };
+  if (raw && raw.v === 4) raw = { ...raw, v: 5, dungeon: emptyDungeon() };
   return raw;
 }
 
@@ -61,6 +66,8 @@ function validate(raw) {
   if (!Number.isInteger(raw.cr2032) || raw.cr2032 < 0 || !j || !Number.isInteger(j.runs) || !Number.isInteger(j.totalEarned)) return null;
   if (!Number.isInteger(raw.xp) || raw.xp < 0 || !Number.isInteger(raw.statPoints) || raw.statPoints < 0) return null;
   if (!raw.bestiary || typeof raw.bestiary !== "object") return null;
+  const d = raw.dungeon;
+  if (!d || ![d.maxFloor, d.attempts, d.clears, d.kos].every((n) => Number.isInteger(n) && n >= 0) || !isCountMap(d.stars ?? {})) return null;
   return {
     ...base,
     bonus: { ...base.bonus, ...raw.bonus },
@@ -73,6 +80,7 @@ function validate(raw) {
     },
     xp: raw.xp,
     statPoints: raw.statPoints,
+    dungeon: { maxFloor: d.maxFloor, attempts: d.attempts, clears: d.clears, kos: d.kos, stars: { ...(d.stars ?? {}) } },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };
@@ -196,4 +204,33 @@ export function startJobCharge(progress, now) {
   if (!next) return false;
   progress.job.charges = next;
   return true;
+}
+
+// ---------- 던전 (Stage 7) ----------
+
+/** 다음에 도전할 층 = 깬 가장 깊은 층 + 1 */
+export const nextFloor = (progress) => progress.dungeon.maxFloor + 1;
+
+/** 입장료를 내고 도전 시작 — 모자라면 false */
+export function payDungeonEntry(progress) {
+  if (progress.cr2032 < DUNGEON.ENTRY_FEE) return false;
+  progress.cr2032 -= DUNGEON.ENTRY_FEE;
+  progress.dungeon.attempts += 1;
+  return true;
+}
+
+/** 층 클리어 (전투 + 링크 퍼즐) — 별점은 최고 기록만 남긴다 */
+export function applyFloorClear(progress, floor, stars) {
+  progress.dungeon.clears += 1;
+  progress.dungeon.maxFloor = Math.max(progress.dungeon.maxFloor, floor);
+  const k = String(floor);
+  progress.dungeon.stars[k] = Math.max(progress.dungeon.stars[k] ?? 0, stars);
+}
+
+/** Connection Timeout: 보유 CR2032의 10%(내림)를 잃는다 (PRD §5, §8.4) — 잃은 양을 반환 */
+export function applyTimeoutPenalty(progress) {
+  const lost = Math.floor(progress.cr2032 * TIMEOUT_PENALTY);
+  progress.cr2032 -= lost;
+  progress.dungeon.kos += 1;
+  return lost;
 }

@@ -163,6 +163,44 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("PRD §8.3 기준선을 통과한다 (보고서 기준)", rep?.criteria?.length >= 6 && failed.length === 0, failed.join(", ") || `${rep?.criteria?.length}개 항목`);
 }
 
+// ---------- Stage 7: 채널 호핑 규칙 & 층 생성 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const H = await imp("hopping.js");
+  const seq = H.csa1Sequence(7, H.allChannelsMap(), 6).map((e) => e.channel).join(",");
+  const map = H.allChannelsMap(); map[7] = false;
+  const remap = H.csa1Sequence(7, map, 1)[0];
+  check("채널 선택 알고리즘 #1이 교과서와 일치한다 (hop 7 → 7,14,21,28,35,5 · 재매핑)",
+    seq === "7,14,21,28,35,5" && remap.remapped && remap.channel === 8 && H.wifiBlockedChannels([1, 6, 11]).size === 31,
+    `열 ${seq} · ch7 제외 시 → ${remap.channel} · Wi-Fi 1·6·11 → ${H.wifiBlockedChannels([1, 6, 11]).size}/37`);
+
+  const D = await imp("dungeon.js");
+  const sig = (l) => `${l.hopIncrement}|${l.wifi.join("-")}|${l.spawns.map(([x, z]) => x.toFixed(1) + z.toFixed(1)).join()}`;
+  const layouts = Array.from({ length: 20 }, (_, i) => D.generateFloor(1, 1000 + i * 7919));
+  const distinct = new Set(layouts.map(sig)).size;
+  const same = sig(D.generateFloor(3, 42)) === sig(D.generateFloor(3, 42));
+  const deep = Array.from({ length: 300 }, (_, i) => D.generateFloor(6 + (i % 5), i * 104729 + 1));
+  const okDeep = deep.every((l) => l.wifi.length === 3 && l.wifi.every((w, j) => j === 0 || w - l.wifi[j - 1] >= 4));
+  check("깊은 층(Wi-Fi 3대)도 항상 생성된다 (배치 무한 루프 회귀 방지)", okDeep, `6~10층 300개`);
+  check("층이 매번 다른 채널 배치로 생성되고, 같은 시드면 같다", distinct >= 18 && same && D.wifiCountFor(1) === 1 && D.wifiCountFor(6) === 3, `20번 중 서로 다른 배치 ${distinct}개`);
+
+  const lay = D.generateFloor(2, 777);
+  const pz = D.createLinkPuzzle(lay);
+  const before = D.runLinkTest(pz).ok;
+  for (const c of lay.blocked) D.toggleChannel(pz, c);
+  const after = D.runLinkTest(pz);
+  const guard = D.createLinkPuzzle(lay);
+  for (let c = 0; c < 37; c++) D.toggleChannel(guard, c);
+  check("채널맵 퍼즐: 막힌 채널을 빼면(AFH) 링크가 안정되고, 최소 2채널은 남는다",
+    !before && after.ok && after.stars === 3 && guard.map.filter(Boolean).length === 2, `★${after.stars} · 사용 ${after.used}채널`);
+
+  const P = await imp("progress.js");
+  const v4 = P.createProgress(); delete v4.dungeon; v4.v = 4; v4.cr2032 = 9;
+  const mem = new Map([[P.SAVE_KEY, JSON.stringify(v4)]]);
+  const l = P.loadProgress({ getItem: (k) => mem.get(k) ?? null });
+  check("Stage 6.5 세이브(v4)가 손실 없이 v5로 마이그레이션된다", l.status === "loaded" && l.progress.cr2032 === 9 && l.progress.dungeon.maxFloor === 0);
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -644,7 +682,103 @@ await page.waitForFunction(() => window.__PK);
   check("5분이 지나면 배터리 1칸이 충전되어 다시 할 수 있다", recharged === "1" && !(await startBtn.isDisabled()), `${recharged}칸`);
   await page.keyboard.press("Escape");
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
-  check("측정기 배터리 상태가 세이브(v4)에 저장된다", saved.v === 4 && Number.isInteger(saved.job.charges.stored));
+  check("측정기 배터리 상태가 세이브(v4+)에 저장된다", saved.v >= 4 && Number.isInteger(saved.job.charges.stored));
+}
+
+// ---------- Stage 7: 37채널 호핑 던전 ----------
+const dState = () => page.evaluate(() => window.__PK.dungeon.state());
+/** 테스트용 강한 기사 세이브 (흐름 검증용 — 밸런스는 봇 시뮬레이션이 맡는다) */
+await page.evaluate(() => {
+  const p = window.__PK.progress();
+  Object.assign(p, { cr2032: 30 });
+  Object.assign(p.bonus, { hp: 900, tx: 60 });
+  localStorage.setItem("packetKnight.save", JSON.stringify(p));
+});
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+await reset();
+{
+  await teleport(-9.0, -7.0);
+  await tick(500);
+  const gp = await page.evaluate(() => window.__PK.projectToScreen(-9.0, 0.8, -13.0)); // 던전 포털
+  await page.mouse.click(gp.x, gp.y);
+  await tick(20);
+  const label = await page.locator("#modal-action").textContent();
+  check("던전 관문 모달에 '던전 입장' 버튼이 있다", label.includes("던전"), label);
+  await page.click("#modal-action");
+  await page.locator("#dungeon-panel .dungeon-enter").click();
+  await tick(50);
+  const s1 = await dState();
+  const cr1 = (await page.evaluate(() => window.__PK.progress())).cr2032;
+  const hudText = await page.locator("#dungeon-hud .dh-text").textContent();
+  check("입장료를 내고 1층(지하 방)에 들어간다", s1?.floor === 1 && s1.phase === "combat" && cr1 === 27 && hudText.includes("1층"), `${hudText} · CR2032 ${cr1}`);
+
+  // 간섭 몬스터 소탕 (강한 기사로 흐름만 검증)
+  await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 300 && pk.dungeon.state().phase === "combat"; i++) { pk.battle.fire(); pk.tick(0.1); } });
+  const s2 = await dState();
+  const mons = await bState();
+  check("Wi-Fi 간섭 몬스터(층 체력 배율 적용)를 모두 쓰러뜨리면 링크 단계로 넘어간다",
+    s2.phase === "link" && mons.monsters.every((m) => m.state === "dead" && m.type === "wifiInterferer"), `${mons.monsters.length}마리 · 체력 ${mons.monsters[0].maxHp}`);
+
+  // 콘솔에 다가가면 자동으로 열린다
+  const room = await page.evaluate(() => window.__PK.dungeon.room);
+  await teleport(room.cx, room.cz - 7.0);
+  await tick(200);
+  check("북쪽 링크 콘솔에 다가가면 채널맵 콘솔이 열린다", (await page.evaluate(() => window.__PK.dungeon.panelMode())) === "console");
+
+  await tick(6000); // 관찰: 연결 이벤트 40개
+  const s3 = await dState();
+  const lossyBlocked = s3.blocked.filter((c) => s3.observed[c].tx > 0 && s3.observed[c].lost / s3.observed[c].tx > 0.5);
+  const seenBlocked = s3.blocked.filter((c) => s3.observed[c].tx > 0);
+  const falseAlarm = s3.observed.filter((o, c) => !s3.blocked.includes(c) && o.tx >= 2 && o.lost / o.tx > 0.5).length;
+  // 숨은 공유기는 늘 켜져 있어 막힌 채널은 항상 깨지고, 다른 채널은 2% 페이딩 잡음 — 오경보는 드물다
+  check("관찰하면 숨은 Wi-Fi가 덮는 채널에서 패킷 손실이 보인다 (채널 분류)",
+    seenBlocked.length > 0 && lossyBlocked.length === seenBlocked.length && falseAlarm <= 1,
+    `Wi-Fi ${s3.wifi.join(",")}번 → 막힘 ${s3.blocked[0]}~${s3.blocked.at(-1)} · 관찰 ${seenBlocked.length}개 중 손실 판정 ${lossyBlocked.length}개 · 오경보 ${falseAlarm}`);
+
+  await page.locator("#dungeon-panel .link-test").click();
+  const fail = await page.locator("#dungeon-panel .ch-status").textContent();
+  check("채널맵을 고치지 않고 링크 테스트하면 실패한다", fail.includes("❌") && (await dState()).phase === "link", fail.slice(0, 30));
+
+  for (const c of s3.blocked) await page.locator(`#dungeon-panel .ch[data-ch="${c}"]`).click();
+  await page.locator("#dungeon-panel .link-test").click();
+  const okText = await page.locator("#dungeon-panel .ch-status").textContent();
+  const s4 = await dState();
+  const prog = await page.evaluate(() => window.__PK.progress());
+  check("막힌 채널을 채널맵에서 빼면 링크가 안정되고 다음 층 포털이 열린다",
+    okText.includes("✅") && okText.includes("★★★") && s4.phase === "open" && prog.dungeon.maxFloor === 1 && prog.dungeon.stars["1"] === 3, okText.slice(0, 40));
+
+  // 포털 → 2층 (다른 채널 배치)
+  await page.keyboard.press("Escape");
+  await teleport(room.cx, room.cz + 7.6);
+  await tick(200);
+  check("남쪽 포털에 다가가면 다음 층 도전 창이 열린다", (await page.evaluate(() => window.__PK.dungeon.panelMode())) === "portal");
+  await page.locator("#dungeon-panel .dungeon-enter").click();
+  await tick(50);
+  const s5 = await dState();
+  const sameLayout = s5.hopIncrement === s3.hopIncrement && s5.wifi.join() === s3.wifi.join();
+  check("클리어하면 다음 층(2층)이 열리고 새 채널 배치로 생성된다", s5.floor === 2 && s5.phase === "combat" && !sameLayout,
+    `1층 hop ${s3.hopIncrement}·Wi-Fi ${s3.wifi} → 2층 hop ${s5.hopIncrement}·Wi-Fi ${s5.wifi}`);
+
+  // 던전에서 쓰러지면 Connection Timeout: 마을로, CR2032 10% 손실
+  const crBefore = (await page.evaluate(() => window.__PK.progress())).cr2032;
+  await page.evaluate(() => {
+    const pk = window.__PK;
+    const m = pk.battle.state().monsters[0];
+    pk.teleport(m.x + 0.5, m.z);
+    pk.battle.setHp(1);
+    for (let i = 0; i < 100 && pk.dungeon.state(); i++) pk.tick(0.1);
+  });
+  const afterKo = await page.evaluate(() => window.__PK.progress());
+  const ko = await state();
+  check("던전에서 쓰러지면 Connection Timeout — 마을 관문으로 돌아오고 CR2032 10%를 잃는다",
+    (await dState()) === null && afterKo.cr2032 === crBefore - Math.floor(crBefore * 0.1) && afterKo.dungeon.kos === 1 && Math.hypot(ko.x + 9, ko.z + 7.6) < 1,
+    `CR2032 ${crBefore} → ${afterKo.cr2032}`);
+
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const re = await page.evaluate(() => window.__PK.progress());
+  check("던전 기록(최고 층·별점)이 저장되고 새로고침 후 유지된다", re.v === 5 && re.dungeon.maxFloor === 1 && re.dungeon.attempts === 2);
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));

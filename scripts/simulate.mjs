@@ -211,7 +211,7 @@ const report = {
     hour: `${ECONOMY.LOOPS}루프 × ${ECONOMY.HOUR / ECONOMY.LOOPS / 60}분`,
     targetSpend: `강화 ${ECONOMY.TARGET_UPGRADES}회 성공(장비 ${Object.keys(GEAR).length}종 고르게) 기대 비용. 수지 = (수급 − 입장료 − 페널티) / 목표 − 1`,
     upgrade: `비용 round(${UPGRADE.BASE}×${UPGRADE.GROWTH}^n), 성공률 max(30%, 95%−10%p×n)`,
-    dungeon: `Stage 7 가정치 — 한 층 = Wi-Fi 간섭 몬스터 ${DUNGEON.FLOOR_MONSTERS}마리, 반경 10 m 원형 방, 입장료 ${DUNGEON.ENTRY_FEE}`,
+    dungeon: `Stage 7 구현(core/dungeon.js) — 한 층 = Wi-Fi 간섭 몬스터 ${DUNGEON.FLOOR_MONSTERS}마리(층마다 체력 +${DUNGEON.FLOOR_HP_SCALE * 100}%), 반경 10 m 방, 입장료 ${DUNGEON.ENTRY_FEE}, 클리어 후 링크 퍼즐 60초`,
     playerStrategies: PLAYER_STRATEGIES
   }
 };
