@@ -455,10 +455,10 @@ window.addEventListener("pointermove", (e) => {
   const dy = e.clientY - pointerDownPos.y;
   const dist = Math.hypot(dx, dy);
 
-  // 드래그 거리 8px 이상이면 시점 회전
+  // 드래그 거리 8px 이상이면 시점 회전 (터치/드래그 방향과 1:1 자연스러운 시점 추종)
   if (dist > 8 || isDraggingCamera) {
     isDraggingCamera = true;
-    cameraYaw += dx * 0.006;
+    cameraYaw -= dx * 0.006;
     cameraPitch = Math.max(0.15, Math.min(1.2, cameraPitch + dy * 0.005));
     pointerDownPos = { x: e.clientX, y: e.clientY };
   }
