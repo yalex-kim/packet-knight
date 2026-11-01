@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 3: 캐릭터 컨트롤 고도화</title>
+<title>Packet Knight — Stage 3.1: 캐릭터 컨트롤 고도화</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -130,11 +130,11 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b> — Stage 3: 컨트롤 고도화<br />
+  <b>PACKET KNIGHT</b> — Stage 3.1: 컨트롤 고도화<br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
-    🧱 충돌: <b>건물·분수대·나무 충돌 슬라이딩</b> (계단 자연 단차)<br />
+    🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />
     🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌
   </div>
 </div>
@@ -180,10 +180,9 @@
 import * as THREE from "three";
 
 // ============================================================
-// Packet Knight — Stage 3: 캐릭터 컨트롤 고도화
-// PRD.md §7 Stage 3 DoD:
-// "큐브가 지형 단차를 오르내리고, 점프를 뛰며,
-//  건물과 분수대, 나무에 부딪히며 자연스럽게 미끄러진다."
+// Packet Knight — Stage 3.1: 캐릭터 컨트롤 고도화
+// PRD.md §7 Stage 3 DoD (scripts/smoke.mjs 로 자동 검증):
+// "큐브가 지형 단차를 오르내리고 건물에 부딪힌다"
 // ============================================================
 
 // ---------- 1. 씬 & 렌더러 ----------
@@ -206,38 +205,57 @@ scene.add(sun);
 scene.add(new THREE.AmbientLight(0xc6e0ff, 0.65));
 scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.55));
 
-// ---------- 2. 지형 규격 및 높이 계산 함수 ----------
+// ---------- 2. 지형 규격 & 칸 단위 높이맵 (시각·물리 단일 진실 공급원) ----------
 const ISLAND_RADIUS = 26;
 const VILLAGE_RADIUS = 16.5; // 마을 평지 반경
 const SURFACE_Y = 2.0;       // 마을 평지 표면 높이
 const DUNGEON_PIT_Y = -0.5;  // 지하 던전 바닥 표면 높이
 const SEA_LEVEL = 0;
+const PLAY_RADIUS = 24.5;    // 섬 외곽 이동 한계
+const HEIGHT_STEP = 0.5;     // 높이 양자화 단위 (반 블록 계단)
 
 // 던전 입구 위치 및 계단 구역 (북서쪽 외곽)
 const DUNGEON_X = -9.0;
 const DUNGEON_Z = -13.0;
 
-/**
- * 임의의 (x, z) 위치에서 실제 밟는 지표면(Top Face) 높이 Y를 반환
- */
-export function groundHeightAt(x, z) {
-  // 1) 던전 계단 및 지하 pit 통로 (x: DUNGEON_X 근방, z: -8 ~ -14)
-  const dx = x - DUNGEON_X;
-  const dz = z - DUNGEON_Z;
-  if (Math.abs(dx) <= 2.2 && z >= -14.5 && z <= -8.0) {
+function isDungeonCell(x, z) {
+  return Math.abs(x - DUNGEON_X) <= 2.2 && z >= -14.5 && z <= -8.0;
+}
+
+/** 연속 높이 설계 함수 (생성 전용 — 물리는 cellHeight를 쓴다) */
+function rawHeight(x, z) {
+  if (isDungeonCell(x, z)) {
     const t = THREE.MathUtils.clamp((-8.0 - z) / 5.5, 0, 1);
     return SURFACE_Y - t * (SURFACE_Y - DUNGEON_PIT_Y);
   }
-
-  // 2) 마을 평지 고원 광장
   const r = Math.hypot(x, z);
-  if (r <= VILLAGE_RADIUS) {
-    return SURFACE_Y;
-  }
+  if (r <= VILLAGE_RADIUS) return SURFACE_Y;
+  return SURFACE_Y - Math.min(2.5, (r - VILLAGE_RADIUS) * 0.35);
+}
 
-  // 3) 외곽 완만한 경사로 & 해안 모래사장
-  const drop = Math.min(2.5, (r - VILLAGE_RADIUS) * 0.35);
-  return SURFACE_Y - drop;
+/**
+ * 칸 (i, j)는 월드 [i, i+1] × [j, j+1] 영역을 덮는다.
+ * 높이는 칸 중심에서 샘플링해 HEIGHT_STEP 단위로 양자화한다.
+ * → 렌더링된 블록 윗면과 캐릭터가 밟는 높이가 항상 정확히 일치한다.
+ */
+const heightMap = new Map();
+const cellKey = (i, j) => i * 1000 + j;
+for (let i = -ISLAND_RADIUS; i < ISLAND_RADIUS; i++) {
+  for (let j = -ISLAND_RADIUS; j < ISLAND_RADIUS; j++) {
+    const cx = i + 0.5, cz = j + 0.5;
+    if (Math.hypot(cx, cz) > ISLAND_RADIUS) continue;
+    heightMap.set(cellKey(i, j), Math.round(rawHeight(cx, cz) / HEIGHT_STEP) * HEIGHT_STEP);
+  }
+}
+
+function cellHeight(i, j) {
+  const h = heightMap.get(cellKey(i, j));
+  return h === undefined ? -Infinity : h;
+}
+
+/** 임의의 (x, z) 위치에서 실제 밟는 지표면(Top Face) 높이 Y */
+function groundHeightAt(x, z) {
+  return cellHeight(Math.floor(x), Math.floor(z));
 }
 
 // 재질 정의
@@ -250,13 +268,13 @@ const stoneMat  = new THREE.MeshLambertMaterial({ color: 0x6e737b });
 const darkStone = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
 const waterMat  = new THREE.MeshLambertMaterial({ color: 0x226cb5, transparent: true, opacity: 0.88 });
 
-// 복셀 레이어 빌더
+// 복셀 레이어 빌더 — p = [칸 x, 블록 윗면 y, 칸 z]
 function buildVoxelLayer(list, material) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const mesh = new THREE.InstancedMesh(geo, material, list.length);
   const m = new THREE.Matrix4();
   list.forEach((p, i) => {
-    m.makeTranslation(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
+    m.makeTranslation(p[0] + 0.5, p[1] - 0.5, p[2] + 0.5);
     mesh.setMatrixAt(i, m);
   });
   mesh.instanceMatrix.needsUpdate = true;
@@ -264,53 +282,43 @@ function buildVoxelLayer(list, material) {
 }
 
 const layer = { grass: [], path: [], plaza: [], sand: [], dirt: [], stone: [], darkStone: [] };
+const BEDROCK_Y = -4;
 
-for (let x = -ISLAND_RADIUS; x <= ISLAND_RADIUS; x++) {
-  for (let z = -ISLAND_RADIUS; z <= ISLAND_RADIUS; z++) {
-    const r = Math.hypot(x, z);
-    if (r > ISLAND_RADIUS) continue;
+for (const key of heightMap.keys()) {
+  const i = Math.round(key / 1000);
+  const j = key - i * 1000;
+  const x = i + 0.5, z = j + 0.5; // 칸 중심
+  const top = heightMap.get(key);
+  const r = Math.hypot(x, z);
 
-    const surfH = groundHeightAt(x, z);
-    const topVoxelY = Math.round(surfH) - 1;
+  if (isDungeonCell(x, z)) {
+    layer.darkStone.push([i, top, j]);
+    for (let y = top - 1; y > BEDROCK_Y; y--) layer.stone.push([i, y, j]);
+    continue;
+  }
 
-    const dx = x - DUNGEON_X;
-    const isDungeonPit = Math.abs(dx) <= 2.2 && z >= -14.5 && z <= -8.0;
+  const isCentralPlaza = r <= 3.2;
+  const isNorthAve = Math.abs(x) <= 1 && z >= -9 && z <= 0;
+  const isSouthAve = Math.abs(x) <= 1 && z >= 0 && z <= 8;
+  const isEastWestAve = (z >= -2 && z <= 0) && (x >= -10 && x <= 10);
+  const isDungeonRoad = (z <= -4 && z >= -8) && Math.abs(x - (DUNGEON_X * ((-4 - z) / 4.0))) <= 1.2;
+  const isBeaconRoad = (z >= 4 && z <= 9) && Math.abs(x - (8.0 * ((z - 4) / 4.0))) <= 1.2;
+  const isRoad = isNorthAve || isSouthAve || isEastWestAve || isDungeonRoad || isBeaconRoad;
 
-    if (isDungeonPit) {
-      layer.darkStone.push([x, topVoxelY, z]);
-      for (let y = topVoxelY - 1; y >= -4; y--) layer.stone.push([x, y, z]);
-      continue;
-    }
+  let topType = "grass";
+  if (r > VILLAGE_RADIUS + 2.5) topType = "sand";
+  else if (isCentralPlaza) topType = "plaza";
+  else if (isRoad) topType = "path";
 
-    const isCentralPlaza = r <= 3.2;
-    const isNorthAve = Math.abs(x) <= 1 && z >= -9 && z <= 0;
-    const isSouthAve = Math.abs(x) <= 1 && z >= 0 && z <= 8;
-    const isEastWestAve = (z >= -2 && z <= 0) && (x >= -10 && x <= 10);
-    const isDungeonRoad = (z <= -4 && z >= -8) && Math.abs(x - (DUNGEON_X * ((-4 - z) / 4.0))) <= 1.2;
-    const isBeaconRoad = (z >= 4 && z <= 9) && Math.abs(x - (8.0 * ((z - 4) / 4.0))) <= 1.2;
+  layer[topType].push([i, top, j]);
 
-    const isRoad = isNorthAve || isSouthAve || isEastWestAve || isDungeonRoad || isBeaconRoad;
-
-    let topType = "grass";
-    if (r > VILLAGE_RADIUS + 2.5) {
-      topType = "sand";
-    } else if (isCentralPlaza) {
-      topType = "plaza";
-    } else if (isRoad) {
-      topType = "path";
-    } else {
-      topType = "grass";
-    }
-
-    layer[topType].push([x, topVoxelY, z]);
-
-    const depth = topType === "sand" ? 2 : 3;
-    for (let d = 1; d <= depth; d++) {
-      const y = topVoxelY - d;
-      if (y < -4) break;
-      if (d === depth) layer.stone.push([x, y, z]);
-      else layer[topType === "sand" ? "sand" : "dirt"].push([x, y, z]);
-    }
+  // 하부 층: 이웃 칸보다 낮아지는 절벽 면이 비지 않도록 충분히 깊게 쌓는다
+  const depth = topType === "sand" ? 2 : 4;
+  for (let d = 1; d <= depth; d++) {
+    const y = top - d;
+    if (y <= BEDROCK_Y) break;
+    if (d === depth) layer.stone.push([i, y, j]);
+    else layer[topType === "sand" ? "sand" : "dirt"].push([i, y, j]);
   }
 }
 
@@ -437,7 +445,7 @@ registerInteractive(library, {
   desc: "2.4GHz 무선통신의 모든 원리가 기록된 지식의 성소입니다. 챕터 퀴즈를 풀면 스탯(TX 파워, 수신 감도)이 오르고 새로운 스킬 슬롯이 해금됩니다.",
   lore: "무선 통신 교과서 connectivityBook 15개 챕터의 원문 지식이 인터랙티브하게 보관되어 있습니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/intro.html",
-  walkPos: new THREE.Vector3(-7.2, SURFACE_Y, -1.0)
+  walkPos: new THREE.Vector3(-6.6, SURFACE_Y, -1.0)
 });
 
 // ----- 3.3 🔨 패킷 대장간 (Packet Forge & Battery Shop) -----
@@ -472,7 +480,7 @@ registerInteractive(forge, {
   desc: "안테나 사거리를 늘리고, 크리스털 정밀도를 맞추며, 던전 탐험에 필수적인 코인 배터리 CR2032를 장착하고 교체하는 하드웨어 정비소입니다.",
   lore: "저전력 BLE 기기의 수명과 성능을 좌우하는 CR2032 전원 설계 및 RF 매칭 회로를 은유합니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/power.html",
-  walkPos: new THREE.Vector3(7.2, SURFACE_Y, -1.0)
+  walkPos: new THREE.Vector3(6.6, SURFACE_Y, -1.0)
 });
 
 // ----- 3.4 📡 전파의 등대 (Beacon Tower) -----
@@ -507,26 +515,27 @@ registerInteractive(tower, {
   desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 신호를 수신해 RSSI 거리를 측정하는 알바 미니게임을 진행할 수 있습니다.",
   lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/advertising.html",
-  walkPos: new THREE.Vector3(6.6, SURFACE_Y, 6.6)
+  walkPos: new THREE.Vector3(6.4, SURFACE_Y, 6.4)
 });
 
 // ----- 3.5 ⛲ 중앙 광장 분수대 (Central Bluetooth Fountain) -----
 const fountain = new THREE.Group();
 {
-  const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.5, 12), stoneMat);
-  basin.position.y = 0.25;
+  // 수반 턱 높이 0.7 — 걸어서는 못 오르고(STEP_MAX 0.55) 점프로 올라설 수 있다
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.7, 12), stoneMat);
+  basin.position.y = 0.35;
   fountain.add(basin);
 
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 0.38, 12), waterMat);
-  water.position.y = 0.32;
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 0.5, 12), waterMat);
+  water.position.y = 0.48;
   fountain.add(water);
 
-  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.9, 8), stoneMat);
-  pillar.position.y = 0.65;
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1.1, 8), stoneMat);
+  pillar.position.y = 0.75;
   fountain.add(pillar);
 
   const rune = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), cyanEmblem);
-  rune.position.y = 1.3;
+  rune.position.y = 1.5;
   fountain.add(rune);
   fountain.userData.rune = rune;
 }
@@ -539,7 +548,7 @@ registerInteractive(fountain, {
   desc: "스펙트럼 대륙의 모든 패킷 기사들이 모여 정보를 나누고 휴식을 취하는 중앙 광장의 분수대입니다. 중앙 룬에서 은은한 2.4GHz 전파의 파동이 샘솟습니다.",
   lore: "블루투스 네트워크의 중심 허브(Central Device)처럼 모든 경로가 모이고 갈라지는 중심점입니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/network.html",
-  walkPos: new THREE.Vector3(0, SURFACE_Y, 2.2)
+  walkPos: new THREE.Vector3(0, SURFACE_Y, 3.0)
 });
 
 // ----- 3.6 ⚔️ 37채널 호핑 던전 지하 입구 (Dungeon Portal Gate) -----
@@ -588,7 +597,7 @@ registerInteractive(dungeonGate, {
   desc: "스펙트럼 대륙 지하 37개 주파수 채널로 이어지는 관문입니다. 패킷 기사는 1600회/초의 호핑 패턴을 밟아가며 Wi-Fi 간섭 몬스터를 격퇴해야 합니다.",
   lore: "데이터 통신 시 외부 간섭을 피하기 위해 37개 데이터 채널(2.404~2.478GHz)을 고속으로 건너뛰는 Frequency Hopping(FHSS) 메커니즘 던전입니다.",
   link: "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/hopping.html",
-  walkPos: new THREE.Vector3(DUNGEON_X, SURFACE_Y, -8.0)
+  walkPos: new THREE.Vector3(DUNGEON_X, SURFACE_Y, -7.6)
 });
 
 // ----- 3.7 복셀 나무 & 가로등 데코레이션 -----
@@ -639,37 +648,41 @@ function createStreetLamp(x, z) {
   lamp.position.set(x, y, z);
   scene.add(lamp);
 }
-[
+const LAMP_POSITIONS = [
   [-1.8, 2.5], [1.8, 2.5], [-1.8, -2.5], [1.8, -2.5],
   [-1.8, -7.0], [1.8, -7.0], [-6.0, -1.8], [6.0, -1.8]
-].forEach(([lx, lz]) => createStreetLamp(lx, lz));
+];
+LAMP_POSITIONS.forEach(([lx, lz]) => createStreetLamp(lx, lz));
 
 // ---------- 4. 주인공 큐브 나이트 & 착지 충격파 이펙트 ----------
+// knight(위치·회전) > knightRig(스쿼시/바운스, 발밑 피벗) > 몸통·바이저·안테나
 const knight = new THREE.Group();
-let knightBody;
+const knightRig = new THREE.Group();
+knight.add(knightRig);
 {
-  knightBody = new THREE.Mesh(
+  const body = new THREE.Mesh(
     new THREE.BoxGeometry(0.85, 0.85, 0.85),
     new THREE.MeshLambertMaterial({ color: 0xd8443c }) // 기사 붉은 갑옷
   );
-  knightBody.position.y = 0.425;
-  knight.add(knightBody);
+  body.position.y = 0.425;
+  knightRig.add(body);
 
   const visor = new THREE.Mesh(
     new THREE.BoxGeometry(0.5, 0.18, 0.06),
     new THREE.MeshBasicMaterial({ color: 0x39d0ff })
   );
   visor.position.set(0, 0.52, 0.44);
-  knight.add(visor);
+  knightRig.add(visor);
 
   const antenna = new THREE.Mesh(
     new THREE.CylinderGeometry(0.035, 0.035, 0.5, 6), metalMat
   );
   antenna.position.set(0.24, 1.05, 0);
-  knight.add(antenna);
+  knightRig.add(antenna);
 }
 
-const SPAWN_POS = new THREE.Vector3(0, SURFACE_Y, 2.2);
+// 스폰은 분수대 충돌 반경(1.85 + 0.42) 바깥이어야 한다
+const SPAWN_POS = new THREE.Vector3(0, SURFACE_Y, 3.0);
 knight.position.copy(SPAWN_POS);
 scene.add(knight);
 
@@ -718,67 +731,80 @@ scene.add(targetMarker);
 
 let targetDestination = null;
 
-// ---------- 6. 충돌 판정 시스템 (AABB + 원형 장애물) ----------
-// 기사 바운딩 반경
-const KNIGHT_RADIUS = 0.42;
+// ---------- 6. 높이 인식 충돌 판정 (지형 칸 + 박스/원형 장애물) ----------
+// 규칙: 목표 지점의 바닥/장애물 윗면이 "발 높이 + STEP_MAX"보다 높으면 벽, 아니면 올라선다.
+const KNIGHT_RADIUS = 0.42;   // 장애물 충돌 반경
+const FOOT_HALF = 0.3;        // 지형 칸 판정용 발바닥 반폭
+const STEP_MAX = 0.55;        // 걸어서 오를 수 있는 최대 단차 (반 블록 OK, 한 블록은 점프)
 
-// 사각 장애물 AABB 목록 (건물 본체 및 등대 기단, 던전 게이트)
+// 사각 장애물 AABB 목록 — top: 윗면 절대 높이
 const OBSTACLE_BOXES = [
-  // GATT 중앙 회관 (0, -8.5) — 문(앞쪽)으로 걸어 들어갈 수 있도록 앞쪽 여유 공간 확보
-  { minX: -2.0, maxX: 2.0, minZ: -10.2, maxZ: -7.0 },
+  // GATT 중앙 회관 (0, -8.5)
+  { minX: -2.0, maxX: 2.0, minZ: -10.2, maxZ: -7.0, top: SURFACE_Y + 3.4 },
   // RF 이론 도서관 (-9.0, -1.0)
-  { minX: -10.6, maxX: -7.4, minZ: -2.4, maxZ: 0.4 },
+  { minX: -10.6, maxX: -7.4, minZ: -2.4, maxZ: 0.4, top: SURFACE_Y + 3.2 },
   // 패킷 대장간 (9.0, -1.0)
-  { minX: 7.4, maxX: 10.6, minZ: -2.4, maxZ: 0.4 },
-  // 전파의 등대 기단 (8.0, 8.0)
-  { minX: 7.1, maxX: 8.9, minZ: 7.1, maxZ: 8.9 },
-  // 호핑 던전 관문 좌우 기둥 (-9.0, -13.0)
-  { minX: -10.6, maxX: -7.4, minZ: -13.5, maxZ: -12.5 }
+  { minX: 7.4, maxX: 10.6, minZ: -2.4, maxZ: 0.4, top: SURFACE_Y + 2.8 },
+  // 전파의 등대 (8.0, 8.0)
+  { minX: 7.1, maxX: 8.9, minZ: 7.1, maxZ: 8.9, top: SURFACE_Y + 8.0 },
+  // 호핑 던전 관문 (-9.0, -13.0) — 던전 구현(Stage 7) 전까지는 통과 불가
+  { minX: -10.6, maxX: -7.4, minZ: -13.5, maxZ: -12.5, top: DUNGEON_PIT_Y + 3.3 }
 ];
 
-// 원형 장애물 목록 (중앙 분수대, 나무 기둥)
+// 원형 장애물 목록 — 분수대 수반(점프로 올라설 수 있음)·기둥, 나무, 가로등
 const OBSTACLE_CIRCLES = [
-  // 중앙 광장 분수대 (0, 0, 반경 1.85)
-  { x: 0, z: 0, r: 1.85 },
-  // 복셀 나무 줄기 (반경 0.45)
-  ...TREE_POSITIONS.map(([tx, tz]) => ({ x: tx, z: tz, r: 0.45 }))
+  { x: 0, z: 0, r: 1.85, top: SURFACE_Y + 0.7 },
+  { x: 0, z: 0, r: 0.45, top: SURFACE_Y + 1.7 },
+  ...TREE_POSITIONS.map(([tx, tz, s]) => ({ x: tx, z: tz, r: 0.45, top: groundHeightAt(tx, tz) + 1.8 * s })),
+  ...LAMP_POSITIONS.map(([lx, lz]) => ({ x: lx, z: lz, r: 0.12, top: groundHeightAt(lx, lz) + 2.0 }))
 ];
 
-/**
- * 특정 (x, z) 위치에서 장애물 충돌 여부 검사
- */
-function checkCollision(x, z) {
-  // 섬 외곽 절벽 낭떠러지 이탈 방지 경계선
-  if (Math.hypot(x, z) > 24.5) return true;
+function boxOverlaps(b, x, z, pad) {
+  return x >= b.minX - pad && x <= b.maxX + pad && z >= b.minZ - pad && z <= b.maxZ + pad;
+}
+function circleOverlaps(c, x, z, pad) {
+  const d = c.r + pad;
+  return (x - c.x) ** 2 + (z - c.z) ** 2 < d * d;
+}
 
-  // AABB 건물 충돌 검사
-  for (let i = 0; i < OBSTACLE_BOXES.length; i++) {
-    const b = OBSTACLE_BOXES[i];
-    if (
-      x >= b.minX - KNIGHT_RADIUS &&
-      x <= b.maxX + KNIGHT_RADIUS &&
-      z >= b.minZ - KNIGHT_RADIUS &&
-      z <= b.maxZ + KNIGHT_RADIUS
-    ) {
-      return true;
-    }
-  }
+// 발바닥 4모서리가 걸치는 지형 칸 높이 목록
+function footprintHeights(x, z) {
+  return [
+    groundHeightAt(x - FOOT_HALF, z - FOOT_HALF), groundHeightAt(x + FOOT_HALF, z - FOOT_HALF),
+    groundHeightAt(x - FOOT_HALF, z + FOOT_HALF), groundHeightAt(x + FOOT_HALF, z + FOOT_HALF)
+  ];
+}
 
-  // 원형 장애물(분수대, 나무) 충돌 검사
-  for (let i = 0; i < OBSTACLE_CIRCLES.length; i++) {
-    const c = OBSTACLE_CIRCLES[i];
-    const distSq = (x - c.x) ** 2 + (z - c.z) ** 2;
-    const minDist = c.r + KNIGHT_RADIUS;
-    if (distSq < minDist * minDist) {
-      return true;
-    }
-  }
-
+/** 발 높이 feetY인 기사가 (x, z)에 있을 수 없으면 true */
+function isBlocked(x, z, feetY) {
+  if (Math.hypot(x, z) > PLAY_RADIUS) return true;
+  const climb = feetY + STEP_MAX;
+  for (const h of footprintHeights(x, z)) if (h > climb) return true;
+  for (const b of OBSTACLE_BOXES) if (b.top > climb && boxOverlaps(b, x, z, KNIGHT_RADIUS)) return true;
+  for (const c of OBSTACLE_CIRCLES) if (c.top > climb && circleOverlaps(c, x, z, KNIGHT_RADIUS)) return true;
   return false;
 }
 
+/** (x, z)에서 발 높이 feetY 기준으로 딛고 설 수 있는 가장 높은 면 */
+function supportHeightAt(x, z, feetY) {
+  const climb = feetY + STEP_MAX;
+  let best = -Infinity;
+  for (const h of footprintHeights(x, z)) if (h <= climb && h > best) best = h;
+  // 장애물 윗면은 중심점이 그 위에 있을 때만 받쳐준다 (가장자리에서 떨어질 수 있게)
+  for (const b of OBSTACLE_BOXES) if (b.top <= climb && b.top > best && boxOverlaps(b, x, z, 0)) best = b.top;
+  for (const c of OBSTACLE_CIRCLES) if (c.top <= climb && c.top > best && circleOverlaps(c, x, z, 0)) best = c.top;
+  return best;
+}
+
 // ---------- 7. 통합 이동 · 점프 · 물리 시스템 ----------
-const keys = new Set();
+const keys = new Set(); // KeyboardEvent.code 기준 — 한글 IME 상태에서도 동작
+const MOVE_CODES = {
+  right:   ["KeyD", "ArrowRight"],
+  left:    ["KeyA", "ArrowLeft"],
+  forward: ["KeyW", "ArrowUp"],
+  back:    ["KeyS", "ArrowDown"]
+};
+const ALL_MOVE_CODES = new Set(Object.values(MOVE_CODES).flat());
 const joystick = { right: 0, forward: 0, active: false };
 
 let cameraYaw = 0;
@@ -787,18 +813,22 @@ let cameraDistance = 15;
 
 const SPEED = 6.4;
 const GRAVITY = -24.0;
-const JUMP_FORCE = 8.5;
+const JUMP_FORCE = 8.5;          // 최고점 ≈ 1.5 (한 블록 + 분수대 턱)
+const STEP_SMOOTH = 16;          // 계단 오르내림 보간 속도
+const LAND_SQUASH_TIME = 0.22;
 
 let velocityY = 0;
 let isGrounded = true;
-let squashTime = 0; // 착지 시 바운스 타이머
+let squashTime = 0;
 let walkAnimTime = 0;
+let pendingArrivalLabel = null;
+const badge = document.getElementById("badge");
 
 function performJump() {
   if (isGrounded) {
     velocityY = JUMP_FORCE;
     isGrounded = false;
-    document.getElementById("badge").textContent = "🦘 점프!";
+    badge.textContent = "🦘 점프!";
   }
 }
 
@@ -808,11 +838,15 @@ window.addEventListener("keydown", (e) => {
     performJump();
     return;
   }
-  keys.add(e.key.toLowerCase());
-  targetDestination = null;
-  targetMarker.visible = false;
+  if (!ALL_MOVE_CODES.has(e.code)) return;
+  e.preventDefault();
+  keys.add(e.code);
+  clearMoveTarget();
 });
-window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+window.addEventListener("keyup", (e) => keys.delete(e.code));
+// 포커스를 잃으면 keyup이 오지 않으므로 눌린 키를 비운다 (Alt+Tab 후 혼자 걷는 문제)
+window.addEventListener("blur", () => keys.clear());
+document.addEventListener("visibilitychange", () => { if (document.hidden) keys.clear(); });
 
 // 점프 버튼 이벤트
 const btnJump = document.getElementById("btn-jump");
@@ -822,143 +856,146 @@ btnJump.addEventListener("pointerdown", (e) => {
   performJump();
 });
 
-function moveKnight(dt) {
-  let rightInput = 0;
-  let forwardInput = 0;
+/** 최단 각도로 회전 보간 (±π 경계에서 반대로 한 바퀴 도는 문제 방지) */
+function turnTowards(current, target, t) {
+  const diff = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + diff * t;
+}
 
-  if (keys.has("d") || keys.has("arrowright")) rightInput += 1;
-  if (keys.has("a") || keys.has("arrowleft"))  rightInput -= 1;
-  if (keys.has("w") || keys.has("arrowup"))    forwardInput += 1;
-  if (keys.has("s") || keys.has("arrowdown"))  forwardInput -= 1;
+/** 축 분리 슬라이딩 이동. 실제 이동량을 반환 */
+function slideMove(stepX, stepZ) {
+  const feetY = knight.position.y;
+  // 이미 장애물 안에 끼어 있으면(스폰·텔레포트 등) 빠져나올 수 있도록 판정을 건너뛴다
+  const stuck = isBlocked(knight.position.x, knight.position.z, feetY);
+  const x0 = knight.position.x, z0 = knight.position.z;
+  if (stuck || !isBlocked(x0 + stepX, z0, feetY)) knight.position.x += stepX;
+  if (stuck || !isBlocked(knight.position.x, z0 + stepZ, feetY)) knight.position.z += stepZ;
+  return Math.hypot(knight.position.x - x0, knight.position.z - z0);
+}
 
+function readMoveInput() {
+  let right = 0, forward = 0;
+  const pressed = (codes) => codes.some(c => keys.has(c));
+  if (pressed(MOVE_CODES.right)) right += 1;
+  if (pressed(MOVE_CODES.left)) right -= 1;
+  if (pressed(MOVE_CODES.forward)) forward += 1;
+  if (pressed(MOVE_CODES.back)) forward -= 1;
   if (joystick.active) {
-    rightInput = joystick.right;
-    forwardInput = joystick.forward;
-    targetDestination = null;
-    targetMarker.visible = false;
+    right = joystick.right;
+    forward = joystick.forward;
   }
+  return { right, forward };
+}
 
-  const inputLen = Math.hypot(rightInput, forwardInput);
-  let isMoving = false;
+function moveKnight(dt) {
+  const input = readMoveInput();
+  if (joystick.active) clearMoveTarget();
+  const inputLen = Math.hypot(input.right, input.forward);
 
-  const currentX = knight.position.x;
-  const currentZ = knight.position.z;
+  let dirX = 0, dirZ = 0, speedScale = 0;
 
   if (inputLen > 0.05) {
-    isMoving = true;
-    const fwdX = -Math.sin(cameraYaw);
-    const fwdZ = -Math.cos(cameraYaw);
-    const rightX = Math.cos(cameraYaw);
-    const rightZ = -Math.sin(cameraYaw);
-
+    const fwdX = -Math.sin(cameraYaw), fwdZ = -Math.cos(cameraYaw);
+    const rightX = Math.cos(cameraYaw), rightZ = -Math.sin(cameraYaw);
     const norm = inputLen > 1 ? 1 / inputLen : 1;
-    const nx = rightInput * norm;
-    const nz = forwardInput * norm;
-
-    const moveStepX = (rightX * nx + fwdX * nz) * SPEED * dt * Math.min(1, inputLen);
-    const moveStepZ = (rightZ * nx + fwdZ * nz) * SPEED * dt * Math.min(1, inputLen);
-
-    // 슬라이딩 충돌: x축과 z축 분리 검사로 벽을 타고 부드럽게 미끄러짐
-    if (!checkCollision(currentX + moveStepX, currentZ)) {
-      knight.position.x += moveStepX;
-    }
-    if (!checkCollision(knight.position.x, currentZ + moveStepZ)) {
-      knight.position.z += moveStepZ;
-    }
-
-    const worldDir = new THREE.Vector3(moveStepX, 0, moveStepZ);
-    if (worldDir.lengthSq() > 0.0001) {
-      const targetRotY = Math.atan2(worldDir.x, worldDir.z);
-      knight.rotation.y = THREE.MathUtils.lerp(knight.rotation.y, targetRotY, Math.min(1, dt * 15));
-    }
+    dirX = rightX * input.right * norm + fwdX * input.forward * norm;
+    dirZ = rightZ * input.right * norm + fwdZ * input.forward * norm;
+    speedScale = Math.min(1, inputLen);
   } else if (targetDestination) {
-    const diff = targetDestination.clone().sub(knight.position);
-    diff.y = 0;
-    const dist = diff.length();
-
+    const dx = targetDestination.x - knight.position.x;
+    const dz = targetDestination.z - knight.position.z;
+    const dist = Math.hypot(dx, dz);
     if (dist > 0.25) {
-      isMoving = true;
-      diff.normalize();
-      const moveStepX = diff.x * SPEED * dt;
-      const moveStepZ = diff.z * SPEED * dt;
-
-      const preX = knight.position.x;
-      const preZ = knight.position.z;
-
-      if (!checkCollision(preX + moveStepX, preZ)) {
-        knight.position.x += moveStepX;
-      }
-      if (!checkCollision(knight.position.x, preZ + moveStepZ)) {
-        knight.position.z += moveStepZ;
-      }
-
-      // 양쪽 축 모두 막힌 경우 목표 도달 불가로 취소
-      if (Math.abs(knight.position.x - preX) < 0.0001 && Math.abs(knight.position.z - preZ) < 0.0001) {
-        targetDestination = null;
-        targetMarker.visible = false;
-      } else {
-        const targetRotY = Math.atan2(diff.x, diff.z);
-        knight.rotation.y = THREE.MathUtils.lerp(knight.rotation.y, targetRotY, Math.min(1, dt * 15));
-      }
+      dirX = dx / dist;
+      dirZ = dz / dist;
+      speedScale = Math.min(1, dist / (SPEED * dt)); // 목표 지점을 넘어가지 않게
     } else {
-      targetDestination = null;
-      targetMarker.visible = false;
+      arriveAtTarget();
     }
   }
 
-  // 지형 스냅 & 점프 중력 물리
-  const groundY = groundHeightAt(knight.position.x, knight.position.z);
+  let moved = 0;
+  if (speedScale > 0) {
+    const len = Math.hypot(dirX, dirZ);
+    moved = slideMove(dirX * SPEED * dt * speedScale, dirZ * SPEED * dt * speedScale);
+    if (len > 0.0001) {
+      knight.rotation.y = turnTowards(knight.rotation.y, Math.atan2(dirX, dirZ), Math.min(1, dt * 15));
+    }
+    // 클릭 이동 중 양 축이 모두 막히면 목표 도달 불가로 취소
+    if (targetDestination && inputLen <= 0.05 && moved < 0.0001) clearMoveTarget();
+  }
+  const isMoving = moved > 0.0005;
+
+  // ----- 수직 물리: 단차 오르내림 · 낙하 · 점프 -----
+  const supportY = supportHeightAt(knight.position.x, knight.position.z, knight.position.y);
+
+  if (isGrounded) {
+    const diff = supportY - knight.position.y;
+    if (diff < -STEP_MAX) {
+      // 한 계단보다 큰 낙차 → 걸어 나가면 떨어진다
+      isGrounded = false;
+      velocityY = 0;
+    } else if (Math.abs(diff) > 0.001) {
+      knight.position.y += diff * Math.min(1, dt * STEP_SMOOTH);
+      if (Math.abs(supportY - knight.position.y) < 0.01) knight.position.y = supportY;
+    }
+  }
 
   if (!isGrounded) {
     velocityY += GRAVITY * dt;
     knight.position.y += velocityY * dt;
-
-    if (knight.position.y <= groundY) {
-      knight.position.y = groundY;
+    if (velocityY <= 0 && knight.position.y <= supportY) {
+      knight.position.y = supportY;
       velocityY = 0;
       isGrounded = true;
-      squashTime = 0.22;
-      triggerLandingEffect(knight.position.x, groundY, knight.position.z);
-      document.getElementById("badge").textContent = "🛡️ GATT 빌리지 광장";
+      squashTime = LAND_SQUASH_TIME;
+      triggerLandingEffect(knight.position.x, supportY, knight.position.z);
+      badge.textContent = regionLabel();
     }
-  } else {
-    // 지상에서는 계단이나 단차를 부드럽게 오르내림
-    knight.position.y += (groundY - knight.position.y) * Math.min(1, dt * 16);
   }
 
-  // 애니메이션 (착지 스쿼시 / 점프 스트레치 / 보행 바운스)
+  // ----- 애니메이션 (착지 스쿼시 / 체공 스트레치 / 보행 바운스) — 리그 전체에 적용 -----
   if (squashTime > 0) {
     squashTime -= dt;
-    const p = Math.max(0, squashTime / 0.22);
-    // 착지 시 납작해졌다가 탄성 복원
-    knightBody.scale.set(1 + p * 0.22, 1 - p * 0.22, 1 + p * 0.22);
-    knightBody.position.y = 0.425 * (1 - p * 0.22);
+    const p = Math.max(0, squashTime / LAND_SQUASH_TIME);
+    knightRig.scale.set(1 + p * 0.22, 1 - p * 0.22, 1 + p * 0.22);
+    knightRig.position.y = 0;
   } else if (!isGrounded) {
-    // 체공 중 상하 스트레치
     const stretch = Math.min(0.18, Math.abs(velocityY) * 0.015);
-    knightBody.scale.set(1 - stretch * 0.5, 1 + stretch, 1 - stretch * 0.5);
-    knightBody.position.y = 0.425;
+    knightRig.scale.set(1 - stretch * 0.5, 1 + stretch, 1 - stretch * 0.5);
+    knightRig.position.y = 0;
   } else if (isMoving) {
     walkAnimTime += dt * 14;
-    knightBody.scale.set(1, 1, 1);
-    knightBody.position.y = 0.425 + Math.abs(Math.sin(walkAnimTime)) * 0.06;
+    knightRig.scale.set(1, 1, 1);
+    knightRig.position.y = Math.abs(Math.sin(walkAnimTime)) * 0.06;
   } else {
-    knightBody.scale.set(1, 1, 1);
-    knightBody.position.y = 0.425;
+    knightRig.scale.set(1, 1, 1);
+    knightRig.position.y = 0;
   }
 }
 
+function regionLabel() {
+  const { x, z, y } = knight.position;
+  if (isDungeonCell(x, z)) return y < 0.6 ? "⚔️ 호핑 던전 입구 · 지하" : "⚔️ 호핑 던전 계단";
+  if (Math.hypot(x, z) > VILLAGE_RADIUS) return "🏖️ 스펙트럼 해안";
+  return "🛡️ GATT 빌리지 광장";
+}
+
 // ---------- 8. 카메라 추종 & 회전 ----------
+// 점프·계단에서 화면이 덜컹이지 않도록 추종 높이만 부드럽게 따라간다
+let cameraFocusY = SPAWN_POS.y;
+
 function updateCamera(dt) {
+  cameraFocusY += (knight.position.y - cameraFocusY) * Math.min(1, dt * 6);
   const hDist = cameraDistance * Math.cos(cameraPitch);
   const vDist = cameraDistance * Math.sin(cameraPitch);
 
-  const desiredX = knight.position.x + Math.sin(cameraYaw) * hDist;
-  const desiredY = knight.position.y + vDist;
-  const desiredZ = knight.position.z + Math.cos(cameraYaw) * hDist;
-
-  camera.position.set(desiredX, desiredY, desiredZ);
-  camera.lookAt(knight.position.x, knight.position.y + 1.0, knight.position.z);
+  camera.position.set(
+    knight.position.x + Math.sin(cameraYaw) * hDist,
+    cameraFocusY + vDist,
+    knight.position.z + Math.cos(cameraYaw) * hDist
+  );
+  camera.lookAt(knight.position.x, cameraFocusY + 1.0, knight.position.z);
 }
 
 // ---------- 9. 마우스 클릭 & 터치 인터랙션 ----------
@@ -975,14 +1012,8 @@ let isDraggingCamera = false;
 let isPointerDown = false;
 let activePointerId = null;
 
+// UI 오버레이는 #app 바깥 형제 요소이므로 여기로 이벤트가 오지 않는다
 app.addEventListener("pointerdown", (e) => {
-  if (
-    e.target.closest("#joystick-zone") ||
-    e.target.closest("#btn-reset") ||
-    e.target.closest("#btn-jump") ||
-    e.target.closest("#info-modal")
-  ) return;
-
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
   if (activePointers.size === 1) {
@@ -1072,12 +1103,17 @@ function showInfoModal(data) {
   modalLink.href = data.link;
   modal.style.display = "block";
 
-  const badge = document.getElementById("badge");
-  badge.textContent = `${data.title} 앞 도착`;
-
   if (data.walkPos) {
-    setMoveTarget(data.walkPos);
+    setMoveTarget(data.walkPos, `${data.title} 앞 도착`);
+    badge.textContent = `🚶 ${data.title}(으)로 이동 중`;
   }
+}
+
+function findInteractiveAncestor(obj) {
+  for (let o = obj; o; o = o.parent) {
+    if (o.userData.interactive) return o.userData.interactive;
+  }
+  return null;
 }
 
 function handleClickOrTap(clientX, clientY) {
@@ -1085,46 +1121,58 @@ function handleClickOrTap(clientX, clientY) {
   pointer.y = -(clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(pointer, camera);
 
-  // 1순위: 인터랙티브 건물/오브젝트 검사
-  for (const obj of interactiveObjects) {
-    const hits = raycaster.intersectObject(obj, true);
-    if (hits.length > 0) {
-      showInfoModal(obj.userData.interactive);
-      return;
-    }
+  // 건물·지형을 한 번에 검사해 화면에서 가장 앞에 있는 대상을 고른다
+  const hits = raycaster.intersectObjects([...interactiveObjects, ...terrain.children, sea], true);
+  if (hits.length === 0) return;
+
+  const info = findInteractiveAncestor(hits[0].object);
+  if (info) {
+    showInfoModal(info);
+    return;
   }
 
-  // 2순위: 지형 바닥 클릭 이동
-  const hits = raycaster.intersectObjects([sea, ...terrain.children], true);
-  if (hits.length > 0) {
-    const p = hits[0].point;
-    // 장애물 내부 클릭 방지
-    if (checkCollision(p.x, p.z)) return;
+  const p = hits[0].point;
+  const targetY = groundHeightAt(p.x, p.z);
+  // 장애물 내부·이동 불가 지점 클릭은 무시
+  if (!Number.isFinite(targetY) || isBlocked(p.x, p.z, targetY)) return;
 
-    const targetY = groundHeightAt(p.x, p.z);
-    setMoveTarget(new THREE.Vector3(p.x, targetY, p.z));
-    document.getElementById("badge").textContent = `📍 이동 중 (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`;
-    modal.style.display = "none";
-  }
+  setMoveTarget(new THREE.Vector3(p.x, targetY, p.z), null);
+  badge.textContent = `📍 이동 중 (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`;
+  modal.style.display = "none";
 }
 
-function setMoveTarget(pos) {
+function setMoveTarget(pos, arrivalLabel) {
   targetDestination = pos;
+  pendingArrivalLabel = arrivalLabel;
   targetMarker.position.set(pos.x, pos.y + 0.04, pos.z);
   targetMarker.visible = true;
 }
 
-// 리셋 버튼
-document.getElementById("btn-reset").addEventListener("click", () => {
-  knight.position.copy(SPAWN_POS);
+function clearMoveTarget() {
   targetDestination = null;
+  pendingArrivalLabel = null;
   targetMarker.visible = false;
+}
+
+function arriveAtTarget() {
+  badge.textContent = pendingArrivalLabel ?? regionLabel();
+  clearMoveTarget();
+}
+
+// 리셋 버튼
+const btnReset = document.getElementById("btn-reset");
+btnReset.addEventListener("click", () => {
+  knight.position.copy(SPAWN_POS);
+  knight.rotation.y = 0;
+  cameraFocusY = SPAWN_POS.y;
+  clearMoveTarget();
   cameraYaw = 0;
   cameraPitch = 0.52;
   velocityY = 0;
   isGrounded = true;
   modal.style.display = "none";
-  document.getElementById("badge").textContent = "🛡️ GATT 빌리지 광장 · 평지";
+  badge.textContent = "🛡️ GATT 빌리지 광장 · 평지";
+  btnReset.blur(); // 포커스가 남아 스페이스바가 버튼을 다시 누르지 않도록
 });
 
 // ---------- 10. 가상 조이스틱 이벤트 ----------
@@ -1185,19 +1233,25 @@ function updateJoystick(clientX, clientY) {
 // ---------- 11. 렌더 루프 ----------
 const clock = new THREE.Clock();
 
+// ?test 모드: 실시간 루프는 렌더만 하고, 시뮬레이션은 __PK.tick()으로 고정 스텝 진행 (FPS와 무관한 결정적 테스트)
+const TEST_MODE = new URLSearchParams(location.search).has("test");
+const FIXED_DT = 1 / 60;
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  moveKnight(dt);
-  updateCamera(dt);
+  if (!TEST_MODE) {
+    moveKnight(dt);
+    updateCamera(dt);
+  }
 
   const t = clock.elapsedTime;
   // 비콘 점멸
   tower.userData.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3.5));
   // 분수대 중앙 블루투스 룬 회전
   fountain.userData.rune.rotation.y = t * 1.5;
-  fountain.userData.rune.position.y = 1.3 + Math.sin(t * 2.5) * 0.08;
+  fountain.userData.rune.position.y = 1.5 + Math.sin(t * 2.5) * 0.08;
   // 포털 소용돌이 맥동
   dungeonGate.userData.portal.scale.set(1 + 0.06 * Math.sin(t * 4), 1 + 0.06 * Math.cos(t * 3), 1);
   sea.position.z = Math.sin(t * 0.3) * 0.4;
@@ -1218,9 +1272,35 @@ function animate() {
     if (landingRingTimer <= 0) landingRing.visible = false;
   }
 
-  renderer.render(scene, camera);
+  // 테스트 모드에서는 헤드리스 소프트웨어 렌더링 비용을 피하기 위해 그리지 않는다
+  if (!TEST_MODE) renderer.render(scene, camera);
 }
 animate();
+
+// 자동 스모크 테스트(scripts/smoke.mjs)용 읽기 전용 관찰 훅
+window.__PK = {
+  knight, SPAWN_POS, STEP_MAX,
+  groundHeightAt, isBlocked, supportHeightAt,
+  state: () => ({
+    x: knight.position.x, y: knight.position.y, z: knight.position.z,
+    rotY: knight.rotation.y, grounded: isGrounded, vy: velocityY,
+    badge: badge.textContent, modal: modal.style.display === "block" ? modalTitle.textContent : null
+  }),
+  /** 시뮬레이션을 seconds 만큼 고정 스텝으로 진행 (테스트 모드용) */
+  tick: (seconds) => {
+    for (let n = Math.round(seconds / FIXED_DT); n > 0; n--) {
+      moveKnight(FIXED_DT);
+      updateCamera(FIXED_DT);
+    }
+    scene.updateMatrixWorld(); // 렌더를 생략하므로 레이캐스트용 행렬을 직접 갱신
+  },
+  projectToScreen: (x, y, z) => {
+    updateCamera(0);
+    scene.updateMatrixWorld();
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    return { x: (v.x + 1) / 2 * window.innerWidth, y: (1 - v.y) / 2 * window.innerHeight };
+  }
+};
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;

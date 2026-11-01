@@ -1,0 +1,13 @@
+{
+  "name": "packet-knight",
+  "private": true,
+  "type": "module",
+  "description": "2.4GHz RF 세계를 탐험하며 배우는 3D 무선통신 RPG",
+  "scripts": {
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0",
+    "three": "0.170.0"
+  }
+}
