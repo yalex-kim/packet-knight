@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Packet Knight — Stage 1: 빈 복셀 섬</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1a2b; }
+  #app { width: 100%; height: 100%; }
+  #hud {
+    position: fixed; left: 12px; bottom: 12px; z-index: 10;
+    font: 13px/1.6 ui-monospace, "D2Coding", Consolas, monospace;
+    color: #cfe8ff; background: rgba(6, 16, 30, .72);
+    border: 1px solid #1f3a5f; border-radius: 8px; padding: 8px 12px;
+    user-select: none; pointer-events: none;
+  }
+  #hud b { color: #7dd8ff; font-weight: 600; }
+  #badge {
+    position: fixed; right: 12px; top: 12px; z-index: 10;
+    font: 12px/1.5 ui-monospace, Consolas, monospace; color: #9fd6a8;
+    background: rgba(6, 30, 16, .72); border: 1px solid #2b5f34;
+    border-radius: 8px; padding: 6px 10px; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <b>PACKET KNIGHT</b> — Stage 1: 빈 복셀 섬<br />
+  이동: <b>W A S D</b> (또는 화살표) · 클릭: 오브젝트 확인
+</div>
+<div id="badge">🛡️ 나이트 페이블 · 채널 37 대기 중</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+
+/* ============================================================
+   Packet Knight — Stage 1
+   PRD.md §7 Stage 1 DoD:
+   "브라우저에서 열면 초록·모래색 복셀 섬과 안테나 타워가 보이고,
+    주인공 큐브가 WASD로 움직이며 카메라가 따라온다"
+   ============================================================ */
+
+// ---------- 1. 기본 씬 ----------
+const app = document.getElementById("app");
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8ec9e8);          // 하늘
+scene.fog = new THREE.Fog(0x8ec9e8, 60, 140);          // 먼 곳 안개
+
+const camera = new THREE.PerspectiveCamera(
+  55, window.innerWidth / window.innerHeight, 0.1, 300
+);
+
+// 빛: 태양(주광) + 하늘색 환경광
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.5);
+sun.position.set(30, 50, 20);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xbfd8ff, 0.6));
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.5));
+
+// ---------- 2. 복셀 섬 지형 ----------
+// 섬 반경 안에서 높이 맵을 결정해 1x1x1 복셀로 쌓는다.
+// 파란 물(해수면) 위에 초록 풀밭 + 모래 해안 + 속을 채우는 흙/돌.
+const ISLAND_RADIUS = 14;
+const SEA_LEVEL = 0;
+
+// 간단한 값 노이즈(결정적 — 매 실행 같은 섬)
+function hash2(x, z) {
+  const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function smoothNoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z);
+  const xf = x - xi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const a = hash2(xi, zi), b = hash2(xi + 1, zi);
+  const c = hash2(xi, zi + 1), d = hash2(xi + 1, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+const grassMat  = new THREE.MeshLambertMaterial({ color: 0x5cab45 }); // 초록
+const sandMat   = new THREE.MeshLambertMaterial({ color: 0xd9c78a }); // 모래
+const dirtMat   = new THREE.MeshLambertMaterial({ color: 0x8a6a45 }); // 흙
+const stoneMat  = new THREE.MeshLambertMaterial({ color: 0x8d939b }); // 돌
+const waterMat  = new THREE.MeshLambertMaterial({
+  color: 0x2f6fb3, transparent: true, opacity: 0.85
+});
+const metalMat  = new THREE.MeshLambertMaterial({ color: 0xb8c2cc }); // 타워 금속
+const beaconMat = new THREE.MeshBasicMaterial({ color: 0x39d0ff });   // 비콘
+
+// 복셀 하나를 인스턴스로 모아 한 번에 그린다(성능).
+function buildVoxelLayer(list, material) {
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mesh = new THREE.InstancedMesh(geo, material, list.length);
+  const m = new THREE.Matrix4();
+  list.forEach((p, i) => {
+    m.makeTranslation(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
+    mesh.setMatrixAt(i, m);
+  });
+  return mesh;
+}
+
+const layer = { grass: [], sand: [], dirt: [], stone: [] };
+
+for (let x = -ISLAND_RADIUS; x <= ISLAND_RADIUS; x++) {
+  for (let z = -ISLAND_RADIUS; z <= ISLAND_RADIUS; z++) {
+    const r = Math.hypot(x, z);
+    if (r > ISLAND_RADIUS) continue;
+
+    // 높이: 중심이 높고 가장자리가 바닷속으로 부드럽게 내려간다
+    const n = smoothNoise(x * 0.18, z * 0.18);
+    let h = Math.round(3 + n * 4 - Math.max(0, (r - 6)) * 0.55);
+
+    const topType = h <= SEA_LEVEL ? "sand" : (n > 0.72 ? "stone" : "grass");
+    layer[topType].push([x, h, z]);
+
+    // 위층 종류에 따라 아래를 채운다
+    const depth = topType === "sand" ? 2 : 3;
+    for (let d = 1; d <= depth; d++) {
+      const y = h - d;
+      if (y < -6) break;
+      if (d === depth) layer.stone.push([x, y, z]);
+      else layer[topType === "sand" ? "sand" : "dirt"].push([x, y, z]);
+    }
+  }
+}
+
+const terrain = new THREE.Group();
+terrain.add(buildVoxelLayer(layer.grass, grassMat));
+terrain.add(buildVoxelLayer(layer.sand,  sandMat));
+terrain.add(buildVoxelLayer(layer.dirt,  dirtMat));
+terrain.add(buildVoxelLayer(layer.stone, stoneMat));
+scene.add(terrain);
+
+// 바다 (넓은 평면)
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), waterMat);
+sea.rotation.x = -Math.PI / 2;
+sea.position.y = SEA_LEVEL - 0.25;
+scene.add(sea);
+
+// ---------- 3. 안테나 타워 1개 (전파의 등대) ----------
+const tower = new THREE.Group();
+{
+  // 돌 받침
+  const base = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), stoneMat);
+  base.position.y = 1;
+  tower.add(base);
+
+  // 금속 기둥 3단 (위로 갈수록 가늘게)
+  const segs = [
+    [1.2, 6, 0.0], [0.9, 5, 6.0], [0.6, 4, 11.0],
+  ];
+  for (const [w, h, y] of segs) {
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), metalMat);
+    seg.position.y = y + 2 + h / 2;
+    tower.add(seg);
+  }
+
+  // 안테나 봉 + 발광 비콘
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 8), metalMat);
+  rod.position.y = 22.5;
+  tower.add(rod);
+
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), beaconMat);
+  beacon.position.y = 25;
+  tower.add(beacon);
+  tower.userData.beacon = beacon;   // 애니메이션에서 점멸
+}
+tower.position.set(4, 6, -4);       // 섬 중앙 근처 언덕 위
+scene.add(tower);
+
+// ---------- 4. 주인공 큐브 나이트 ----------
+const knight = new THREE.Group();
+{
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshLambertMaterial({ color: 0xd8443c })   // 기사 붉은 갑옷
+  );
+  body.position.y = 0.5;
+  knight.add(body);
+
+  // 가슴 안테나 문양
+  const emblem = new THREE.Mesh(
+    new THREE.BoxGeometry(0.2, 0.2, 0.05),
+    new THREE.MeshBasicMaterial({ color: 0x39d0ff })
+  );
+  emblem.position.set(0, 0.55, 0.53);
+  knight.add(emblem);
+
+  // 목부분 안테나
+  const antenna = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.04, 0.7, 6), metalMat
+  );
+  antenna.position.set(0.3, 1.2, 0);
+  knight.add(antenna);
+}
+knight.position.set(0, 5, 6);
+scene.add(knight);
+
+// 스폰 지점에서 지형 위로 살짝 올리기
+knight.userData.vy = 0;             // 수직 속도 (Stage 3 점프 예비)
+
+// 지형 위 높이 찾기: 스폰/이동 시 주변 최고 복셀 위에 서도록 한다.
+// Stage 1에서는 원뿔 근사: 중심에서의 반경 기반 높이 공식을 재사용.
+function groundHeightAt(x, z) {
+  const r = Math.hypot(x, z);
+  if (r > ISLAND_RADIUS) return SEA_LEVEL - 1;      // 바다
+  const n = smoothNoise(x * 0.18, z * 0.18);
+  return Math.round(3 + n * 4 - Math.max(0, r - 6) * 0.55) + 1;
+}
+knight.position.y = groundHeightAt(knight.position.x, knight.position.z);
+
+// ---------- 5. 조작 (WASD / 화살표) ----------
+const keys = new Set();
+window.addEventListener("keydown", (e) => {
+  keys.add(e.key.toLowerCase());
+});
+window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+const SPEED = 6;          // 복셀/초
+let yaw = 0;              // 이동 방향(카메라 기준)
+
+function moveKnight(dt) {
+  const dir = new THREE.Vector3(
+    (keys.has("d") || keys.has("arrowright") ? 1 : 0) -
+    (keys.has("a") || keys.has("arrowleft")  ? 1 : 0),
+    0,
+    (keys.has("s") || keys.has("arrowdown")  ? 1 : 0) -
+    (keys.has("w") || keys.has("arrowup")    ? 1 : 0)
+  );
+  if (dir.lengthSq() > 0) {
+    dir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    knight.position.addScaledVector(dir, SPEED * dt);
+    // 이동 방향을 바라보게
+    knight.rotation.y = Math.atan2(dir.x, dir.z);
+  }
+  // 지형에 붙어 걷기 (Stage 1: 점프 없이 스냅)
+  const targetY = groundHeightAt(knight.position.x, knight.position.z);
+  knight.position.y += (targetY - knight.position.y) * Math.min(1, dt * 12);
+}
+
+// ---------- 6. 카메라 팔로우 ----------
+const camOffset = new THREE.Vector3(0, 8, 12);
+function followCamera(dt) {
+  const desired = knight.position.clone().add(camOffset);
+  camera.position.lerp(desired, Math.min(1, dt * 4));
+  camera.lookAt(knight.position.x, knight.position.y + 1, knight.position.z);
+}
+
+// ---------- 7. 클릭: 오브젝트 확인 ----------
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  pointer.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(tower, true)[0];
+  const badge = document.getElementById("badge");
+  badge.textContent = hit
+    ? "📡 안테나 타워 — Beacon 채널 37 (Advertise 중)"
+    : "🛡️ 나이트 페이블 · 채널 37 대기 중";
+});
+
+// ---------- 8. 렌더 루프 ----------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  moveKnight(dt);
+  followCamera(dt);
+
+  // 비콘 점멸 + 물 결
+  const t = clock.elapsedTime;
+  tower.userData.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3));
+  sea.position.z = Math.sin(t * 0.3) * 0.4;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
