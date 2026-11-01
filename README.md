@@ -35,7 +35,7 @@ cd packet-knight
 open index.html          # macOS (Windows: start index.html)
 ```
 
-- 조작: **WASD** / **마우스 바닥 클릭 및 터치** / **모바일 가상 조이스틱** · **우클릭 드래그** 카메라 시점 회전
+- 조작: **WASD** / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
 - Stage 1~3은 단일 `index.html`(CDN import map)로 동작하며, Stage 4부터 Vite 프로젝트로 전환됩니다.
 

@@ -75,8 +75,8 @@
 <div id="hud">
   <b>PACKET KNIGHT</b> — Stage 1: 복셀 섬<br />
   <div class="control-desc" id="hud-controls">
-    🎮 조작: <b>마우스 클릭 / 바닥 터치</b> 또는 <b>WASD</b> 이동<br />
-    🔄 시점: <b>우클릭 드래그</b> 또는 <b>화면 드래그</b> 회전
+    🎮 조작: <b>바닥 터치 / 마우스 클릭</b> 또는 <b>가상 조이스틱 / WASD</b> 이동<br />
+    🔄 시점: <b>화면 드래그 / 우클릭</b> 회전 · <b>두 손가락 핀치 / 휠</b> 줌
   </div>
 </div>
 
@@ -305,8 +305,8 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
-// 조이스틱 상태 (-1 ~ 1)
-const joystick = { x: 0, z: 0, active: false };
+// 조이스틱 상태 (right: -1 ~ 1, forward: -1 ~ 1)
+const joystick = { right: 0, forward: 0, active: false };
 
 // 카메라 회전 각도 (yaw)
 let cameraYaw = 0;
@@ -316,39 +316,45 @@ let cameraDistance = 14;
 const SPEED = 6.5; // 복셀/초
 
 function moveKnight(dt) {
-  let moveX = 0;
-  let moveZ = 0;
+  let rightInput = 0;
+  let forwardInput = 0;
 
   // 1) 키보드 입력
-  if (keys.has("d") || keys.has("arrowright")) moveX += 1;
-  if (keys.has("a") || keys.has("arrowleft"))  moveX -= 1;
-  if (keys.has("s") || keys.has("arrowdown"))  moveZ += 1;
-  if (keys.has("w") || keys.has("arrowup"))    moveZ -= 1;
+  if (keys.has("d") || keys.has("arrowright")) rightInput += 1;
+  if (keys.has("a") || keys.has("arrowleft"))  rightInput -= 1;
+  if (keys.has("w") || keys.has("arrowup"))    forwardInput += 1;
+  if (keys.has("s") || keys.has("arrowdown"))  forwardInput -= 1;
 
   // 2) 가상 조이스틱 입력 (모바일)
   if (joystick.active) {
-    moveX = joystick.x;
-    moveZ = joystick.z;
+    rightInput = joystick.right;
+    forwardInput = joystick.forward;
     targetDestination = null;
     targetMarker.visible = false;
   }
 
-  const hasManualInput = Math.hypot(moveX, moveZ) > 0.05;
+  const inputLen = Math.hypot(rightInput, forwardInput);
 
-  if (hasManualInput) {
-    // 카메라 방향을 기준으로 이동 벡터 회전
-    const inputDir = new THREE.Vector2(moveX, moveZ);
-    if (inputDir.length() > 1) inputDir.normalize();
+  if (inputLen > 0.05) {
+    // 카메라 시점 기준 전방/우측 벡터 (화면 기준 절대 직관 방향)
+    const fwdX = -Math.sin(cameraYaw);
+    const fwdZ = -Math.cos(cameraYaw);
+    const rightX = Math.cos(cameraYaw);
+    const rightZ = -Math.sin(cameraYaw);
 
-    // cameraYaw 기준 회전
-    const angle = cameraYaw;
-    const worldDirX = inputDir.x * Math.cos(angle) + inputDir.y * Math.sin(angle);
-    const worldDirZ = -inputDir.x * Math.sin(angle) + inputDir.y * Math.cos(angle);
+    const norm = inputLen > 1 ? 1 / inputLen : 1;
+    const nx = rightInput * norm;
+    const nz = forwardInput * norm;
 
-    const worldDir = new THREE.Vector3(worldDirX, 0, worldDirZ).normalize();
-    knight.position.addScaledVector(worldDir, SPEED * dt * Math.min(1, inputDir.length()));
+    const worldDir = new THREE.Vector3(
+      rightX * nx + fwdX * nz,
+      0,
+      rightZ * nx + fwdZ * nz
+    ).normalize();
 
-    // 캐릭터 회전
+    knight.position.addScaledVector(worldDir, SPEED * dt * Math.min(1, inputLen));
+
+    // 이동 방향으로 캐릭터 부드럽게 회전
     const targetRotY = Math.atan2(worldDir.x, worldDir.z);
     knight.rotation.y = THREE.MathUtils.lerp(knight.rotation.y, targetRotY, Math.min(1, dt * 15));
   } else if (targetDestination) {
@@ -376,21 +382,26 @@ function moveKnight(dt) {
 
 // ---------- 7. 카메라 팔로우 & 회전 ----------
 function updateCamera(dt) {
-  // 나이트 위치 기준 구면 좌표계로 카메라 위치 계산
+  // 나이트 위치 기준 구면 좌표계로 카메라 위치 계산 (기사 등 뒤에서 앞을 바라봄)
   const hDist = cameraDistance * Math.cos(cameraPitch);
   const vDist = cameraDistance * Math.sin(cameraPitch);
 
-  const desiredX = knight.position.x - Math.sin(cameraYaw) * hDist;
+  const desiredX = knight.position.x + Math.sin(cameraYaw) * hDist;
   const desiredY = knight.position.y + vDist;
-  const desiredZ = knight.position.z - Math.cos(cameraYaw) * hDist;
+  const desiredZ = knight.position.z + Math.cos(cameraYaw) * hDist;
 
   camera.position.set(desiredX, desiredY, desiredZ);
   camera.lookAt(knight.position.x, knight.position.y + 1.2, knight.position.z);
 }
 
-// ---------- 8. 마우스 클릭 & 터치 인터랙션 (클릭 이동 + 시점 회전) ----------
+// ---------- 8. 마우스 클릭 & 터치 인터랙션 (클릭 이동 + 시점 회전 + 핀치 줌) ----------
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+
+const activePointers = new Map();
+let initialPinchDist = 0;
+let initialPinchCamDist = 14;
+let isPinching = false;
 
 let pointerDownPos = { x: 0, y: 0 };
 let isDraggingCamera = false;
@@ -401,17 +412,43 @@ app.addEventListener("pointerdown", (e) => {
   // 조이스틱 영역이나 버튼 클릭은 제외
   if (e.target.closest("#joystick-zone") || e.target.closest("#btn-reset")) return;
 
-  isPointerDown = true;
-  activePointerId = e.pointerId;
-  pointerDownPos = { x: e.clientX, y: e.clientY };
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  // 우클릭이면 무조건 카메라 회전 모드
-  if (e.button === 2) {
-    isDraggingCamera = true;
+  if (activePointers.size === 1) {
+    isPointerDown = true;
+    activePointerId = e.pointerId;
+    pointerDownPos = { x: e.clientX, y: e.clientY };
+    if (e.button === 2) {
+      isDraggingCamera = true;
+    }
+  } else if (activePointers.size === 2) {
+    // 두 손가락 터치 시작 -> 핀치 줌 모드
+    isPinching = true;
+    isDraggingCamera = false;
+    isPointerDown = false;
+    const pts = Array.from(activePointers.values());
+    initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    initialPinchCamDist = cameraDistance;
   }
 });
 
 window.addEventListener("pointermove", (e) => {
+  if (activePointers.has(e.pointerId)) {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  }
+
+  // 두 손가락 핀치 줌인/줌아웃
+  if (isPinching && activePointers.size >= 2) {
+    const pts = Array.from(activePointers.values());
+    const curDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (curDist > 10 && initialPinchDist > 10) {
+      const factor = initialPinchDist / curDist;
+      cameraDistance = Math.max(6, Math.min(32, initialPinchCamDist * factor));
+    }
+    return;
+  }
+
+  // 단일 포인터 카메라 회전 (드래그)
   if (!isPointerDown || e.pointerId !== activePointerId) return;
 
   const dx = e.clientX - pointerDownPos.x;
@@ -421,22 +458,37 @@ window.addEventListener("pointermove", (e) => {
   // 드래그 거리 8px 이상이면 시점 회전
   if (dist > 8 || isDraggingCamera) {
     isDraggingCamera = true;
-    cameraYaw -= dx * 0.006;
+    cameraYaw += dx * 0.006;
     cameraPitch = Math.max(0.15, Math.min(1.2, cameraPitch + dy * 0.005));
     pointerDownPos = { x: e.clientX, y: e.clientY };
   }
 });
 
-window.addEventListener("pointerup", (e) => {
-  if (!isPointerDown) return;
-  isPointerDown = false;
+function handlePointerEnd(e) {
+  activePointers.delete(e.pointerId);
 
-  // 단순 탭/클릭이었던 경우 -> 마우스/터치 이동 또는 오브젝트 클릭
-  if (!isDraggingCamera && e.button !== 2) {
-    handleClickOrTap(e.clientX, e.clientY);
+  if (activePointers.size < 2) {
+    isPinching = false;
   }
-  isDraggingCamera = false;
-});
+
+  if (e.pointerId === activePointerId) {
+    // 단순 탭/클릭이었던 경우 -> 마우스/터치 이동 또는 오브젝트 클릭
+    if (isPointerDown && !isDraggingCamera && !isPinching && e.button !== 2) {
+      handleClickOrTap(e.clientX, e.clientY);
+    }
+    isPointerDown = false;
+    isDraggingCamera = false;
+    activePointerId = null;
+  }
+}
+
+window.addEventListener("pointerup", handlePointerEnd);
+window.addEventListener("pointercancel", handlePointerEnd);
+
+// PC 마우스 휠 줌
+window.addEventListener("wheel", (e) => {
+  cameraDistance = Math.max(6, Math.min(32, cameraDistance + e.deltaY * 0.015));
+}, { passive: true });
 
 // 우클릭 컨텍스트 메뉴 방지
 window.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -519,8 +571,8 @@ function endJoystick(e) {
   if (e.pointerId !== joyPointerId) return;
   joyPointerId = null;
   joystick.active = false;
-  joystick.x = 0;
-  joystick.z = 0;
+  joystick.right = 0;
+  joystick.forward = 0;
   joyThumb.style.transform = `translate(0px, 0px)`;
 }
 joyZone.addEventListener("pointerup", endJoystick);
@@ -538,10 +590,10 @@ function updateJoystick(clientX, clientY) {
   const thumbY = Math.sin(angle) * clampedDist;
   joyThumb.style.transform = `translate(${thumbX}px, ${thumbY}px)`;
 
-  // x: 좌(-1) ~ 우(1), z: 상(-1) ~ 하(1)
+  // right: 우(+1) ~ 좌(-1), forward: 상(+1) ~ 하(-1)
   const norm = clampedDist / JOY_MAX_DIST;
-  joystick.x = (thumbX / JOY_MAX_DIST) * norm;
-  joystick.z = (thumbY / JOY_MAX_DIST) * norm;
+  joystick.right = (thumbX / JOY_MAX_DIST) * norm;
+  joystick.forward = -(thumbY / JOY_MAX_DIST) * norm;
 }
 
 // ---------- 10. 렌더 루프 ----------
