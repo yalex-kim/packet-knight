@@ -39,7 +39,14 @@ if (existsSync(LOCAL_THREE)) {
 }
 
 await page.goto(`${ORIGIN}/?test`);
-await page.waitForFunction(() => window.__PK, null, { timeout: 15000 });
+try {
+  await page.waitForFunction(() => window.__PK, null, { timeout: 15000 });
+} catch {
+  console.error("❌ 게임이 로드되지 않았습니다. three.js CDN에 접근할 수 없다면 `npm install` 로 node_modules/three 사본을 받으세요.");
+  console.error(errors.join("\n"));
+  await browser.close();
+  process.exit(1);
+}
 await page.waitForTimeout(300);
 
 const state = () => page.evaluate(() => window.__PK.state());

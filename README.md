@@ -35,10 +35,22 @@ cd packet-knight
 open index.html          # macOS (Windows: start index.html)
 ```
 
-- 조작: **WASD** / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
+- 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
-- 현재 진행: **Stage 3 완료** (점프 물리, 건물/나무 충돌 판정 및 슬라이딩, 계단 단차 자연 보행, 착지 충격파 & 스쿼시 애니메이션)
-- Stage 1~3은 단일 `index.html`(CDN import map)로 동작하며, Stage 4부터 Vite 프로젝트로 전환됩니다.
+- 현재 진행: **Stage 3.1 완료** (점프 물리, 반 블록 계단 보행·큰 단차 낙하/차단, 분수대 턱 점프 등반, 건물/나무/가로등 충돌 슬라이딩, 착지 충격파 & 스쿼시 애니메이션) → 다음: Stage 3.5 무빌드 모듈 분리
+- 빌드 도구 없이 `index.html`(CDN import map)로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
+
+## ✅ DoD 자동 검증 (스모크 테스트)
+
+각 스테이지의 완료 기준(DoD)은 Playwright 헤드리스 테스트로 검증합니다. 스테이지를 커밋하기 전에 반드시 통과시킵니다.
+
+```bash
+npm install          # playwright, three(오프라인용 사본)
+npx playwright install chromium   # 최초 1회
+npm run smoke        # → 21/21 통과
+```
+
+- 게임을 `index.html?test`로 열면 실시간 시뮬레이션이 멈추고, 테스트가 `window.__PK.tick(초)`로 고정 1/60초 스텝을 진행시킵니다. 헤드리스 FPS와 무관하게 결정적으로 검증됩니다.
 
 ## 📚 connectivityBook 연동
 
@@ -56,7 +68,7 @@ open index.html          # macOS (Windows: start index.html)
 
 ## 🗺️ 로드맵 (요약)
 
-Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 → Stage 3 컨트롤 고도화 → Stage 4 교육 루프 → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
+Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 → Stage 4 교육 루프 → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
 
 각 단계의 완료 기준(DoD)은 [PRD.md §7](PRD.md)에 정의되어 있습니다.
 
