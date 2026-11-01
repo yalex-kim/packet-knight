@@ -9,8 +9,8 @@
 //   테스트가 __PK.tick(초)로 고정 1/60초 스텝을 진행시킨다 → 헤드리스 FPS와 무관하게 결정적.
 
 import { createRequire } from "node:module";
-import { readFileSync, existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -27,13 +27,37 @@ function check(name, ok, detail = "") {
 }
 const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
 
+// ---------- Stage 3.5: 순수 로직 계층은 Node에서 THREE·DOM 없이 import 된다 ----------
+{
+  const coreDir = path.join(ROOT, "src/core");
+  const files = readdirSync(coreDir).filter((f) => f.endsWith(".js"));
+  const leaks = files.filter((f) => /from\s+["']three["']|\b(window|document)\./.test(readFileSync(path.join(coreDir, f), "utf8")));
+  check("src/core/ 는 THREE·DOM에 의존하지 않는다", leaks.length === 0, leaks.join(", ") || `${files.length}개 모듈`);
+  try {
+    const { createMotor, stepMotor } = await import(pathToFileURL(path.join(coreDir, "motor.js")).href);
+    const { SPAWN_POS } = await import(pathToFileURL(path.join(coreDir, "layout.js")).href);
+    const m = createMotor(SPAWN_POS);
+    for (let i = 0; i < 60; i++) stepMotor(m, { dirX: 0, dirZ: 1, speedScale: 1 }, 1 / 60);
+    check("Node에서 이동 물리(core/motor)를 단독 실행할 수 있다", m.z - SPAWN_POS.z > 5 && m.grounded, `1초 후 z ${m.z.toFixed(2)}`);
+  } catch (e) {
+    check("Node에서 이동 물리(core/motor)를 단독 실행할 수 있다", false, e.message);
+  }
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
-await page.route((url) => url.origin === ORIGIN && url.pathname === "/", (r) => r.fulfill({ body: readFileSync(path.join(ROOT, "index.html")), contentType: "text/html" }));
+// 저장소 루트를 정적 서버처럼 제공 (index.html + src/*.js 모듈)
+const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json" };
+await page.route((url) => url.origin === ORIGIN, (r) => {
+  const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
+  const file = path.resolve(ROOT, rel);
+  if (!file.startsWith(ROOT + path.sep) || !existsSync(file)) return r.fulfill({ status: 404, body: "not found" });
+  return r.fulfill({ body: readFileSync(file), contentType: MIME[path.extname(file)] ?? "application/octet-stream" });
+});
 if (existsSync(LOCAL_THREE)) {
   await page.route("**/three.module.js", (r) => r.fulfill({ body: readFileSync(LOCAL_THREE), contentType: "application/javascript" }));
 }
@@ -50,10 +74,7 @@ try {
 await page.waitForTimeout(300);
 
 const state = () => page.evaluate(() => window.__PK.state());
-const teleport = (x, z, y) => page.evaluate(([x, z, y]) => {
-  const pk = window.__PK;
-  pk.knight.position.set(x, y ?? pk.groundHeightAt(x, z), z);
-}, [x, z, y]);
+const teleport = (x, z, y) => page.evaluate(([x, z, y]) => window.__PK.teleport(x, z, y ?? undefined), [x, z, y ?? null]);
 const tick = (ms) => page.evaluate((s) => window.__PK.tick(s), ms / 1000);
 const reset = async () => { await page.click("#btn-reset"); await tick(50); };
 async function hold(code, ms) {
@@ -207,7 +228,7 @@ await reset();
 // ---------- Stage 3: 회전 ----------
 await reset();
 {
-  await page.evaluate(() => { window.__PK.knight.rotation.y = 3.0; });
+  await page.evaluate(() => { window.__PK.motor.rotY = 3.0; });
   // W(-z) 방향 = atan2(-0, -1) = -π. 3.0 → -π 는 최단 0.14 rad인데, 단순 lerp는 0을 지나 한 바퀴 돈다
   await teleport(0, 6);
   await page.keyboard.down("KeyW");

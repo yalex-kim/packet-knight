@@ -190,7 +190,7 @@
 | 1 | **빈 복셀 섬** | Three.js 셋업, 복셀 지형, 안테나 타워 1개, 주인공 큐브 이동(WASD/터치/마우스/조이스틱), 카메라 회전 및 핀치/휠 줌 | `index.html`을 브라우저에서 열면 복셀 섬과 타워가 보이고, 큐브가 WASD·바닥 클릭·조이스틱으로 움직이며 카메라 회전·핀치 줌이 동작한다 ✅ |
 | 2 | **건물과 오브젝트 배치** | GATT 빌리지 평지화, 37채널 호핑 던전 지하 입구, 마을 건물(GATT 중앙 회관·RF 도서관·패킷 대장간), 안테나 타워, 복셀 나무·가로등, 상호작용 툴팁 | 마을 구역이 반듯한 평지로 정리되고, 지하 던전 입구(계단+포털)가 생기며, 각 건물과 입구 클릭 시 이름과 블루투스 역할 툴팁이 뜬다 ✅ |
 | 3 | **캐릭터 컨트롤 고도화** | 점프, 높이 인식 충돌 판정, 간단한 애니메이션 | 큐브가 지형 단차를 오르내리고 건물에 부딪힌다. 구체적으로: ⓐ 스폰에서 WASD 4방향 모두 이동(한글 IME 포함) ⓑ 반 블록(0.5) 계단은 걸어서 오르내림 ⓒ STEP_MAX(0.55) 초과 단차는 벽, 내려가면 낙하 ⓓ 0.7 높이 분수대 턱은 점프로만 등반 ⓔ 건물에 정면 충돌 시 정지, 비스듬히 충돌 시 미끄러짐 ✅ (3.1에서 결함 수정 · 스모크 21항목) |
-| 3.5 | 무빌드 모듈 분리 | `index.html` 단일 파일(1.2k줄)을 import map 기반 ESM 모듈(`src/terrain`, `collision`, `player`, `input`, `ui`)로 분리. **기능 변화 없음** | 분리 전후 `npm run smoke` 결과가 동일하고, 순수 로직(`collision`·`terrain`)이 Node에서 THREE 없이 import 된다 (봇 시뮬레이터 재사용 준비) |
+| 3.5 | 무빌드 모듈 분리 | `index.html` 단일 파일(1.2k줄)을 import map 기반 ESM 모듈로 분리: `src/core/`(config·terrain·layout·collision·motor — 순수 로직), `src/render/`(world·knight·camera), `src/ui/`(input·hud), `src/main.js`. **기능 변화 없음** | 분리 전후 `npm run smoke`의 기존 21개 항목 결과가 동일하고, `src/core/`가 THREE·DOM 없이 Node에서 import·실행된다 (봇 시뮬레이터 재사용 준비) ✅ |
 | 4 | 교육 루프 v1 | 도서관 건물 + 퀴즈 UI (DOM 오버레이). 빌드 도구 전환은 하지 않는다 | 퀴즈 3문제 정답 시 스탯이 오르고 localStorage에 저장된다 (새로고침 후에도 유지) |
 | 5 | 알바 미니게임 | RSSI 측정 미니게임, CR2032 화폐 | 60초 플레이로 CR2032가 지급되고 잔액이 저장된다 |
 | 6 | 첫 전투 | ADV 패킷 발사, 훈련용 봇 몬스터 1종. 수치는 §8.4 `balance.json`에서 읽는다 | 몬스터를 처치해 아이템을 얻고, HP가 줄었다가 회복된다 |
@@ -297,6 +297,8 @@ scripts/
 | 오디오 | Web Audio API | 외부 파일 없이 신디사이즈 기반 효과음 가능 (패킷 비프음 은유에도 유리) |
 | 언어 | JavaScript(ESM) + JSDoc 타입 주석 — TypeScript 도입은 번들러 재평가(Stage 12) 때 함께 검토 | 빠른 프로토타이핑 우선 |
 | 빌드 | 없음 — Stage 1~3: 단일 index.html + CDN import map, Stage 3.5~: import map 기반 무빌드 ESM 모듈. Vite 등 번들러는 Stage 12에서 필요성 재평가 | 김플립 방법론: 초기에는 번들러조차 최소화. 빌드 전환과 기능 추가를 한 스테이지에 섞지 않는다 |
+| 로컬 실행 | `npm start` (무의존 정적 서버 `scripts/serve.mjs`) | ES 모듈은 `file://`에서 로드되지 않는다(브라우저 CORS 정책). GitHub Pages 배포에는 영향 없음 |
+| 계층 규칙 | `src/core/` → `src/render/`·`src/ui/` → `src/main.js` 단방향 의존. `core/`는 THREE·DOM import 금지(스모크 테스트가 검사) | 게임 로직을 봇 시뮬레이터(§8)가 Node에서 그대로 재사용하기 위함 |
 | 테스트 | Playwright 헤드리스 스모크 테스트(`npm run smoke`) | DoD를 손이 아니라 자동으로 검증 (§7.1) |
 | 상태 | localStorage (진행도), 이후 필요 시 IndexedDB | 서버 없이 저장 |
 | 학습 연동 | connectivityBook 챕터 URL 직접 링크/iframe | 정적 사이트라 그대로 임베드 가능 |
@@ -310,8 +312,8 @@ scripts/
 - [x] Stage 2: 건물 및 오브젝트 배치 (GATT 빌리지 평지화, 던전 입구, 건물 3채, 지형·비율 리밸런싱)
 - [x] Stage 3: 캐릭터 컨트롤 고도화 (점프, 건물/나무 충돌 판정 및 슬라이딩, 계단 단차 보행, 착지 충격파 & 스쿼시 애니메이션)
 - [x] Stage 3.1: Stage 3 리뷰 결함 수정 — 스폰 끼임, 한글 IME WASD, 칸 단위 높이맵(시각·물리 일치) + STEP_MAX 높이 인식 충돌, 최단각 회전, 최근접 클릭, DoD 자동 스모크 테스트(21항목) 도입
-- [ ] Stage 3.5: 무빌드 모듈 분리 — **다음 작업**
-- [ ] Stage 4: 교육 루프 v1 (도서관 건물 + 퀴즈 UI + 스탯 보상)
+- [x] Stage 3.5: 무빌드 모듈 분리 — `src/core·render·ui` 계층화, 이동 물리를 순수 모터(`core/motor.js`)로 추출, `npm start` 로컬 서버, 스모크 23항목
+- [ ] Stage 4: 교육 루프 v1 (도서관 건물 + 퀴즈 UI + 스탯 보상) — **다음 작업**
 - [ ] Stage 5 이후: §7 로드맵 참조
 
 ---

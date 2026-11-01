@@ -27,18 +27,40 @@
 
 ## 🚀 빠른 실행
 
-저장소를 클론하고 `index.html`을 브라우저로 열면 끝입니다. 빌드도 서버도 필요 없습니다.
+빌드는 필요 없습니다. 다만 ES 모듈(`src/*.js`)은 `file://`로 열면 브라우저가 막기 때문에, 의존성 없는 로컬 서버로 엽니다.
 
 ```bash
 git clone https://github.com/yalex-kim/packet-knight.git
 cd packet-knight
-open index.html          # macOS (Windows: start index.html)
+npm start                # → http://localhost:5173  (Node만 있으면 됨, npm install 불필요)
+# 또는: python3 -m http.server 5173
 ```
 
 - 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
-- 현재 진행: **Stage 3.1 완료** (점프 물리, 반 블록 계단 보행·큰 단차 낙하/차단, 분수대 턱 점프 등반, 건물/나무/가로등 충돌 슬라이딩, 착지 충격파 & 스쿼시 애니메이션) → 다음: Stage 3.5 무빌드 모듈 분리
-- 빌드 도구 없이 `index.html`(CDN import map)로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
+- 현재 진행: **Stage 3.5 완료** (무빌드 ESM 모듈 분리 — 기능 변화 없음, 순수 로직 계층은 Node에서 단독 실행) → 다음: Stage 4 교육 루프 v1
+- 빌드 도구 없이 CDN import map + ES 모듈로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
+
+## 🧱 코드 구조
+
+```
+index.html            DOM 오버레이(HUD·조이스틱·모달) + import map + 엔트리
+src/
+  main.js             조립: 씬·게임 상태·메인 루프·테스트 훅(window.__PK)
+  core/               순수 로직 — THREE·DOM 의존 금지, Node에서 import 가능 (봇 시뮬레이터 재사용)
+    config.js         월드·물리 상수
+    terrain.js        칸 단위 높이맵 (시각·물리 단일 진실 공급원)
+    layout.js         랜드마크 위치·문구·충돌 형상 데이터
+    collision.js      높이 인식 충돌 (STEP_MAX)
+    motor.js          이동·점프·낙하 물리
+  render/             THREE 렌더링 — world(지형·건물), knight(기사·이펙트), camera(오빗 카메라)
+  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·모달)
+scripts/
+  serve.mjs           무의존 로컬 정적 서버 (npm start)
+  smoke.mjs           DoD 자동 검증 (npm run smoke)
+```
+
+의존 방향은 `core → render/ui → main` 한 방향입니다. `core/`가 THREE나 DOM을 import 하면 스모크 테스트가 실패합니다.
 
 ## ✅ DoD 자동 검증 (스모크 테스트)
 
@@ -47,7 +69,7 @@ open index.html          # macOS (Windows: start index.html)
 ```bash
 npm install          # playwright, three(오프라인용 사본)
 npx playwright install chromium   # 최초 1회
-npm run smoke        # → 21/21 통과
+npm run smoke        # → 23/23 통과
 ```
 
 - 게임을 `index.html?test`로 열면 실시간 시뮬레이션이 멈추고, 테스트가 `window.__PK.tick(초)`로 고정 1/60초 스텝을 진행시킵니다. 헤드리스 FPS와 무관하게 결정적으로 검증됩니다.
@@ -68,7 +90,7 @@ npm run smoke        # → 21/21 통과
 
 ## 🗺️ 로드맵 (요약)
 
-Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 → Stage 4 교육 루프 → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
+Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
 
 각 단계의 완료 기준(DoD)은 [PRD.md §7](PRD.md)에 정의되어 있습니다.
 

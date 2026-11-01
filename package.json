@@ -4,6 +4,7 @@
   "type": "module",
   "description": "2.4GHz RF 세계를 탐험하며 배우는 3D 무선통신 RPG",
   "scripts": {
+    "start": "node scripts/serve.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
