@@ -10,7 +10,7 @@ const LOCATION_URL = "https://yalex-kim.github.io/connectivityBook/bluetooth/cha
 const Y_TOP = -40, Y_BOTTOM = -110; // 캔버스 dBm 범위
 const WINDOW = 5;                    // 캔버스 가로 = 5초
 
-/** @type {{ onStart: () => void, onConfirm: () => void, onClose: (aborted: boolean) => void, getProgress: () => any }} */
+/** @type {{ onStart: () => void, onConfirm: () => void, onClose: (aborted: boolean) => void, getProgress: () => any, getCharges: () => { count: number, nextInSec: number|null } }} */
 let hooks;
 let view = null; // 측정 화면 DOM 참조
 let lastFocus = null;
@@ -44,6 +44,22 @@ function header(title, sub) {
 const fmtD = (d) => (d >= 10 ? d.toFixed(0) : d.toFixed(1));
 const tierPts = (p) => (p > 0 ? `+${p}` : `${p}`);
 
+// ---------- 측정기 배터리 (알바 횟수 제한, PRD §4.2) ----------
+const fmtWait = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+function chargeLine() {
+  const c = hooks.getCharges();
+  const cells = "🔋".repeat(c.count) + "▫️".repeat(RSSI_JOB.CHARGES_MAX - c.count);
+  const wait = c.nextInSec === null ? "가득 참" : `다음 충전 ${fmtWait(c.nextInSec)}`;
+  return el("p", { class: "charge-line", "data-charges": String(c.count),
+    textContent: `측정기 배터리 ${cells} ${c.count}/${RSSI_JOB.CHARGES_MAX} · ${wait} (한 판에 1칸, ${RSSI_JOB.RECHARGE_SEC / 60}분마다 1칸 충전)` });
+}
+function startButton(label) {
+  const c = hooks.getCharges();
+  const b = button(c.count > 0 ? label : `🔋 충전 중 (${fmtWait(c.nextInSec)})`, () => hooks.onStart(), "lib-btn primary job-start");
+  b.disabled = c.count <= 0;
+  return b;
+}
+
 // ---------- 화면 1: 안내 ----------
 function showIntro() {
   view = null;
@@ -61,9 +77,10 @@ function showIntro() {
       el("li", { textContent: `보수(CR2032): ${c.GRADES.map((g) => `${g.grade} ${Number.isFinite(g.minScore) ? `${g.minScore}점+` : "참가"} → ${g.reward}개`).join(" · ")}` })
     ),
     el("p", { class: "muted", textContent: `🪙 보유 CR2032 ${p.cr2032}개 · 최고 기록 ${p.job.bestScore ?? "-"}점 · 중간에 나가면 보수가 없습니다.` }),
+    chargeLine(),
     el("div", { class: "lib-actions" },
       button("닫기", () => close()),
-      button("▶ 60초 측정 시작", () => hooks.onStart(), "lib-btn primary")
+      startButton("▶ 60초 측정 시작")
     )
   );
 }
@@ -183,10 +200,11 @@ export function showResult(r, paid, history) {
     el("p", { class: "reward", textContent: `🪙 CR2032 +${paid.earned}개 (보유 ${paid.balance}개)` }),
     el("p", { textContent: `측정한 비콘 ${r.rounds}개 · ${tiers}` }),
     el("p", { class: "npc", textContent: `비콘 하나에 평균 패킷 ${r.avgN.toFixed(1)}개를 썼네. 패킷 N개를 평균하면 흔들림이 σ/√N 으로 줄어 약 ${sigmaAvg} dB가 되지. 대신 그만큼 늦어진다네 — 정확도와 속도의 균형이 측정 기사의 실력일세.` }),
+    chargeLine(),
     el("p", { class: "muted" }, "더 알아보기: ", el("a", { href: LOCATION_URL, target: "_blank", rel: "noopener", textContent: "BluetoothBook · 위치 찾기: RSSI에서 채널 사운딩까지" })),
     el("div", { class: "lib-actions" },
       button("닫기", () => close()),
-      button("🔁 한 번 더 (60초)", () => hooks.onStart(), "lib-btn primary")
+      startButton("🔁 한 번 더 (60초)")
     )
   );
 }

@@ -66,8 +66,9 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   const again = P.applyQuizResult(progress, "radio", true);
   P.saveProgress(st, progress);
   const reloaded = P.loadProgress(st);
+  const { QUIZ_BONUS, PLAYER_BASE } = await imp("balance.js");
   check("만점 첫 이수에만 보상하고 저장·복원된다 (Node)",
-    !miss.reward && first.reward?.stat === "tx" && !again.reward && reloaded.status === "loaded" && P.effectiveStats(reloaded.progress).tx === 11,
+    !miss.reward && first.reward?.stat === "tx" && !again.reward && reloaded.status === "loaded" && P.effectiveStats(reloaded.progress).tx === PLAYER_BASE.tx + QUIZ_BONUS.tx,
     `TX ${P.effectiveStats(reloaded.progress).tx}, 도전 ${reloaded.progress.metrics.quizAttempts.radio}회`);
   mem.set(P.SAVE_KEY, "{broken");
   check("손상된 저장 데이터는 새 진행도로 시작한다 (Node)", P.loadProgress(st).status === "corrupt");
@@ -128,6 +129,38 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   const mem = new Map([[P.SAVE_KEY, JSON.stringify(v2)]]);
   const l = P.loadProgress({ getItem: (k) => mem.get(k) ?? null });
   check("Stage 5 세이브(v2)가 손실 없이 v3로 마이그레이션된다", l.status === "loaded" && l.progress.cr2032 === 8 && l.progress.bonus.hp === 5 && l.progress.xp === 0);
+}
+
+// ---------- Stage 6.5: 측정기 배터리 · 장비 · 시뮬레이션 보고서 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const J = await imp("jobCharges.js");
+  const { RSSI_JOB, upgradeCost, upgradeSuccess } = await imp("balance.js");
+  const MIN = RSSI_JOB.RECHARGE_SEC * 1000;
+  let c = J.fullCharges(0);
+  for (let i = 0; i < RSSI_JOB.CHARGES_MAX; i++) c = J.useCharge(c, 1000 * i);
+  const empty = J.useCharge(c, 5000) === null && J.chargesAt(c, 5000).count === 0;
+  const one = J.chargesAt(c, 2000 + MIN).count === 1;
+  const full = J.chargesAt(c, 2000 + MIN * 5).count === RSSI_JOB.CHARGES_MAX && J.chargesAt(c, 2000 + MIN * 5).nextInSec === null;
+  check("측정기 배터리: 칸을 다 쓰면 막히고 시간이 지나면 충전된다", empty && one && full);
+
+  const G = await imp("gear.js");
+  const geared = G.applyGear({ hp: 100, tx: 10, rx: 5, hop: 6.4, sec: 0, pwr: 100 }, { antenna: 2, crystal: 1, battery: 1, shield: 3 });
+  const exp2 = G.expectedCostTo(2);
+  check("장비 강화가 스탯에 반영되고 기대 비용이 공식과 맞다",
+    geared.tx === 14 && geared.rx === 7 && geared.hp === 110 && geared.sec === 3 &&
+    Math.abs(exp2 - (upgradeCost(0) / upgradeSuccess(0) + upgradeCost(1) / upgradeSuccess(1))) < 1e-9, `+2 기대 비용 ${exp2.toFixed(1)}`);
+
+  const { createHash } = await import("node:crypto");
+  const REPORT = path.join(ROOT, "scripts/report/balance-report.json");
+  const hash = createHash("sha256").update(readFileSync(path.join(ROOT, "src/core/balance.js"))).digest("hex").slice(0, 16);
+  let rep = null;
+  try { rep = JSON.parse(readFileSync(REPORT, "utf8")); } catch { /* 없음 */ }
+  check("밸런스 보고서가 현재 balance.js로 생성되어 있다 (수치를 바꾸면 시뮬레이션 재실행)",
+    rep?.balanceHash === hash, rep ? `보고서 ${rep.balanceHash} vs 현재 ${hash}` : "scripts/report/balance-report.json 없음 — node scripts/simulate.mjs 실행");
+  check("Stage 6.5 DoD: 봇 1000명 전략 전체 시뮬레이션이 1분 안에 끝났다", rep?.bots >= 1000 && rep?.strategy === "all" && rep?.elapsedSec < 60, `${rep?.bots}명, ${rep?.elapsedSec}초`);
+  const failed = (rep?.criteria ?? []).filter((x) => !x.pass && x.gating !== false).map((x) => x.id);
+  check("PRD §8.3 기준선을 통과한다 (보고서 기준)", rep?.criteria?.length >= 6 && failed.length === 0, failed.join(", ") || `${rep?.criteria?.length}개 항목`);
 }
 
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
@@ -338,6 +371,8 @@ await reset();
 // ---------- Stage 4: 교육 루프 (도서관 퀴즈 → 스탯 → localStorage) ----------
 const lib = (sel) => page.locator(`#library-panel ${sel}`);
 const statsNow = () => page.evaluate(() => window.__PK.stats());
+const { QUIZ_BONUS: QB, PLAYER_BASE: PB } = await import(pathToFileURL(path.join(ROOT, "src/core/balance.js")).href);
+const HP_AFTER_INTRO = PB.hp + QB.hp;
 /** 진행 중 퀴즈를 푼다. wrongAt 번째 문제만 일부러 틀린다 */
 async function answerQuiz(wrongAt = -1) {
   const key = await page.evaluate(() => window.__PK.library.answerKey());
@@ -382,9 +417,9 @@ await reset();
   const prog = await page.evaluate(() => window.__PK.progress());
   const hudText = await page.locator("#stats").textContent();
   check("3문제 모두 맞히면 스탯이 오르고 스킬 슬롯이 열린다",
-    after.hp === before.hp + 5 && prog.skillSlots === 2 && hudText.includes(`${after.hp}`), `HP ${before.hp} → ${after.hp}, 슬롯 ${prog.skillSlots}`);
+    after.hp === before.hp + QB.hp && prog.skillSlots === 2 && hudText.includes(`${after.hp}`), `HP ${before.hp} → ${after.hp}, 슬롯 ${prog.skillSlots}`);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
-  check("진행도가 localStorage에 저장된다", Boolean(saved?.cleared?.intro) && saved.bonus.hp === 5 && saved.metrics.quizAttempts.intro === 2);
+  check("진행도가 localStorage에 저장된다", Boolean(saved?.cleared?.intro) && saved.bonus.hp === QB.hp && saved.metrics.quizAttempts.intro === 2);
 }
 
 await page.reload();
@@ -393,7 +428,7 @@ await page.waitForFunction(() => window.__PK);
   const s1 = await statsNow();
   const st = await page.evaluate(() => window.__PK.saveStatus());
   const hudText = await page.locator("#stats").textContent();
-  check("새로고침 후에도 스탯이 유지된다", s1.hp === 105 && st.load === "loaded" && hudText.includes("105"), `HP ${s1.hp}, ${st.load}`);
+  check("새로고침 후에도 스탯이 유지된다", s1.hp === HP_AFTER_INTRO && st.load === "loaded" && hudText.includes(`${HP_AFTER_INTRO}`), `HP ${s1.hp}, ${st.load}`);
 
   await page.evaluate(() => window.__PK.library.open());
   const doneTag = await lib(".course").first().textContent();
@@ -402,7 +437,7 @@ await page.waitForFunction(() => window.__PK);
   await lib(".lib-btn.primary").click();
   await answerQuiz();
   const s2 = await statsNow();
-  check("이미 이수한 챕터를 다시 만점 받아도 보상이 중복되지 않는다", s2.hp === 105, `HP ${s2.hp}`);
+  check("이미 이수한 챕터를 다시 만점 받아도 보상이 중복되지 않는다", s2.hp === HP_AFTER_INTRO, `HP ${s2.hp}`);
 
   await page.keyboard.press("Escape");
   const closed = !(await page.evaluate(() => window.__PK.library.isOpen()));
@@ -513,7 +548,7 @@ await reset();
     const pk = window.__PK;
     const start = pk.progress();
     let minHp = Infinity, t = 0;
-    while (t < 90) {
+    while (t < 300) { // 훈련용 봇 CR2032 드롭 10% — 몇 마리는 잡아야 한다
       pk.battle.fire();
       pk.tick(0.1);
       t += 0.1;
@@ -581,7 +616,35 @@ await reset();
   await page.waitForFunction(() => window.__PK);
   const reloaded = await page.evaluate(() => window.__PK.progress());
   check("XP·도감·CR2032가 저장되고 새로고침 후 유지된다",
-    saved.v === 3 && reloaded.xp === hunt.xp && reloaded.bestiary.trainingBot?.kills === hunt.kills && reloaded.cr2032 >= 1);
+    saved.v >= 3 && reloaded.xp === hunt.xp && reloaded.bestiary.trainingBot?.kills === hunt.kills && reloaded.cr2032 >= 1);
+}
+
+// ---------- Stage 6.5: 측정기 배터리 (게임) ----------
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const startBtn = page.locator("#job-panel .job-start");
+  await page.evaluate(() => window.__PK.job.open());
+  const before = await page.locator("#job-panel .charge-line").getAttribute("data-charges");
+  for (let i = 0; i < 3; i++) {
+    await startBtn.click();           // 1칸 사용
+    await tick(500);
+    await page.keyboard.press("Escape"); // 도중 이탈 (보수 없음, 배터리는 돌려받지 못함)
+    await page.evaluate(() => window.__PK.job.open());
+  }
+  const emptyCount = await page.locator("#job-panel .charge-line").getAttribute("data-charges");
+  const disabled = await startBtn.isDisabled();
+  const label = await startBtn.textContent();
+  check("측정기 배터리 3칸을 다 쓰면 알바를 시작할 수 없다", before === "3" && emptyCount === "0" && disabled && label.includes("충전 중"), `${before} → ${emptyCount}, '${label}'`);
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => window.__PK.advanceClock(5 * 60 * 1000 + 1000));
+  await page.evaluate(() => window.__PK.job.open());
+  const recharged = await page.locator("#job-panel .charge-line").getAttribute("data-charges");
+  check("5분이 지나면 배터리 1칸이 충전되어 다시 할 수 있다", recharged === "1" && !(await startBtn.isDisabled()), `${recharged}칸`);
+  await page.keyboard.press("Escape");
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
+  check("측정기 배터리 상태가 세이브(v4)에 저장된다", saved.v === 4 && Number.isInteger(saved.job.charges.stored));
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));

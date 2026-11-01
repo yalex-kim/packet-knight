@@ -43,3 +43,11 @@ export function supportHeightAt(x, z, feetY) {
   for (const c of OBSTACLE_CIRCLES) if (c.top <= climb && c.top > best && circleOverlaps(c, x, z, 0)) best = c.top;
   return best;
 }
+
+/**
+ * 충돌 세계 인터페이스 — 이동 물리(motor)와 전투(battle)는 이 두 함수만 쓴다.
+ * 마을 외의 맵(던전 층, 시뮬레이션 아레나)은 같은 모양의 객체를 넘기면 된다 (core/arena.js).
+ * @typedef {{ isBlocked: (x: number, z: number, feetY: number) => boolean, supportHeightAt: (x: number, z: number, feetY: number) => number }} CollisionWorld
+ * @type {CollisionWorld}
+ */
+export const VILLAGE = Object.freeze({ isBlocked, supportHeightAt });

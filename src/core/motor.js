@@ -2,7 +2,7 @@
 // 렌더(THREE)와 분리되어 있어 봇 시뮬레이터가 Node에서 그대로 재사용할 수 있다.
 
 import { PHYSICS } from "./config.js";
-import { isBlocked, supportHeightAt } from "./collision.js";
+import { VILLAGE } from "./collision.js";
 
 /**
  * @typedef {{ x: number, y: number, z: number, rotY: number, vy: number, grounded: boolean }} MotorState
@@ -35,7 +35,7 @@ export function jump(m) {
 }
 
 /** 축 분리 슬라이딩 이동. 실제 이동량을 반환 */
-function slideMove(m, stepX, stepZ) {
+function slideMove(m, stepX, stepZ, { isBlocked }) {
   // 이미 장애물 안에 끼어 있으면(스폰·텔레포트 등) 빠져나올 수 있도록 판정을 건너뛴다
   const stuck = isBlocked(m.x, m.z, m.y);
   const x0 = m.x, z0 = m.z;
@@ -46,23 +46,25 @@ function slideMove(m, stepX, stepZ) {
 
 /**
  * 한 스텝 진행
- * @param {MotorState} m @param {MoveIntent} intent @param {number} dt @returns {StepResult}
+ * @param {MotorState} m @param {MoveIntent} intent @param {number} dt
+ * @param {import("./collision.js").CollisionWorld} [world] 기본값은 마을
+ * @returns {StepResult}
  */
-export function stepMotor(m, intent, dt) {
+export function stepMotor(m, intent, dt, world = VILLAGE) {
   const { SPEED, STEP_MAX, GRAVITY, STEP_SMOOTH, TURN_RATE } = PHYSICS;
   let moved = 0;
   let landed = false;
 
   if (intent.speedScale > 0) {
     const step = SPEED * dt * intent.speedScale;
-    moved = slideMove(m, intent.dirX * step, intent.dirZ * step);
+    moved = slideMove(m, intent.dirX * step, intent.dirZ * step, world);
     if (Math.hypot(intent.dirX, intent.dirZ) > 0.0001) {
       m.rotY = turnTowards(m.rotY, Math.atan2(intent.dirX, intent.dirZ), Math.min(1, dt * TURN_RATE));
     }
   }
 
   // ----- 수직: 단차 오르내림 · 낙하 · 점프 -----
-  const supportY = supportHeightAt(m.x, m.z, m.y);
+  const supportY = world.supportHeightAt(m.x, m.z, m.y);
 
   if (m.grounded) {
     const diff = supportY - m.y;

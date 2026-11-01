@@ -3,9 +3,10 @@
 
 import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL } from "./balance.js";
 import { levelFromXp } from "./combat.js";
+import { fullCharges, useCharge, chargesAt } from "./jobCharges.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 3; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6)
+export const SAVE_VERSION = 4; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5)
 
 /**
  * @typedef {{
@@ -14,7 +15,7 @@ export const SAVE_VERSION = 3; // v2: CR2032·알바 기록 (Stage 5) · v3: XP�
  *   skillSlots: number,
  *   cleared: Record<string, string>,
  *   cr2032: number,
- *   job: { runs: number, bestScore: number|null, totalEarned: number },
+ *   job: { runs: number, bestScore: number|null, totalEarned: number, charges: import("./jobCharges.js").Charges },
  *   xp: number, statPoints: number,
  *   bestiary: Record<string, { kills: number, firstScan: string }>,
  *   metrics: { quizAttempts: Record<string, number>, quizPerfect: Record<string, number>, chapterOpens: Record<string, number> }
@@ -30,7 +31,7 @@ export function createProgress() {
     skillSlots: QUIZ.BASE_SKILL_SLOTS,
     cleared: {},
     cr2032: 0,
-    job: { runs: 0, bestScore: null, totalEarned: 0 },
+    job: { runs: 0, bestScore: null, totalEarned: 0, charges: fullCharges(0) },
     xp: 0,
     statPoints: 0,
     bestiary: {},
@@ -42,6 +43,7 @@ export function createProgress() {
 function migrate(raw) {
   if (raw && raw.v === 1) raw = { ...raw, v: 2, cr2032: 0, job: { runs: 0, bestScore: null, totalEarned: 0 } };
   if (raw && raw.v === 2) raw = { ...raw, v: 3, xp: 0, statPoints: 0, bestiary: {} };
+  if (raw && raw.v === 3) raw = { ...raw, v: 4, job: { ...raw.job, charges: fullCharges(0) } };
   return raw;
 }
 
@@ -65,7 +67,10 @@ function validate(raw) {
     skillSlots: Math.min(QUIZ.MAX_SKILL_SLOTS, Math.max(QUIZ.BASE_SKILL_SLOTS, raw.skillSlots)),
     cleared: { ...raw.cleared },
     cr2032: raw.cr2032,
-    job: { runs: j.runs, bestScore: Number.isFinite(j.bestScore) ? j.bestScore : null, totalEarned: j.totalEarned },
+    job: {
+      runs: j.runs, bestScore: Number.isFinite(j.bestScore) ? j.bestScore : null, totalEarned: j.totalEarned,
+      charges: Number.isInteger(j.charges?.stored) && Number.isFinite(j.charges?.since) ? { stored: j.charges.stored, since: j.charges.since } : fullCharges(0)
+    },
     xp: raw.xp,
     statPoints: raw.statPoints,
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
@@ -180,4 +185,15 @@ export function applyKill(progress, monsterType, xp) {
 /** 아이템 줍기 */
 export function applyPickup(progress, item, count) {
   if (item === "cr2032") progress.cr2032 += count;
+}
+
+/** 측정기 배터리 현황 */
+export const jobChargesAt = (progress, now) => chargesAt(progress.job.charges, now);
+
+/** 알바 시작 시 배터리 1칸 사용 — 없으면 false (중도 이탈해도 돌려주지 않는다: 이탈 남용 방지) */
+export function startJobCharge(progress, now) {
+  const next = useCharge(progress.job.charges, now);
+  if (!next) return false;
+  progress.job.charges = next;
+  return true;
 }

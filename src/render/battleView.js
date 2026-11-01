@@ -119,7 +119,7 @@ export function syncBattle(battle, camera, t, dt) {
     }
     bodyMat.emissive.setHex(m.hitFlash > 0 ? 0xffffff : 0x000000);
 
-    const ratio = m.hp / MONSTERS[m.type].hp;
+    const ratio = m.hp / (m.maxHp ?? MONSTERS[m.type].hp);
     fg.scale.x = Math.max(0.001, ratio);
     fg.position.x = -0.45 * (1 - ratio);
     bar.visible = ratio < 1;

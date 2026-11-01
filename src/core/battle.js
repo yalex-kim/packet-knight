@@ -9,7 +9,7 @@ import { PHYSICS } from "./config.js";
 import { COMBAT, MONSTERS } from "./balance.js";
 import { computeDamage, rollDodge } from "./combat.js";
 import { createMotor, stepMotor } from "./motor.js";
-import { isBlocked, supportHeightAt } from "./collision.js";
+import { VILLAGE } from "./collision.js";
 
 /**
  * @typedef {{ x: number, y: number, z: number }} Vec3
@@ -23,9 +23,13 @@ import { isBlocked, supportHeightAt } from "./collision.js";
 
 let nextId = 1;
 
-export function createBattle(spawns, type = "trainingBot") {
+/** @param {import("./collision.js").CollisionWorld} [world] 전투가 벌어지는 맵 (기본값 마을) */
+export function createBattle(spawns, type = "trainingBot", world = VILLAGE, { hpScale = 1 } = {}) {
+  const monsters = spawns.map(([x, z]) => spawnMonster(type, x, z, world));
+  for (const m of monsters) { m.maxHp = Math.round(MONSTERS[type].hp * hpScale); m.hp = m.maxHp; }
   return {
-    monsters: spawns.map(([x, z]) => spawnMonster(type, x, z)),
+    world,
+    monsters,
     projectiles: [],
     drops: [],
     player: { hp: null, maxHp: null, sinceHit: Infinity, fireCooldown: 0 },
@@ -34,10 +38,10 @@ export function createBattle(spawns, type = "trainingBot") {
   };
 }
 
-function spawnMonster(type, x, z) {
-  const m = createMotor({ x, y: supportHeightAt(x, z, 99), z });
+function spawnMonster(type, x, z, world) {
+  const m = createMotor({ x, y: world.supportHeightAt(x, z, 99), z });
   return Object.assign(m, {
-    id: nextId++, type, hp: MONSTERS[type].hp, state: "idle", t: 1,
+    id: nextId++, type, hp: MONSTERS[type].hp, maxHp: MONSTERS[type].hp, state: "idle", t: 1,
     home: { x, z }, wander: null, hitFlash: 0
   });
 }
@@ -133,18 +137,18 @@ function stepProjectiles(battle, dt, ctx, events) {
           return false;
         }
       }
-      if (isBlocked(pr.x, pr.z, pr.y - 0.3)) { events.push({ type: "wall", x: pr.x, y: pr.y, z: pr.z }); return false; }
+      if (battle.world.isBlocked(pr.x, pr.z, pr.y - 0.3)) { events.push({ type: "wall", x: pr.x, y: pr.y, z: pr.z }); return false; }
       if (pr.traveled >= range) return false;
     }
     return true;
   });
 }
 
-function moveMonster(m, toX, toZ, speedScale, dt) {
+function moveMonster(world, m, toX, toZ, speedScale, dt) {
   const dx = toX - m.x, dz = toZ - m.z;
   const d = Math.hypot(dx, dz);
-  if (d < 0.05) return stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt);
-  return stepMotor(m, { dirX: dx / d, dirZ: dz / d, speedScale }, dt);
+  if (d < 0.05) return stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt, world);
+  return stepMotor(m, { dirX: dx / d, dirZ: dz / d, speedScale }, dt, world);
 }
 
 function stepMonster(battle, m, dt, ctx, events) {
@@ -160,8 +164,8 @@ function stepMonster(battle, m, dt, ctx, events) {
     case "dead":
       m.t -= dt;
       if (m.t <= 0) {
-        const fresh = spawnMonster(m.type, m.home.x + (ctx.rng() - 0.5) * 2, m.home.z + (ctx.rng() - 0.5) * 2);
-        Object.assign(m, fresh, { id: m.id, home: m.home });
+        const fresh = spawnMonster(m.type, m.home.x + (ctx.rng() - 0.5) * 2, m.home.z + (ctx.rng() - 0.5) * 2, battle.world);
+        Object.assign(m, fresh, { id: m.id, home: m.home, maxHp: m.maxHp, hp: m.maxHp });
         events.push({ type: "respawn", monster: m });
       }
       return;
@@ -175,11 +179,11 @@ function stepMonster(battle, m, dt, ctx, events) {
         m.wander = { x: m.home.x + Math.cos(a) * r, z: m.home.z + Math.sin(a) * r };
         m.t = 2 + ctx.rng() * 2;
       }
-      moveMonster(m, m.wander.x, m.wander.z, speedScale * 0.35, dt);
+      moveMonster(battle.world, m, m.wander.x, m.wander.z, speedScale * 0.35, dt);
       return;
 
     case "return":
-      moveMonster(m, m.home.x, m.home.z, speedScale, dt);
+      moveMonster(battle.world, m, m.home.x, m.home.z, speedScale, dt);
       if (dist2D(m, m.home) < 0.6) { m.state = "idle"; m.t = 1; }
       return;
 
@@ -192,16 +196,16 @@ function stepMonster(battle, m, dt, ctx, events) {
         events.push({ type: "windup", monster: m });
         return;
       }
-      moveMonster(m, player.x, player.z, speedScale, dt);
+      moveMonster(battle.world, m, player.x, player.z, speedScale, dt);
       return;
 
     case "windup":
       // 예고 동작 — 이 시간 안에 사거리 밖으로 빠지면 피할 수 있다
       m.t -= dt;
-      stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt);
+      stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt, battle.world);
       if (m.t <= 0) {
         if (d <= def.attackRange + 0.4 && p.hp > 0) {
-          if (rollDodge(ctx.stats.rx, ctx.rng)) {
+          if (!def.aoe && rollDodge(ctx.stats.rx, ctx.rng)) { // 광역 공격은 회피 불가 (PRD §8.4)
             events.push({ type: "dodge", monster: m });
           } else {
             const { amount, crit } = computeDamage(def.atk, 1, ctx.stats.sec, ctx.rng);
@@ -219,8 +223,8 @@ function stepMonster(battle, m, dt, ctx, events) {
     case "cooldown":
       m.t -= dt;
       // 공격 뒤 살짝 물러난다
-      if (d < 1.2) moveMonster(m, m.x + (m.x - player.x), m.z + (m.z - player.z), speedScale * 0.4, dt);
-      else stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt);
+      if (d < 1.2) moveMonster(battle.world, m, m.x + (m.x - player.x), m.z + (m.z - player.z), speedScale * 0.4, dt);
+      else stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt, battle.world);
       if (m.t <= 0) m.state = "chase";
       return;
   }
@@ -270,7 +274,7 @@ export function stepBattle(battle, dt, ctx) {
     for (const o of [ctx.player, ...battle.monsters]) {
       if (o === m || (o.state && !alive(o))) continue;
       const dx = m.x - o.x, dz = m.z - o.z, d = Math.hypot(dx, dz), min = 0.85;
-      if (d > 0.0001 && d < min && !isBlocked(m.x + (dx / d) * (min - d), m.z + (dz / d) * (min - d), m.y)) {
+      if (d > 0.0001 && d < min && !battle.world.isBlocked(m.x + (dx / d) * (min - d), m.z + (dz / d) * (min - d), m.y)) {
         m.x += (dx / d) * (min - d);
         m.z += (dz / d) * (min - d);
       }

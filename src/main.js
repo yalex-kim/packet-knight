@@ -23,7 +23,7 @@ import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
 } from "./core/progress.js";
 import { CHAPTERS } from "./core/chapters.data.js";
-import { applyJobResult } from "./core/progress.js";
+import { applyJobResult, jobChargesAt, startJobCharge } from "./core/progress.js";
 import { createRng } from "./core/quiz.js";
 import { createJob, stepJob, confirmMeasurement } from "./core/rssiJob.js";
 import * as jobPanel from "./ui/jobPanel.js";
@@ -244,6 +244,9 @@ function handleBattleEvents(events) {
 }
 
 // ---------- 알바: 비콘 신호 측정소 ----------
+// 실시간 시계 (테스트는 __PK.advanceClock으로 앞당긴다 — 측정기 배터리 충전 검증용)
+let clockOffset = 0;
+const now = () => Date.now() + clockOffset;
 const jobRng = createRng(TEST_MODE ? 7 : Date.now());
 /** @type {import("./core/rssiJob.js").Job | null} */
 let job = null;
@@ -257,7 +260,10 @@ function onJobDone() {
 
 jobPanel.initJobPanel({
   getProgress: () => progress,
+  getCharges: () => jobChargesAt(progress, now()),
   onStart: () => {
+    if (!startJobCharge(progress, now())) return; // 배터리 없음 (버튼도 비활성)
+    persist();
     job = createJob(jobRng);
     jobPanel.showRunning();
     jobPanel.updateJob(job);
@@ -407,6 +413,7 @@ window.__PK = {
       monsters: battle.monsters.map((m) => ({ id: m.id, hp: m.hp, state: m.state, x: m.x, z: m.z }))
     })
   },
+  advanceClock: (ms) => { clockOffset += ms; },
   job: {
     open: openJob,
     isOpen: jobPanel.isJobOpen,

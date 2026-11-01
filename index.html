@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 6</title>
+<title>Packet Knight — Stage 6.5</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -215,7 +215,8 @@
   .job-estimate.tier-near { color: #ffb36b; }
   .job-estimate.tier-miss { color: #ff7a70; }
   .job-confirm { font-size: 15px; padding: 11px 18px; min-height: 46px; }
-  .job-confirm:disabled { opacity: 0.45; cursor: default; }
+  .job-confirm:disabled, .job-start:disabled { opacity: 0.45; cursor: default; }
+  .charge-line { font-size: 12.5px; color: #b5f07d; }
 
   /* 전투: 발사 버튼, 플레이어 HP 바, 떠오르는 숫자, 토스트 */
   #btn-fire {
@@ -267,7 +268,7 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 6: 첫 전투</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 6.5: 밸런스 보정</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />

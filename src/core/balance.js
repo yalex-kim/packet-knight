@@ -16,8 +16,11 @@ export const STAT_META = Object.freeze({
   pwr: { icon: "🔋", label: "PWR", name: "배터리 효율", unit: "" }
 });
 
-/** 퀴즈 만점 보너스 크기 (PRD §8.4 "퀴즈 만점 보너스" 열) */
-export const QUIZ_BONUS = Object.freeze({ hp: 5, tx: 1, rx: 1, sec: 1, pwr: 5 });
+/**
+ * 퀴즈 만점 보너스 크기 (PRD §8.4 "퀴즈 만점 보너스" 열) — 강좌 하나 = 장비 강화 1단계와 같은 가치.
+ * (Stage 6.5 시뮬레이션: 원안 HP+5·TX+1·RX+1·PWR+5로는 퀴즈를 건너뛰고 알바한 쪽이 더 빨리 성장했다 — PRD §8.7)
+ */
+export const QUIZ_BONUS = Object.freeze({ hp: 15, tx: 3, rx: 3, sec: 2, pwr: 5 });
 
 export const QUIZ = Object.freeze({
   QUESTIONS_PER_QUIZ: 3,   // PRD §4.1 "레슨 후 3문제 퀴즈"
@@ -35,7 +38,7 @@ export const LIBRARY_COURSES = Object.freeze([
   { chapter: "intro",       reward: "hp"  }, // 블루투스의 큰 그림 → 연결 안정성
   { chapter: "radio",       reward: "tx"  }, // 전파·데시벨 → 송신 출력
   { chapter: "phy",         reward: "rx"  }, // PHY·변조 → 수신 감도(회피)
-  { chapter: "advertising", reward: "pwr" }  // 광고 간격·듀티 → 배터리 효율
+  { chapter: "advertising", reward: "sec" }  // 광고 채널 3개로 간섭을 견딘다 → 간섭 내성(방어). PWR는 스킬 배터리가 생기면 다시 검토
 ]);
 
 /**
@@ -52,6 +55,10 @@ export const RSSI_JOB = Object.freeze({
   ADV_DELAY_MAX: 0.01,     // advDelay 0~10 ms
   MIN_SAMPLES: 1,
   REVEAL_TIME: 2.0,        // 결과 표시 + 다음 비콘 설치 시간 (초)
+  // 측정기 배터리 — 알바 1판에 1칸, RECHARGE_SEC마다 1칸 충전 (PRD §4.2·§8.7).
+  // 횟수 제한이 없으면 알바가 늘 최고 효율이라 공부 시간이 손해가 된다 (Stage 6.5 시뮬레이션)
+  CHARGES_MAX: 3,
+  RECHARGE_SEC: 300,
   // 판정: 배율 오차 기준. 틀린 측정 보고는 감점 — 감점이 없으면 "대충 많이 재기"가 최적이 되어
   // 학습 목표(평균을 내야 정확하다)와 반대가 된다 (2026-11 시뮬레이션에서 확인, PRD §4.2)
   TIERS: Object.freeze([
@@ -101,14 +108,65 @@ export const MONSTERS = Object.freeze({
     attackRange: 1.5, windup: 0.6, cooldown: 1.4,
     respawn: 12,
     xp: 10,
-    drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.35 }]),
+    drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.1 }]),
     role: "브로드캐스터 (Broadcaster)",
     pdu: "ADV_NONCONN_IND",
     scan: "능동 스캔(SCAN_REQ)을 보내도 응답하지 않는다 — ADV_NONCONN_IND는 연결도 스캔 요청도 받지 않는 순수 방송이라, 수동 스캔으로 광고 데이터만 읽었다.",
     lore: "광고만 하고 연결은 받지 않는 GAP 브로드캐스터. 광고 이벤트마다 채널 37·38·39에 같은 PDU를 외친다.",
     chapter: "advertising.html"
+  }),
+  // Wi-Fi 간섭 몬스터 (PRD §4.3) — Stage 7 던전용. 광역(aoe) 공격은 회피(RX) 불가.
+  // (Stage 8에서 "간섭 채널 밖이면 피해 0" 채널맵 메커니즘을 더한다)
+  wifiInterferer: Object.freeze({
+    id: "wifiInterferer",
+    name: "Wi-Fi 간섭 몬스터",
+    hp: 90, atk: 12, sec: 2,
+    speed: 2.6, aggro: 14, leash: 30,
+    attackRange: 3.0, aoe: true, windup: 0.8, cooldown: 1.8,
+    respawn: Infinity,
+    xp: 25,
+    drops: Object.freeze([{ item: "cr2032", count: 2, chance: 0.6 }]),
+    role: "간섭원 (Interferer)",
+    pdu: "802.11 OFDM (20 MHz)",
+    scan: "블루투스 패킷이 아니라 응답이 없다 — 2.4 GHz를 20 MHz 폭으로 넓게 덮는 Wi-Fi 신호다.",
+    lore: "Wi-Fi 채널 1·6·11(20 MHz 폭)은 BLE 데이터 채널 여러 개를 한꺼번에 덮는다.",
+    chapter: "coexistence.html"
   })
 });
 
 /** 훈련장 (마을 남서쪽 풀밭) */
 export const TRAINING_GROUND = Object.freeze({ x: -9, z: 10, spawns: Object.freeze([[-10, 9], [-8, 11.5]]) });
+
+/**
+ * 장비 (PRD §3.3 "장비는 모두 RF 부품 은유") — 강화 1단계당 스탯 상승. 강화 UI는 RF 랩 단계에서 구현한다.
+ */
+export const GEAR = Object.freeze({
+  antenna: Object.freeze({ name: "안테나",        stat: "tx",  per: 2,  note: "안테나 이득 → 송신 세기(공격력)" }),
+  crystal: Object.freeze({ name: "크리스털",      stat: "rx",  per: 2,  note: "기준 주파수 정밀도 → 수신 여유(회피)" }),
+  battery: Object.freeze({ name: "배터리",        stat: "hp",  per: 10, note: "용량 → 연결 유지력(HP)" }),
+  shield:  Object.freeze({ name: "쉴드 캐패시터", stat: "sec", per: 1,  note: "전원 안정화 → 간섭 내성(방어)" })
+});
+
+/** 강화 (PRD §8.4): 비용 = round(UPGRADE_BASE × 1.4^n), 성공률 = max(30%, 95% − 10%p × n), 실패 시 재료만 소실 */
+export const UPGRADE = Object.freeze({ BASE: 7, GROWTH: 1.3, MAX_LEVEL: 8 });
+export const upgradeCost = (n) => Math.round(UPGRADE.BASE * UPGRADE.GROWTH ** n);
+export const upgradeSuccess = (n) => Math.max(0.3, 0.95 - 0.1 * n);
+
+/** Connection Timeout 페널티: 보유 CR2032의 10% (내림) (PRD §5, §8.4) */
+export const TIMEOUT_PENALTY = 0.1;
+
+/**
+ * 던전 (Stage 7 구현 전 시뮬레이션용 가정치 — PRD §8.7). 수치를 바꾸면 PRD 표도 같이 고친다.
+ * k층 = Wi-Fi 간섭 몬스터 FLOOR_MONSTERS마리(체력 ×(1 + FLOOR_HP_SCALE·(k−1)))를 모두 쓰러뜨리면 클리어,
+ * HP 0이면 실패(타임아웃). 클리어하면 다음 층이 열린다 (PRD §7 Stage 7 DoD). 입장 1회 = 한 층 도전.
+ * (층마다 몬스터 +1마리는 장비 1단계로 메울 수 없는 절벽이었다 — PRD §8.7)
+ */
+export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, TIME_LIMIT: 180 });
+export const floorHpScale = (floor) => 1 + DUNGEON.FLOOR_HP_SCALE * (floor - 1);
+
+/**
+ * 경제 목표 (PRD §8.3·§8.7): 플레이 1시간 = 루프 4회. 중간 전략 플레이어가 1시간에
+ * 장비 강화 TARGET_UPGRADES회 성공 + 던전 LOOPS회 입장하는 데 드는 CR2032가 "목표 소모"다.
+ * (수급 − 목표 소모) / 목표 소모 가 +5%~+15%면 합격.
+ */
+export const ECONOMY = Object.freeze({ HOUR: 3600, LOOPS: 4, TARGET_UPGRADES: 8, SURPLUS_MIN: 0.05, SURPLUS_MAX: 0.15 });

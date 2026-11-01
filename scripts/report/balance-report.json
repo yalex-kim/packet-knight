@@ -1,0 +1,541 @@
+{
+  "generatedBy": "node scripts/simulate.mjs",
+  "balanceHash": "46b49bb18b242f3b",
+  "seed": 1,
+  "bots": 1000,
+  "strategy": "all",
+  "assumptions": {
+    "hour": "4루프 × 15분",
+    "targetSpend": "강화 8회 성공(장비 4종 고르게) 기대 비용. 수지 = (수급 − 입장료 − 페널티) / 목표 − 1",
+    "upgrade": "비용 round(7×1.3^n), 성공률 max(30%, 95%−10%p×n)",
+    "dungeon": "Stage 7 가정치 — 한 층 = Wi-Fi 간섭 몬스터 3마리, 반경 10 m 원형 방, 입장료 3",
+    "playerStrategies": [
+      {
+        "id": "aggressive",
+        "name": "공격형",
+        "jobs": 1,
+        "trainMin": 0,
+        "dungeonMode": "rush",
+        "rssiN": 6,
+        "retryAfterFail": true
+      },
+      {
+        "id": "balanced",
+        "name": "균형형 (중간 전략)",
+        "jobs": 3,
+        "trainMin": 1,
+        "dungeonMode": "kite",
+        "rssiN": 10,
+        "retryAfterFail": false
+      },
+      {
+        "id": "collector",
+        "name": "수집형",
+        "jobs": 6,
+        "trainMin": 2,
+        "dungeonMode": "stand",
+        "rssiN": 10,
+        "retryAfterFail": false
+      }
+    ]
+  },
+  "rssi": {
+    "bots": 1000,
+    "grades": [
+      "S≥1100",
+      "A≥850",
+      "B≥500",
+      "C(참가)"
+    ],
+    "strategies": [
+      {
+        "name": "성급 (N=1)",
+        "meanScore": 388,
+        "p10": -40,
+        "p90": 840,
+        "meanRounds": 24,
+        "meanCR2032": 2.96,
+        "gradePct": {
+          "S": 2,
+          "A": 8,
+          "B": 28,
+          "C": 63
+        }
+      },
+      {
+        "name": "조급 (N=3)",
+        "meanScore": 712,
+        "p10": 340,
+        "p90": 1060,
+        "meanRounds": 23,
+        "meanCR2032": 4.39,
+        "gradePct": {
+          "S": 8,
+          "A": 25,
+          "B": 44,
+          "C": 22
+        }
+      },
+      {
+        "name": "적당 (N=6)",
+        "meanScore": 899,
+        "p10": 580,
+        "p90": 1220,
+        "meanRounds": 20,
+        "meanCR2032": 5.53,
+        "gradePct": {
+          "S": 24,
+          "A": 34,
+          "B": 37,
+          "C": 5
+        }
+      },
+      {
+        "name": "평균 (N=10)",
+        "meanScore": 1012,
+        "p10": 740,
+        "p90": 1260,
+        "meanRounds": 18,
+        "meanCR2032": 6.2,
+        "gradePct": {
+          "S": 33,
+          "A": 46,
+          "B": 21,
+          "C": 1
+        }
+      },
+      {
+        "name": "신중 (N=15)",
+        "meanScore": 972,
+        "p10": 780,
+        "p90": 1140,
+        "meanRounds": 15,
+        "meanCR2032": 5.92,
+        "gradePct": {
+          "S": 20,
+          "A": 56,
+          "B": 24,
+          "C": 0
+        }
+      },
+      {
+        "name": "느긋 (N=25)",
+        "meanScore": 896,
+        "p10": 720,
+        "p90": 1020,
+        "meanRounds": 12,
+        "meanCR2032": 5.25,
+        "gradePct": {
+          "S": 2,
+          "A": 58,
+          "B": 39,
+          "C": 0
+        }
+      },
+      {
+        "name": "과신중 (N=40)",
+        "meanScore": 745,
+        "p10": 600,
+        "p90": 840,
+        "meanRounds": 9,
+        "meanCR2032": 4.12,
+        "gradePct": {
+          "S": 0,
+          "A": 6,
+          "B": 93,
+          "C": 0
+        }
+      }
+    ]
+  },
+  "training": {
+    "bots": 300,
+    "fireCooldown": 0.8,
+    "strategies": [
+      {
+        "name": "제자리 (stand)",
+        "killsPerMin": 8,
+        "cr2032PerMin": 0.8,
+        "damagePerKill": 9.7,
+        "hurtPct": 100,
+        "regenPct": 100,
+        "lowestHp": 74,
+        "koPct": 0
+      },
+      {
+        "name": "회피 (kite)",
+        "killsPerMin": 8,
+        "cr2032PerMin": 0.8,
+        "damagePerKill": 0,
+        "hurtPct": 0,
+        "regenPct": 0,
+        "lowestHp": 100,
+        "koPct": 0
+      },
+      {
+        "name": "돌격 (rush)",
+        "killsPerMin": 8.1,
+        "cr2032PerMin": 0.8,
+        "damagePerKill": 8,
+        "hurtPct": 100,
+        "regenPct": 100,
+        "lowestHp": 77,
+        "koPct": 0
+      }
+    ]
+  },
+  "dungeonCurve": [
+    {
+      "mode": "stand",
+      "gear": 0,
+      "clearPct": 0,
+      "koPct": 100,
+      "clearTime": null
+    },
+    {
+      "mode": "stand",
+      "gear": 1,
+      "clearPct": 99,
+      "koPct": 1,
+      "clearTime": 16.5
+    },
+    {
+      "mode": "stand",
+      "gear": 2,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 14.1
+    },
+    {
+      "mode": "stand",
+      "gear": 3,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 13.2
+    },
+    {
+      "mode": "stand",
+      "gear": 4,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 11.6
+    },
+    {
+      "mode": "kite",
+      "gear": 0,
+      "clearPct": 61.5,
+      "koPct": 38.5,
+      "clearTime": 20.4
+    },
+    {
+      "mode": "kite",
+      "gear": 1,
+      "clearPct": 99.5,
+      "koPct": 0.5,
+      "clearTime": 16.6
+    },
+    {
+      "mode": "kite",
+      "gear": 2,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 14.2
+    },
+    {
+      "mode": "kite",
+      "gear": 3,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 13.3
+    },
+    {
+      "mode": "kite",
+      "gear": 4,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 11.7
+    },
+    {
+      "mode": "rush",
+      "gear": 0,
+      "clearPct": 27.5,
+      "koPct": 72.5,
+      "clearTime": 19.8
+    },
+    {
+      "mode": "rush",
+      "gear": 1,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 16.4
+    },
+    {
+      "mode": "rush",
+      "gear": 2,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 14
+    },
+    {
+      "mode": "rush",
+      "gear": 3,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 13.1
+    },
+    {
+      "mode": "rush",
+      "gear": 4,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 11.5
+    }
+  ],
+  "quizContribution": [
+    {
+      "gear": 1,
+      "without": {
+        "clearPct": 33.7,
+        "expectedTimePerClear": 159
+      },
+      "with": {
+        "clearPct": 100,
+        "expectedTimePerClear": 56
+      },
+      "speedup": 64.8
+    },
+    {
+      "gear": 2,
+      "without": {
+        "clearPct": 83,
+        "expectedTimePerClear": 68
+      },
+      "with": {
+        "clearPct": 100,
+        "expectedTimePerClear": 54
+      },
+      "speedup": 20.6
+    }
+  ],
+  "economy": {
+    "bots": 1000,
+    "target": {
+      "upgrade": 71.8,
+      "total": 71.8
+    },
+    "rows": [
+      {
+        "strategy": "aggressive",
+        "name": "공격형",
+        "quiz": true,
+        "income": 123,
+        "incomeBySource": {
+          "job": 55.2,
+          "training": 1.1,
+          "dungeon": 66.8
+        },
+        "spend": {
+          "upgrade": 16,
+          "fee": 102.4,
+          "penalty": 0.5
+        },
+        "available": 20.1,
+        "surplusVsTarget": -72,
+        "upgradesSucceeded": 2.1,
+        "dungeonAttempts": 34.1,
+        "dungeonClearPct": 7.6,
+        "reachedClearPct": 99.3,
+        "floorsCleared": 2.6,
+        "firstClearMin": 32.1,
+        "kosBeforeFirstClear": 14.5,
+        "endBalance": 4.1
+      },
+      {
+        "strategy": "aggressive",
+        "name": "공격형",
+        "quiz": false,
+        "income": 124.4,
+        "incomeBySource": {
+          "job": 76,
+          "training": 11.7,
+          "dungeon": 36.7
+        },
+        "spend": {
+          "upgrade": 19.5,
+          "fee": 102.7,
+          "penalty": 0
+        },
+        "available": 21.7,
+        "surplusVsTarget": -69.8,
+        "upgradesSucceeded": 2.7,
+        "dungeonAttempts": 34.2,
+        "dungeonClearPct": 0.1,
+        "reachedClearPct": 1.7,
+        "floorsCleared": 0,
+        "firstClearMin": 48.2,
+        "kosBeforeFirstClear": 27.3,
+        "endBalance": 2.2
+      },
+      {
+        "strategy": "balanced",
+        "name": "균형형 (중간 전략)",
+        "quiz": true,
+        "income": 120.7,
+        "incomeBySource": {
+          "job": 77.1,
+          "training": 12.8,
+          "dungeon": 30.9
+        },
+        "spend": {
+          "upgrade": 72.3,
+          "fee": 41.4,
+          "penalty": 0
+        },
+        "available": 79.3,
+        "surplusVsTarget": 10.4,
+        "upgradesSucceeded": 7.9,
+        "dungeonAttempts": 13.8,
+        "dungeonClearPct": 62.2,
+        "reachedClearPct": 100,
+        "floorsCleared": 8.6,
+        "firstClearMin": 16.9,
+        "kosBeforeFirstClear": 0.9,
+        "endBalance": 7
+      },
+      {
+        "strategy": "balanced",
+        "name": "균형형 (중간 전략)",
+        "quiz": false,
+        "income": 125.8,
+        "incomeBySource": {
+          "job": 84.6,
+          "training": 27.6,
+          "dungeon": 13.6
+        },
+        "spend": {
+          "upgrade": 84.5,
+          "fee": 34,
+          "penalty": 0
+        },
+        "available": 91.7,
+        "surplusVsTarget": 27.7,
+        "upgradesSucceeded": 8.7,
+        "dungeonAttempts": 11.3,
+        "dungeonClearPct": 32.7,
+        "reachedClearPct": 100,
+        "floorsCleared": 3.7,
+        "firstClearMin": 20.3,
+        "kosBeforeFirstClear": 2.4,
+        "endBalance": 7.2
+      },
+      {
+        "strategy": "collector",
+        "name": "수집형",
+        "quiz": true,
+        "income": 123.2,
+        "incomeBySource": {
+          "job": 78.1,
+          "training": 15.2,
+          "dungeon": 29.9
+        },
+        "spend": {
+          "upgrade": 81.6,
+          "fee": 33.5,
+          "penalty": 0.6
+        },
+        "available": 89.1,
+        "surplusVsTarget": 24.1,
+        "upgradesSucceeded": 8.6,
+        "dungeonAttempts": 11.2,
+        "dungeonClearPct": 44,
+        "reachedClearPct": 100,
+        "floorsCleared": 4.9,
+        "firstClearMin": 29.3,
+        "kosBeforeFirstClear": 2.5,
+        "endBalance": 7.5
+      },
+      {
+        "strategy": "collector",
+        "name": "수집형",
+        "quiz": false,
+        "income": 130.5,
+        "incomeBySource": {
+          "job": 84.6,
+          "training": 29.2,
+          "dungeon": 16.7
+        },
+        "spend": {
+          "upgrade": 94.6,
+          "fee": 27.9,
+          "penalty": 0.2
+        },
+        "available": 102.4,
+        "surplusVsTarget": 42.5,
+        "upgradesSucceeded": 9.4,
+        "dungeonAttempts": 9.3,
+        "dungeonClearPct": 9.8,
+        "reachedClearPct": 74,
+        "floorsCleared": 0.9,
+        "firstClearMin": 50,
+        "kosBeforeFirstClear": 6.9,
+        "endBalance": 7.8
+      }
+    ],
+    "cacheSize": 400
+  },
+  "criteria": [
+    {
+      "id": "clearRate",
+      "label": "던전 층 클리어율 (중간 전략, 도전 중인 가장 깊은 층 기준 1시간 전체 시도)",
+      "target": "40~70%",
+      "value": "62.2%",
+      "pass": true
+    },
+    {
+      "id": "questTime",
+      "label": "첫 던전 클리어까지 시간 (퀘스트 완료 시간의 대리 지표, 중간 전략)",
+      "target": "10~20분",
+      "value": "16.9분",
+      "pass": true,
+      "note": "Stage 9 퀘스트 구현 후 실제 퀘스트 완료 시간으로 교체"
+    },
+    {
+      "id": "surplus",
+      "label": "CR2032 수지 ((수급 − 입장료 − 페널티) / 목표 강화 비용 − 1, 중간 전략)",
+      "target": "+5~+15%",
+      "value": "+10.4%",
+      "pass": true
+    },
+    {
+      "id": "timeouts",
+      "label": "첫 클리어 전 타임아웃(KO) 횟수 평균 (중간 전략)",
+      "target": "≤ 3회",
+      "value": "0.9회",
+      "pass": true
+    },
+    {
+      "id": "quizOptional",
+      "label": "퀴즈 보너스 없이도 클리어 가능 (중간 전략, 퀴즈 생략 시 1시간 내 첫 클리어 도달률)",
+      "target": "≥ 80%",
+      "value": "100%",
+      "pass": true
+    },
+    {
+      "id": "quizSpeedup",
+      "label": "퀴즈 보너스로 던전 클리어가 빨라지는 정도 (같은 장비, 기대 소요 시간, 첫 클리어가 일어나는 장비 +1·+2 평균)",
+      "target": "≥ 20%",
+      "value": "평균 42.7% (+1: 64.8%, +2: 20.6%)",
+      "pass": true
+    },
+    {
+      "id": "quizWorthIt",
+      "label": "공부한 시간까지 따져도 퀴즈가 이득 (중간 전략 1시간: 첫 클리어 시간 퀴즈 O / 퀴즈 X)",
+      "target": "≤ 0.8배",
+      "value": "16.9분 / 20.3분 = 0.83배",
+      "pass": false,
+      "gating": false,
+      "note": "관찰 지표(Stage 6.5 추가, 합격 판정 제외) — 공부 시간의 기회비용까지 따진 학습 인센티브. 목표치는 PRD §8.7 결정 대기"
+    }
+  ],
+  "elapsedSec": 38.1
+}
