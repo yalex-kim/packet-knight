@@ -73,6 +73,31 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("손상된 저장 데이터는 새 진행도로 시작한다 (Node)", P.loadProgress(st).status === "corrupt");
 }
 
+// ---------- Stage 5: RSSI 알바 모델 & 밸런스 (Node) ----------
+{
+  const R = await import(pathToFileURL(path.join(ROOT, "src/core/rssiJob.js")).href);
+  const { RSSI_JOB } = await import(pathToFileURL(path.join(ROOT, "src/core/balance.js")).href);
+  // 교과서 location.html 예제: P1m = −59 dBm, n = 2, RSSI = −71 dBm → d ≈ 4 m
+  const ex = R.distanceFromRssi(-71, { ...RSSI_JOB, PATH_LOSS_N: 2 });
+  const roundTrip = [1, 3.7, 12].every((d) => Math.abs(R.distanceFromRssi(R.meanRssiAt(d)) - d) < 1e-9);
+  check("RSSI 거리 모델이 교과서 예제와 일치한다", Math.abs(ex - 3.98) < 0.01 && roundTrip, `−71 dBm, n=2 → ${ex.toFixed(2)} m`);
+
+  const { execFileSync } = await import("node:child_process");
+  const sim = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "scripts/simulate.mjs"), "--game=rssi", "--bots=300", "--json"], { encoding: "utf8" }));
+  const by = Object.fromEntries(sim.strategies.map((x) => [x.name.split(" ")[0], x]));
+  const best = sim.strategies.reduce((a, b) => (b.meanScore > a.meanScore ? b : a));
+  check("봇 시뮬: 적당히 평균 내는 전략이 성급·과신중보다 낫다 (학습 목표)",
+    by["평균"].meanScore > by["성급"].meanScore && by["평균"].meanScore > by["과신중"].meanScore && /N=(6|10|15)/.test(best.name),
+    `최적 ${best.name} ${best.meanScore}점 · 성급 ${by["성급"].meanScore} · 과신중 ${by["과신중"].meanScore}`);
+  check("봇 시뮬: 합리적 전략의 보수가 PRD 범위(분당 4~8개)에 든다", by["평균"].meanCR2032 >= 4 && by["평균"].meanCR2032 <= 8, `${by["평균"].meanCR2032}개/60초`);
+
+  const P = await import(pathToFileURL(path.join(ROOT, "src/core/progress.js")).href);
+  const v1 = { v: 1, bonus: { hp: 5, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, skillSlots: 2, cleared: { intro: "2026-11-01" }, metrics: { quizAttempts: { intro: 1 }, quizPerfect: { intro: 1 }, chapterOpens: {} } };
+  const mem = new Map([[P.SAVE_KEY, JSON.stringify(v1)]]);
+  const loadedV1 = P.loadProgress({ getItem: (k) => mem.get(k) ?? null, setItem: () => {} });
+  check("Stage 4 세이브(v1)가 진행도 손실 없이 v2로 마이그레이션된다", loadedV1.status === "loaded" && loadedV1.progress.bonus.hp === 5 && loadedV1.progress.skillSlots === 2 && loadedV1.progress.cr2032 === 0);
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -364,6 +389,71 @@ await page.waitForFunction(() => window.__PK);
   const s3 = await statsNow();
   const backup = await page.evaluate(() => localStorage.getItem("packetKnight.save.corrupt"));
   check("손상된 세이브로도 게임이 시작되고 원본은 백업된다", st.load === "corrupt" && s3.hp === 100 && backup === "{not json");
+}
+
+// ---------- Stage 5: 알바 (60초 RSSI 측정 → CR2032 지급·저장) ----------
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+const jobState = () => page.evaluate(() => window.__PK.job.state());
+await reset();
+{
+  await teleport(5.0, 13.0); // 등대가 카메라 정면에 오도록
+  await tick(500);
+  const p = await page.evaluate(() => window.__PK.projectToScreen(8.0, 5.0, 8.0)); // 등대 탑신
+  await page.mouse.click(p.x, p.y);
+  await tick(20);
+  const label = await page.locator("#modal-action").textContent();
+  check("등대 모달에 '알바 시작' 버튼이 있다", (await state()).modal?.includes("등대") && label.includes("알바"), label);
+  await page.click("#modal-action");
+  await page.locator("#job-panel .lib-btn.primary").click(); // 60초 측정 시작
+
+  await tick(1200);
+  const s1 = await jobState();
+  check("측정 중 광고 패킷(약 100 ms 간격)이 RSSI 샘플로 쌓인다", s1.phase === "measure" && s1.samples >= 9 && s1.samples <= 13, `1.2초 → ${s1.samples}개`);
+
+  const a = await state();
+  await hold("KeyW", 300);
+  const b = await state();
+  check("알바 중에는 기사가 움직이지 않는다", Math.hypot(b.x - a.x, b.z - a.z) < 0.01);
+
+  await page.keyboard.press("Space");
+  const s2 = await jobState();
+  const shown = await page.locator(".job-estimate").textContent();
+  check("스페이스바로 측정을 확정하면 실제 거리와 판정이 공개된다", s2.phase === "reveal" && s2.rounds === 1 && /실제 .* m · 추정/.test(shown), shown);
+
+  // 남은 시간은 봇처럼 플레이: 패킷 10개가 모이면 확정
+  const result = await page.evaluate(() => {
+    const pk = window.__PK;
+    while (pk.job.state().phase !== "done") {
+      pk.tick(1 / 60);
+      const st = pk.job.state();
+      if (st.phase === "measure" && st.samples >= 10) window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " " }));
+    }
+    return pk.job.state().result;
+  });
+  const prog = await page.evaluate(() => window.__PK.progress());
+  const hudCoins = await page.locator('#stats [data-stat="cr2032"]').textContent();
+  check("60초가 끝나면 등급에 따라 CR2032가 지급된다",
+    result.rounds >= 10 && result.reward >= 2 && prog.cr2032 === result.reward && hudCoins.includes(`${result.reward}`),
+    `비콘 ${result.rounds}개 · ${result.score}점 · 등급 ${result.grade} · +${result.reward}`);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
+  check("CR2032 잔액이 localStorage에 저장된다", saved.v === 2 && saved.cr2032 === result.reward && saved.job.runs === 1);
+
+  // 두 번째 판은 도중에 나가면 보수 없음
+  await page.locator("#job-panel .lib-btn.primary").click(); // 한 번 더
+  await tick(3000);
+  await page.keyboard.press("Escape");
+  await tick(100);
+  const after = await page.evaluate(() => window.__PK.progress());
+  check("측정 도중 나가면 보수 없이 중단되고 다시 조작할 수 있다",
+    after.cr2032 === result.reward && after.job.runs === 1 && !(await page.evaluate(() => window.__PK.job.isOpen())));
+
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const reloaded = await page.evaluate(() => window.__PK.progress());
+  const hud2 = await page.locator('#stats [data-stat="cr2032"]').textContent();
+  check("새로고침 후에도 CR2032 잔액이 유지된다", reloaded.cr2032 === result.reward && hud2.includes(`${result.reward}`), hud2);
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));

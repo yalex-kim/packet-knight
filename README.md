@@ -38,8 +38,19 @@ npm start                # → http://localhost:5173  (Node만 있으면 됨, np
 
 - 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
-- 현재 진행: **Stage 4 완료** (RF 이론 도서관 강의실: 교과서 레슨 → 3문제 퀴즈 → 첫 만점 시 스탯·스킬 슬롯 영구 상승, localStorage 저장) → 다음: Stage 5 알바 미니게임
+- 현재 진행: **Stage 5 완료** (전파의 등대 → 비콘 신호 측정소 알바: 흔들리는 RSSI를 평균 내 비콘 거리를 재고 CR2032 획득) → 다음: Stage 6 첫 전투
+- 지금 할 수 있는 것: 📚 도서관 퀴즈로 스탯 올리기 · 📡 등대 알바로 CR2032 벌기 (진행도는 브라우저에 자동 저장)
 - 빌드 도구 없이 CDN import map + ES 모듈로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
+
+## 🤖 봇 시뮬레이션
+
+밸런스는 손으로 느끼지 않고 수치로 검증합니다. 게임과 같은 `src/core` 로직을 Node에서 수천 판 돌립니다.
+
+```bash
+node scripts/simulate.mjs --game=rssi --bots=2000   # 알바 전략별 점수·등급·CR2032 분포
+```
+
+결과와 보정 이력은 [PRD.md §8.5](PRD.md)에 기록합니다.
 
 ## 🧱 코드 구조
 
@@ -57,11 +68,13 @@ src/
     quiz.js           퀴즈 출제(시드 고정 가능)·채점
     progress.js       진행도 저장/복원·보상·학습 지표 (저장소 주입)
     chapters.data.js  교과서 레슨·퀴즈 데이터 (자동 생성)
+    rssiJob.js        알바: RSSI 거리 측정 미니게임 상태 기계
   render/             THREE 렌더링 — world(지형·건물), knight(기사·이펙트), camera(오빗 카메라)
-  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·스탯·모달), library(강의실)
+  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·스탯·모달), library(강의실), jobPanel(알바)
 scripts/
   serve.mjs           무의존 로컬 정적 서버 (npm start)
   import-chapters.mjs connectivityBook 챕터 → chapters.data.js 생성
+  simulate.mjs        봇 시뮬레이션 (게임과 같은 core 로직을 Node에서 실행)
   smoke.mjs           DoD 자동 검증 (npm run smoke)
 ```
 
@@ -74,7 +87,7 @@ scripts/
 ```bash
 npm install          # playwright, three(오프라인용 사본)
 npx playwright install chromium   # 최초 1회
-npm run smoke        # → 38/38 통과
+npm run smoke        # → 50/50 통과
 ```
 
 - 게임을 `index.html?test`로 열면 실시간 시뮬레이션이 멈추고, 테스트가 `window.__PK.tick(초)`로 고정 1/60초 스텝을 진행시킵니다. 헤드리스 FPS와 무관하게 결정적으로 검증됩니다.
@@ -102,7 +115,7 @@ node scripts/import-chapters.mjs ../connectivityBook   # → src/core/chapters.d
 
 ## 🗺️ 로드맵 (요약)
 
-Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 ✅ → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
+Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 ✅ → Stage 5 알바 미니게임 ✅ → Stage 6 첫 전투 → Stage 6.5 봇 시뮬레이션 v1 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
 
 각 단계의 완료 기준(DoD)은 [PRD.md §7](PRD.md)에 정의되어 있습니다.
 

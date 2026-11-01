@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 4</title>
+<title>Packet Knight — Stage 5</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -140,6 +140,7 @@
   #stats .stat b { color: #7dd8ff; }
   #stats .stat.up { animation: statUp 1.6s ease-out; }
   #stats .slots { grid-column: 1 / -1; border-top: 1px solid #1b3554; margin-top: 3px; padding-top: 3px; color: #9fd6a8; }
+  #stats .coins { color: #ffd76b; border-top: none; margin-top: 0; padding-top: 0; }
   @keyframes statUp { 0%, 40% { color: #fff36b; text-shadow: 0 0 8px #fff36b; } 100% { color: inherit; text-shadow: none; } }
 
   /* 도서관 강의실 & 원문 리더 오버레이 */
@@ -200,6 +201,20 @@
   #reader .panel { max-width: 920px; height: calc(100vh - 32px); display: flex; flex-direction: column; padding: 12px; }
   #reader iframe { flex: 1; width: 100%; border: 0; border-radius: 8px; background: #fff; }
 
+  /* 알바: 비콘 신호 측정소 */
+  .formula { font-size: 12.5px; background: rgba(14, 34, 60, 0.7); border: 1px solid #234b78; border-radius: 6px; padding: 7px 10px; color: #ffd76b; overflow-x: auto; white-space: nowrap; }
+  .job-bar { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 8px; }
+  .job-stat { background: rgba(14, 34, 60, 0.7); border-radius: 6px; padding: 3px 9px; }
+  .rssi-canvas { width: 100%; height: auto; aspect-ratio: 540 / 200; border-radius: 8px; border: 1px solid #1f3a5f; display: block; }
+  .job-readout { font-size: 12.5px; color: #9fc4e8; margin-top: 7px; }
+  .job-estimate { font-size: 17px; font-weight: 700; margin-top: 6px; min-height: 26px; color: #ffd76b; }
+  .job-estimate.tier-precise { color: #7dffb5; }
+  .job-estimate.tier-good { color: #b5f07d; }
+  .job-estimate.tier-near { color: #ffb36b; }
+  .job-estimate.tier-miss { color: #ff7a70; }
+  .job-confirm { font-size: 15px; padding: 11px 18px; min-height: 46px; }
+  .job-confirm:disabled { opacity: 0.45; cursor: default; }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
@@ -213,13 +228,14 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 4: 교육 루프</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 5: 알바 미니게임</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
     🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />
     🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌<br />
-    📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장
+    📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
+    📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)
   </div>
 </div>
 
@@ -257,6 +273,11 @@
 <!-- 도서관 강의실 (Stage 4 교육 루프) -->
 <div id="library" class="overlay" role="dialog" aria-modal="true" aria-labelledby="library-title" hidden>
   <div class="panel" id="library-panel"></div>
+</div>
+
+<!-- 알바: 비콘 신호 측정소 (Stage 5) -->
+<div id="job" class="overlay" role="dialog" aria-modal="true" aria-label="비콘 신호 측정소 알바" hidden>
+  <div class="panel" id="job-panel"></div>
 </div>
 
 <!-- 교과서 원문 리더 -->

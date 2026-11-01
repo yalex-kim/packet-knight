@@ -2,6 +2,7 @@
 // PRD.md §7 DoD는 scripts/smoke.mjs 로 자동 검증한다.
 //   Stage 3: "큐브가 지형 단차를 오르내리고 건물에 부딪힌다"
 //   Stage 4: "퀴즈 3문제 정답 시 스탯이 오르고 localStorage에 저장된다 (새로고침 후에도 유지)"
+//   Stage 5: "60초 플레이로 CR2032가 지급되고 잔액이 저장된다"
 //
 // 계층:  core/ (순수 로직, Node에서 import 가능) → render/ (THREE) · ui/ (DOM) → main.js (조립)
 
@@ -21,6 +22,10 @@ import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
 } from "./core/progress.js";
 import { CHAPTERS } from "./core/chapters.data.js";
+import { applyJobResult } from "./core/progress.js";
+import { createRng } from "./core/quiz.js";
+import { createJob, stepJob, confirmMeasurement } from "./core/rssiJob.js";
+import * as jobPanel from "./ui/jobPanel.js";
 
 // ---------- 씬 & 렌더러 ----------
 const app = document.getElementById("app");
@@ -60,7 +65,8 @@ function persist() {
   lastSaveOk = saveProgress(storage, progress);
   if (!lastSaveOk) hud.setBadge("⚠️ 진행도를 저장할 수 없습니다 (브라우저 저장소 차단)");
 }
-hud.renderStats(effectiveStats(progress), progress.skillSlots);
+const wallet = () => ({ skillSlots: progress.skillSlots, cr2032: progress.cr2032 });
+hud.renderStats(effectiveStats(progress), wallet());
 
 // ---------- 게임 상태 ----------
 const motor = createMotor(SPAWN_POS);
@@ -141,7 +147,7 @@ initLibrary({
     persist();
     if (outcome.reward) {
       const changed = [outcome.reward.stat, ...(outcome.reward.slotUnlocked ? ["slots"] : [])];
-      hud.renderStats(effectiveStats(progress), progress.skillSlots, changed);
+      hud.renderStats(effectiveStats(progress), wallet(), changed);
     }
     return outcome;
   },
@@ -152,8 +158,44 @@ initLibrary({
   }
 });
 
+// ---------- 알바: 비콘 신호 측정소 ----------
+const jobRng = createRng(TEST_MODE ? 7 : Date.now());
+/** @type {import("./core/rssiJob.js").Job | null} */
+let job = null;
+
+function onJobDone() {
+  const paid = applyJobResult(progress, job.result);
+  persist();
+  hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  jobPanel.showResult(job.result, paid, job.history);
+}
+
+jobPanel.initJobPanel({
+  getProgress: () => progress,
+  onStart: () => {
+    job = createJob(jobRng);
+    jobPanel.showRunning();
+    jobPanel.updateJob(job);
+  },
+  onConfirm: () => { if (job) { confirmMeasurement(job); jobPanel.updateJob(job); } },
+  onClose: () => {
+    job = null; // 측정 도중 닫으면 보수 없이 중단
+    setInputEnabled(true);
+  }
+});
+
+function openJob() {
+  setInputEnabled(false);
+  clearMoveTarget();
+  hud.hideModal();
+  jobPanel.openJob();
+}
+
 hud.setModalHandlers({
-  action: (id) => { if (id === "library") openLibrary(); },
+  action: (id) => {
+    if (id === "library") openLibrary();
+    else if (id === "job") openJob();
+  },
   // 모달의 "교과서 챕터 보기" 클릭도 학습 지표로 센다 (PRD §1.3 ②)
   link: (href) => {
     const chapter = CHAPTERS.find((c) => href.endsWith(`/${c.file}`));
@@ -183,6 +225,12 @@ btnReset.addEventListener("click", () => {
 
 // ---------- 시뮬레이션 한 스텝 ----------
 function simulate(dt) {
+  if (job && job.phase !== "done") {
+    stepJob(job, dt, jobRng);
+    if (job.phase === "done") onJobDone();
+    else jobPanel.updateJob(job);
+  }
+
   const input = readMoveInput();
   if (input.joystick) clearMoveTarget();
   const inputLen = Math.hypot(input.right, input.forward);
@@ -247,6 +295,15 @@ window.__PK = {
   stats: () => effectiveStats(progress),
   saveStatus: () => ({ load: loaded.status, lastSaveOk }),
   library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey },
+  job: {
+    open: openJob,
+    isOpen: jobPanel.isJobOpen,
+    /** 테스트용 관찰: 현재 세션 요약 (실제 거리 포함) */
+    state: () => job && {
+      phase: job.phase, timeLeft: job.timeLeft, score: job.score, rounds: job.history.length,
+      samples: job.beacon.samples.length, distance: job.beacon.distance, result: job.result
+    }
+  },
   teleport: (x, z, y) => Object.assign(motor, { x, z, y: y ?? groundHeightAt(x, z), vy: 0, grounded: true }),
   /** 시뮬레이션을 seconds 만큼 고정 스텝으로 진행 (테스트 모드용) */
   tick: (seconds) => {

@@ -4,7 +4,7 @@
 import { PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES } from "./balance.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2; // v2: CR2032 잔액·알바 기록 추가 (Stage 5)
 
 /**
  * @typedef {{
@@ -12,6 +12,8 @@ export const SAVE_VERSION = 1;
  *   bonus: Record<string, number>,
  *   skillSlots: number,
  *   cleared: Record<string, string>,
+ *   cr2032: number,
+ *   job: { runs: number, bestScore: number|null, totalEarned: number },
  *   metrics: { quizAttempts: Record<string, number>, quizPerfect: Record<string, number>, chapterOpens: Record<string, number> }
  * }} Progress
  * @typedef {{ getItem(k: string): string|null, setItem(k: string, v: string): void }} StorageLike
@@ -24,24 +26,37 @@ export function createProgress() {
     bonus: { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 },
     skillSlots: QUIZ.BASE_SKILL_SLOTS,
     cleared: {},
+    cr2032: 0,
+    job: { runs: 0, bestScore: null, totalEarned: 0 },
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
   };
+}
+
+/** 구버전 세이브를 현재 버전으로 올린다 (진행도를 잃지 않는 것이 원칙) */
+function migrate(raw) {
+  if (raw && raw.v === 1) raw = { ...raw, v: 2, cr2032: 0, job: { runs: 0, bestScore: null, totalEarned: 0 } };
+  return raw;
 }
 
 const isCountMap = (o) => o && typeof o === "object" && Object.values(o).every((n) => Number.isFinite(n) && n >= 0);
 
 /** 저장 데이터 검증 — 깨졌거나 버전이 다르면 null */
 function validate(raw) {
-  if (!raw || raw.v !== SAVE_VERSION || typeof raw !== "object") return null;
+  raw = migrate(raw);
+  if (!raw || typeof raw !== "object" || raw.v !== SAVE_VERSION) return null;
   const base = createProgress();
   if (!isCountMap(raw.bonus) || !Number.isInteger(raw.skillSlots) || typeof raw.cleared !== "object" || !raw.metrics) return null;
   const m = raw.metrics;
   if (![m.quizAttempts, m.quizPerfect, m.chapterOpens].every(isCountMap)) return null;
+  const j = raw.job;
+  if (!Number.isInteger(raw.cr2032) || raw.cr2032 < 0 || !j || !Number.isInteger(j.runs) || !Number.isInteger(j.totalEarned)) return null;
   return {
     ...base,
     bonus: { ...base.bonus, ...raw.bonus },
     skillSlots: Math.min(QUIZ.MAX_SKILL_SLOTS, Math.max(QUIZ.BASE_SKILL_SLOTS, raw.skillSlots)),
     cleared: { ...raw.cleared },
+    cr2032: raw.cr2032,
+    job: { runs: j.runs, bestScore: Number.isFinite(j.bestScore) ? j.bestScore : null, totalEarned: j.totalEarned },
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };
 }
@@ -112,4 +127,18 @@ export function applyQuizResult(progress, chapterId, perfect, now = new Date()) 
   const slotUnlocked = progress.skillSlots < QUIZ.MAX_SKILL_SLOTS;
   if (slotUnlocked) progress.skillSlots += 1;
   return { firstClear: true, reward: { stat: course.reward, amount, slotUnlocked } };
+}
+
+/**
+ * 알바 결과 반영 — 보수 CR2032 지급, 기록 갱신
+ * @param {{ score: number, rounds: number, reward: number }} result
+ * @returns {{ earned: number, balance: number, newBest: boolean }}
+ */
+export function applyJobResult(progress, result) {
+  progress.job.runs += 1;
+  const newBest = result.rounds > 0 && (progress.job.bestScore === null || result.score > progress.job.bestScore);
+  if (newBest) progress.job.bestScore = result.score;
+  progress.cr2032 += result.reward;
+  progress.job.totalEarned += result.reward;
+  return { earned: result.reward, balance: progress.cr2032, newBest };
 }
