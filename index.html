@@ -2,35 +2,94 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Packet Knight — Stage 1: 빈 복셀 섬</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Packet Knight — Stage 1: 복셀 섬 (모바일 & 마우스 조작 지원)</title>
 <style>
   :root { color-scheme: dark; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1a2b; }
-  #app { width: 100%; height: 100%; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #0e1a2b;
+    font-family: ui-monospace, "D2Coding", Consolas, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #app { width: 100%; height: 100%; touch-action: none; }
+  
+  /* 안내 HUD */
   #hud {
-    position: fixed; left: 12px; bottom: 12px; z-index: 10;
-    font: 13px/1.6 ui-monospace, "D2Coding", Consolas, monospace;
-    color: #cfe8ff; background: rgba(6, 16, 30, .72);
-    border: 1px solid #1f3a5f; border-radius: 8px; padding: 8px 12px;
-    user-select: none; pointer-events: none;
+    position: fixed; left: 14px; top: 14px; z-index: 10;
+    font-size: 13px; line-height: 1.5;
+    color: #cfe8ff; background: rgba(6, 16, 30, .78);
+    border: 1px solid #1f3a5f; border-radius: 10px; padding: 10px 14px;
+    pointer-events: none; backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   }
-  #hud b { color: #7dd8ff; font-weight: 600; }
+  #hud b { color: #7dd8ff; font-weight: 700; }
+  #hud .control-desc { font-size: 11.5px; color: #a4c7e8; margin-top: 4px; }
+  
+  /* 우상단 상태 배지 */
   #badge {
-    position: fixed; right: 12px; top: 12px; z-index: 10;
-    font: 12px/1.5 ui-monospace, Consolas, monospace; color: #9fd6a8;
-    background: rgba(6, 30, 16, .72); border: 1px solid #2b5f34;
-    border-radius: 8px; padding: 6px 10px; pointer-events: none;
+    position: fixed; right: 14px; top: 14px; z-index: 10;
+    font-size: 12px; line-height: 1.5; color: #9fd6a8;
+    background: rgba(6, 30, 16, .78); border: 1px solid #2b5f34;
+    border-radius: 10px; padding: 8px 12px; pointer-events: none;
+    backdrop-filter: blur(6px); box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   }
+  
+  /* 모바일 가상 조이스틱 */
+  #joystick-zone {
+    position: fixed; left: 16px; bottom: 16px; z-index: 20;
+    width: 130px; height: 130px;
+    touch-action: none; display: flex; align-items: center; justify-content: center;
+  }
+  #joystick-base {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(15, 35, 60, 0.7) 0%, rgba(6, 16, 30, 0.85) 100%);
+    border: 2px solid rgba(57, 208, 255, 0.45);
+    box-shadow: 0 0 16px rgba(57, 208, 255, 0.2);
+    position: relative; display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
+  }
+  #joystick-thumb {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #7dd8ff 0%, #0099cc 60%, #005580 100%);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5), 0 0 12px rgba(57, 208, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    position: absolute; pointer-events: none;
+    transition: transform 0.04s ease-out;
+  }
+  
+  /* 조작 모드 토글/리셋 버튼 */
+  #btn-reset {
+    position: fixed; right: 14px; bottom: 16px; z-index: 10;
+    background: rgba(14, 30, 50, 0.8); color: #7dd8ff;
+    border: 1px solid #1f4266; border-radius: 8px;
+    padding: 8px 14px; font-size: 12px; cursor: pointer;
+    font-family: inherit; backdrop-filter: blur(6px);
+  }
+  #btn-reset:active { background: rgba(30, 60, 95, 0.9); }
 </style>
 </head>
 <body>
 <div id="app"></div>
+
 <div id="hud">
-  <b>PACKET KNIGHT</b> — Stage 1: 빈 복셀 섬<br />
-  이동: <b>W A S D</b> (또는 화살표) · 클릭: 오브젝트 확인
+  <b>PACKET KNIGHT</b> — Stage 1: 복셀 섬<br />
+  <div class="control-desc" id="hud-controls">
+    🎮 조작: <b>마우스 클릭 / 바닥 터치</b> 또는 <b>WASD</b> 이동<br />
+    🔄 시점: <b>우클릭 드래그</b> 또는 <b>화면 드래그</b> 회전
+  </div>
 </div>
+
 <div id="badge">🛡️ 나이트 페이블 · 채널 37 대기 중</div>
+
+<!-- 모바일 & 터치 가상 조이스틱 -->
+<div id="joystick-zone">
+  <div id="joystick-base">
+    <div id="joystick-thumb"></div>
+  </div>
+</div>
+
+<button id="btn-reset">📍 시작 위치로 리셋</button>
 
 <script type="importmap">
 {
@@ -43,43 +102,33 @@
 <script type="module">
 import * as THREE from "three";
 
-/* ============================================================
-   Packet Knight — Stage 1
-   PRD.md §7 Stage 1 DoD:
-   "브라우저에서 열면 초록·모래색 복셀 섬과 안테나 타워가 보이고,
-    주인공 큐브가 WASD로 움직이며 카메라가 따라온다"
-   ============================================================ */
-
-// ---------- 1. 기본 씬 ----------
+// ---------- 1. 기본 씬 설정 ----------
 const app = document.getElementById("app");
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8ec9e8);          // 하늘
-scene.fog = new THREE.Fog(0x8ec9e8, 60, 140);          // 먼 곳 안개
+scene.background = new THREE.Color(0x8ec9e8);
+scene.fog = new THREE.Fog(0x8ec9e8, 60, 140);
 
 const camera = new THREE.PerspectiveCamera(
-  55, window.innerWidth / window.innerHeight, 0.1, 300
+  50, window.innerWidth / window.innerHeight, 0.1, 300
 );
 
-// 빛: 태양(주광) + 하늘색 환경광
-const sun = new THREE.DirectionalLight(0xfff2d8, 1.5);
-sun.position.set(30, 50, 20);
+// 조명
+const sun = new THREE.DirectionalLight(0xfff4db, 1.6);
+sun.position.set(35, 55, 25);
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xbfd8ff, 0.6));
+scene.add(new THREE.AmbientLight(0xc2dcff, 0.65));
 scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.5));
 
 // ---------- 2. 복셀 섬 지형 ----------
-// 섬 반경 안에서 높이 맵을 결정해 1x1x1 복셀로 쌓는다.
-// 파란 물(해수면) 위에 초록 풀밭 + 모래 해안 + 속을 채우는 흙/돌.
 const ISLAND_RADIUS = 14;
 const SEA_LEVEL = 0;
 
-// 간단한 값 노이즈(결정적 — 매 실행 같은 섬)
 function hash2(x, z) {
   const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
   return s - Math.floor(s);
@@ -93,17 +142,21 @@ function smoothNoise(x, z) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-const grassMat  = new THREE.MeshLambertMaterial({ color: 0x5cab45 }); // 초록
-const sandMat   = new THREE.MeshLambertMaterial({ color: 0xd9c78a }); // 모래
-const dirtMat   = new THREE.MeshLambertMaterial({ color: 0x8a6a45 }); // 흙
-const stoneMat  = new THREE.MeshLambertMaterial({ color: 0x8d939b }); // 돌
-const waterMat  = new THREE.MeshLambertMaterial({
-  color: 0x2f6fb3, transparent: true, opacity: 0.85
-});
-const metalMat  = new THREE.MeshLambertMaterial({ color: 0xb8c2cc }); // 타워 금속
-const beaconMat = new THREE.MeshBasicMaterial({ color: 0x39d0ff });   // 비콘
+export function groundHeightAt(x, z) {
+  const r = Math.hypot(x, z);
+  if (r > ISLAND_RADIUS) return SEA_LEVEL - 0.2;
+  const n = smoothNoise(x * 0.18, z * 0.18);
+  return Math.round(3 + n * 4 - Math.max(0, r - 6) * 0.55) + 1;
+}
 
-// 복셀 하나를 인스턴스로 모아 한 번에 그린다(성능).
+const grassMat = new THREE.MeshLambertMaterial({ color: 0x5cab45 });
+const sandMat  = new THREE.MeshLambertMaterial({ color: 0xd9c78a });
+const dirtMat  = new THREE.MeshLambertMaterial({ color: 0x8a6a45 });
+const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8d939b });
+const waterMat = new THREE.MeshLambertMaterial({ color: 0x2772b8, transparent: true, opacity: 0.85 });
+const metalMat = new THREE.MeshLambertMaterial({ color: 0xb8c2cc });
+const beaconMat = new THREE.MeshBasicMaterial({ color: 0x39d0ff });
+
 function buildVoxelLayer(list, material) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const mesh = new THREE.InstancedMesh(geo, material, list.length);
@@ -112,6 +165,7 @@ function buildVoxelLayer(list, material) {
     m.makeTranslation(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
     mesh.setMatrixAt(i, m);
   });
+  mesh.instanceMatrix.needsUpdate = true;
   return mesh;
 }
 
@@ -122,14 +176,12 @@ for (let x = -ISLAND_RADIUS; x <= ISLAND_RADIUS; x++) {
     const r = Math.hypot(x, z);
     if (r > ISLAND_RADIUS) continue;
 
-    // 높이: 중심이 높고 가장자리가 바닷속으로 부드럽게 내려간다
     const n = smoothNoise(x * 0.18, z * 0.18);
     let h = Math.round(3 + n * 4 - Math.max(0, (r - 6)) * 0.55);
 
     const topType = h <= SEA_LEVEL ? "sand" : (n > 0.72 ? "stone" : "grass");
     layer[topType].push([x, h, z]);
 
-    // 위층 종류에 따라 아래를 채운다
     const depth = topType === "sand" ? 2 : 3;
     for (let d = 1; d <= depth; d++) {
       const y = h - d;
@@ -153,15 +205,22 @@ sea.rotation.x = -Math.PI / 2;
 sea.position.y = SEA_LEVEL - 0.25;
 scene.add(sea);
 
-// ---------- 3. 안테나 타워 1개 (전파의 등대) ----------
+// 클릭 감지용 보이지 않는 지형 돔 평면
+const raycastPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+raycastPlane.rotation.x = -Math.PI / 2;
+raycastPlane.position.y = 0;
+scene.add(raycastPlane);
+
+// ---------- 3. 안테나 타워 (비콘 등대) ----------
 const tower = new THREE.Group();
 {
-  // 돌 받침
   const base = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 3), stoneMat);
   base.position.y = 1;
   tower.add(base);
 
-  // 금속 기둥 3단 (위로 갈수록 가늘게)
   const segs = [
     [1.2, 6, 0.0], [0.9, 5, 6.0], [0.6, 4, 11.0],
   ];
@@ -171,7 +230,6 @@ const tower = new THREE.Group();
     tower.add(seg);
   }
 
-  // 안테나 봉 + 발광 비콘
   const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 8), metalMat);
   rod.position.y = 22.5;
   tower.add(rod);
@@ -179,9 +237,9 @@ const tower = new THREE.Group();
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), beaconMat);
   beacon.position.y = 25;
   tower.add(beacon);
-  tower.userData.beacon = beacon;   // 애니메이션에서 점멸
+  tower.userData.beacon = beacon;
 }
-tower.position.set(4, 6, -4);       // 섬 중앙 근처 언덕 위
+tower.position.set(4, 6, -4);
 scene.add(tower);
 
 // ---------- 4. 주인공 큐브 나이트 ----------
@@ -189,12 +247,11 @@ const knight = new THREE.Group();
 {
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshLambertMaterial({ color: 0xd8443c })   // 기사 붉은 갑옷
+    new THREE.MeshLambertMaterial({ color: 0xd8443c })
   );
   body.position.y = 0.5;
   knight.add(body);
 
-  // 가슴 안테나 문양
   const emblem = new THREE.Mesh(
     new THREE.BoxGeometry(0.2, 0.2, 0.05),
     new THREE.MeshBasicMaterial({ color: 0x39d0ff })
@@ -202,98 +259,318 @@ const knight = new THREE.Group();
   emblem.position.set(0, 0.55, 0.53);
   knight.add(emblem);
 
-  // 목부분 안테나
   const antenna = new THREE.Mesh(
     new THREE.CylinderGeometry(0.04, 0.04, 0.7, 6), metalMat
   );
   antenna.position.set(0.3, 1.2, 0);
   knight.add(antenna);
 }
-knight.position.set(0, 5, 6);
+const SPAWN_POS = new THREE.Vector3(0, 0, 6);
+SPAWN_POS.y = groundHeightAt(SPAWN_POS.x, SPAWN_POS.z);
+knight.position.copy(SPAWN_POS);
 scene.add(knight);
 
-// 스폰 지점에서 지형 위로 살짝 올리기
-knight.userData.vy = 0;             // 수직 속도 (Stage 3 점프 예비)
+// ---------- 5. 클릭/터치 이동 목표 지점 마커 ----------
+const targetMarker = new THREE.Group();
+{
+  // 펄스 링
+  const ringGeo = new THREE.RingGeometry(0.35, 0.55, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x39d0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.85
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  targetMarker.add(ring);
 
-// 지형 위 높이 찾기: 스폰/이동 시 주변 최고 복셀 위에 서도록 한다.
-// Stage 1에서는 원뿔 근사: 중심에서의 반경 기반 높이 공식을 재사용.
-function groundHeightAt(x, z) {
-  const r = Math.hypot(x, z);
-  if (r > ISLAND_RADIUS) return SEA_LEVEL - 1;      // 바다
-  const n = smoothNoise(x * 0.18, z * 0.18);
-  return Math.round(3 + n * 4 - Math.max(0, r - 6) * 0.55) + 1;
+  // 중앙 점
+  const dotGeo = new THREE.CircleGeometry(0.12, 16);
+  const dotMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.95
+  });
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.rotation.x = -Math.PI / 2;
+  targetMarker.add(dot);
 }
-knight.position.y = groundHeightAt(knight.position.x, knight.position.z);
+targetMarker.visible = false;
+scene.add(targetMarker);
 
-// ---------- 5. 조작 (WASD / 화살표) ----------
+let targetDestination = null; // THREE.Vector3 또는 null
+
+// ---------- 6. 통합 이동 및 조작 시스템 ----------
 const keys = new Set();
 window.addEventListener("keydown", (e) => {
   keys.add(e.key.toLowerCase());
+  targetDestination = null; // 키보드 누르면 마우스 이동 취소
+  targetMarker.visible = false;
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
-const SPEED = 6;          // 복셀/초
-let yaw = 0;              // 이동 방향(카메라 기준)
+// 조이스틱 상태 (-1 ~ 1)
+const joystick = { x: 0, z: 0, active: false };
+
+// 카메라 회전 각도 (yaw)
+let cameraYaw = 0;
+let cameraPitch = 0.52; // 약 30도 각도 내려보기
+let cameraDistance = 14;
+
+const SPEED = 6.5; // 복셀/초
 
 function moveKnight(dt) {
-  const dir = new THREE.Vector3(
-    (keys.has("d") || keys.has("arrowright") ? 1 : 0) -
-    (keys.has("a") || keys.has("arrowleft")  ? 1 : 0),
-    0,
-    (keys.has("s") || keys.has("arrowdown")  ? 1 : 0) -
-    (keys.has("w") || keys.has("arrowup")    ? 1 : 0)
-  );
-  if (dir.lengthSq() > 0) {
-    dir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-    knight.position.addScaledVector(dir, SPEED * dt);
-    // 이동 방향을 바라보게
-    knight.rotation.y = Math.atan2(dir.x, dir.z);
+  let moveX = 0;
+  let moveZ = 0;
+
+  // 1) 키보드 입력
+  if (keys.has("d") || keys.has("arrowright")) moveX += 1;
+  if (keys.has("a") || keys.has("arrowleft"))  moveX -= 1;
+  if (keys.has("s") || keys.has("arrowdown"))  moveZ += 1;
+  if (keys.has("w") || keys.has("arrowup"))    moveZ -= 1;
+
+  // 2) 가상 조이스틱 입력 (모바일)
+  if (joystick.active) {
+    moveX = joystick.x;
+    moveZ = joystick.z;
+    targetDestination = null;
+    targetMarker.visible = false;
   }
-  // 지형에 붙어 걷기 (Stage 1: 점프 없이 스냅)
+
+  const hasManualInput = Math.hypot(moveX, moveZ) > 0.05;
+
+  if (hasManualInput) {
+    // 카메라 방향을 기준으로 이동 벡터 회전
+    const inputDir = new THREE.Vector2(moveX, moveZ);
+    if (inputDir.length() > 1) inputDir.normalize();
+
+    // cameraYaw 기준 회전
+    const angle = cameraYaw;
+    const worldDirX = inputDir.x * Math.cos(angle) + inputDir.y * Math.sin(angle);
+    const worldDirZ = -inputDir.x * Math.sin(angle) + inputDir.y * Math.cos(angle);
+
+    const worldDir = new THREE.Vector3(worldDirX, 0, worldDirZ).normalize();
+    knight.position.addScaledVector(worldDir, SPEED * dt * Math.min(1, inputDir.length()));
+
+    // 캐릭터 회전
+    const targetRotY = Math.atan2(worldDir.x, worldDir.z);
+    knight.rotation.y = THREE.MathUtils.lerp(knight.rotation.y, targetRotY, Math.min(1, dt * 15));
+  } else if (targetDestination) {
+    // 3) 마우스 클릭 / 바닥 터치 이동
+    const diff = targetDestination.clone().sub(knight.position);
+    diff.y = 0;
+    const dist = diff.length();
+
+    if (dist > 0.25) {
+      diff.normalize();
+      knight.position.addScaledVector(diff, SPEED * dt);
+      const targetRotY = Math.atan2(diff.x, diff.z);
+      knight.rotation.y = THREE.MathUtils.lerp(knight.rotation.y, targetRotY, Math.min(1, dt * 15));
+    } else {
+      // 목표 도착!
+      targetDestination = null;
+      targetMarker.visible = false;
+    }
+  }
+
+  // 지형 높이에 스냅
   const targetY = groundHeightAt(knight.position.x, knight.position.z);
   knight.position.y += (targetY - knight.position.y) * Math.min(1, dt * 12);
 }
 
-// ---------- 6. 카메라 팔로우 ----------
-const camOffset = new THREE.Vector3(0, 8, 12);
-function followCamera(dt) {
-  const desired = knight.position.clone().add(camOffset);
-  camera.position.lerp(desired, Math.min(1, dt * 4));
-  camera.lookAt(knight.position.x, knight.position.y + 1, knight.position.z);
+// ---------- 7. 카메라 팔로우 & 회전 ----------
+function updateCamera(dt) {
+  // 나이트 위치 기준 구면 좌표계로 카메라 위치 계산
+  const hDist = cameraDistance * Math.cos(cameraPitch);
+  const vDist = cameraDistance * Math.sin(cameraPitch);
+
+  const desiredX = knight.position.x - Math.sin(cameraYaw) * hDist;
+  const desiredY = knight.position.y + vDist;
+  const desiredZ = knight.position.z - Math.cos(cameraYaw) * hDist;
+
+  camera.position.set(desiredX, desiredY, desiredZ);
+  camera.lookAt(knight.position.x, knight.position.y + 1.2, knight.position.z);
 }
 
-// ---------- 7. 클릭: 오브젝트 확인 ----------
+// ---------- 8. 마우스 클릭 & 터치 인터랙션 (클릭 이동 + 시점 회전) ----------
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-renderer.domElement.addEventListener("pointerdown", (e) => {
-  pointer.x =  (e.clientX / window.innerWidth)  * 2 - 1;
-  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObject(tower, true)[0];
-  const badge = document.getElementById("badge");
-  badge.textContent = hit
-    ? "📡 안테나 타워 — Beacon 채널 37 (Advertise 중)"
-    : "🛡️ 나이트 페이블 · 채널 37 대기 중";
+
+let pointerDownPos = { x: 0, y: 0 };
+let isDraggingCamera = false;
+let isPointerDown = false;
+let activePointerId = null;
+
+app.addEventListener("pointerdown", (e) => {
+  // 조이스틱 영역이나 버튼 클릭은 제외
+  if (e.target.closest("#joystick-zone") || e.target.closest("#btn-reset")) return;
+
+  isPointerDown = true;
+  activePointerId = e.pointerId;
+  pointerDownPos = { x: e.clientX, y: e.clientY };
+
+  // 우클릭이면 무조건 카메라 회전 모드
+  if (e.button === 2) {
+    isDraggingCamera = true;
+  }
 });
 
-// ---------- 8. 렌더 루프 ----------
+window.addEventListener("pointermove", (e) => {
+  if (!isPointerDown || e.pointerId !== activePointerId) return;
+
+  const dx = e.clientX - pointerDownPos.x;
+  const dy = e.clientY - pointerDownPos.y;
+  const dist = Math.hypot(dx, dy);
+
+  // 드래그 거리 8px 이상이면 시점 회전
+  if (dist > 8 || isDraggingCamera) {
+    isDraggingCamera = true;
+    cameraYaw -= dx * 0.006;
+    cameraPitch = Math.max(0.15, Math.min(1.2, cameraPitch + dy * 0.005));
+    pointerDownPos = { x: e.clientX, y: e.clientY };
+  }
+});
+
+window.addEventListener("pointerup", (e) => {
+  if (!isPointerDown) return;
+  isPointerDown = false;
+
+  // 단순 탭/클릭이었던 경우 -> 마우스/터치 이동 또는 오브젝트 클릭
+  if (!isDraggingCamera && e.button !== 2) {
+    handleClickOrTap(e.clientX, e.clientY);
+  }
+  isDraggingCamera = false;
+});
+
+// 우클릭 컨텍스트 메뉴 방지
+window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function handleClickOrTap(clientX, clientY) {
+  pointer.x =  (clientX / window.innerWidth)  * 2 - 1;
+  pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+
+  // 1순위: 안테나 타워 확인
+  const towerHit = raycaster.intersectObject(tower, true)[0];
+  const badge = document.getElementById("badge");
+
+  if (towerHit) {
+    badge.textContent = "📡 안테나 타워 — Beacon 채널 37 (Advertise 중)";
+    // 비콘 타워 쪽으로 걷기
+    setMoveTarget(new THREE.Vector3(4, groundHeightAt(4, -4), -4));
+    return;
+  }
+
+  // 2순위: 지형 복셀 또는 바다 바닥 클릭 이동
+  const hits = raycaster.intersectObjects([sea, ...terrain.children], true);
+  if (hits.length > 0) {
+    const p = hits[0].point;
+    // 섬 경계 및 반경 검사
+    const targetY = groundHeightAt(p.x, p.z);
+    setMoveTarget(new THREE.Vector3(p.x, targetY, p.z));
+    badge.textContent = `📍 목표 지점 (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) 이동 중`;
+  }
+}
+
+function setMoveTarget(pos) {
+  targetDestination = pos;
+  targetMarker.position.set(pos.x, pos.y + 0.08, pos.z);
+  targetMarker.visible = true;
+}
+
+// 리셋 버튼
+document.getElementById("btn-reset").addEventListener("click", () => {
+  knight.position.copy(SPAWN_POS);
+  targetDestination = null;
+  targetMarker.visible = false;
+  cameraYaw = 0;
+  cameraPitch = 0.52;
+  document.getElementById("badge").textContent = "🛡️ 나이트 페이블 · 채널 37 대기 중";
+});
+
+// ---------- 9. 모바일 가상 조이스틱 이벤트 ----------
+const joyZone = document.getElementById("joystick-zone");
+const joyBase = document.getElementById("joystick-base");
+const joyThumb = document.getElementById("joystick-thumb");
+
+const JOY_MAX_DIST = 38; // px
+
+let joyPointerId = null;
+let joyCenter = { x: 0, y: 0 };
+
+joyZone.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  joyPointerId = e.pointerId;
+  joyZone.setPointerCapture(joyPointerId);
+
+  const rect = joyBase.getBoundingClientRect();
+  joyCenter = {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2
+  };
+  joystick.active = true;
+  updateJoystick(e.clientX, e.clientY);
+});
+
+joyZone.addEventListener("pointermove", (e) => {
+  if (e.pointerId !== joyPointerId) return;
+  e.preventDefault();
+  updateJoystick(e.clientX, e.clientY);
+});
+
+function endJoystick(e) {
+  if (e.pointerId !== joyPointerId) return;
+  joyPointerId = null;
+  joystick.active = false;
+  joystick.x = 0;
+  joystick.z = 0;
+  joyThumb.style.transform = `translate(0px, 0px)`;
+}
+joyZone.addEventListener("pointerup", endJoystick);
+joyZone.addEventListener("pointercancel", endJoystick);
+
+function updateJoystick(clientX, clientY) {
+  const dx = clientX - joyCenter.x;
+  const dy = clientY - joyCenter.y;
+  const dist = Math.hypot(dx, dy);
+
+  const clampedDist = Math.min(dist, JOY_MAX_DIST);
+  const angle = Math.atan2(dy, dx);
+
+  const thumbX = Math.cos(angle) * clampedDist;
+  const thumbY = Math.sin(angle) * clampedDist;
+  joyThumb.style.transform = `translate(${thumbX}px, ${thumbY}px)`;
+
+  // x: 좌(-1) ~ 우(1), z: 상(-1) ~ 하(1)
+  const norm = clampedDist / JOY_MAX_DIST;
+  joystick.x = (thumbX / JOY_MAX_DIST) * norm;
+  joystick.z = (thumbY / JOY_MAX_DIST) * norm;
+}
+
+// ---------- 10. 렌더 루프 ----------
 const clock = new THREE.Clock();
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
   moveKnight(dt);
-  followCamera(dt);
+  updateCamera(dt);
 
-  // 비콘 점멸 + 물 결
+  // 비콘 점멸 애니메이션
   const t = clock.elapsedTime;
-  tower.userData.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3));
+  tower.userData.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3.5));
   sea.position.z = Math.sin(t * 0.3) * 0.4;
+
+  // 목표 마커 회전 & 펄스
+  if (targetMarker.visible) {
+    targetMarker.rotation.y = t * 2;
+    const s = 1 + 0.15 * Math.sin(t * 6);
+    targetMarker.scale.set(s, 1, s);
+  }
 
   renderer.render(scene, camera);
 }
 animate();
 
+// 반응형 리사이즈
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
