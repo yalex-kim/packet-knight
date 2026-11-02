@@ -43,12 +43,12 @@ function shuffled(n) {
   return a;
 }
 
-/** withGuide: 퀘스트 로그에서만 "📍 길 안내"를 붙인다 (HUD 트래커는 짧게) */
-function stepLine(qs, p, quest, step, withGuide = false) {
+/** 퀘스트 로그의 단계 한 줄 — 아직 안 한 단계에는 "📍 길 안내" */
+function stepLine(qs, p, quest, step) {
   const done = step.kind === "whatif" ? Boolean(qs.done[quest.id]) : stepDone(qs, p, quest, step);
   const n = qs.progress[quest.id]?.[step.id] ?? 0;
   const count = step.kind === "event" && (step.need ?? 1) > 1 && !done ? ` (${Math.floor(n)}/${step.need})` : "";
-  const place = withGuide && !done ? stepPlace(step) : null;
+  const place = done ? null : stepPlace(step);
   return el("li", { class: done ? "done" : "" }, `${done ? "✓" : "○"} ${step.text}${count}`,
     place ? el("button", {
       type: "button", class: "q-go", "data-place": place, textContent: "📍 길 안내",
@@ -61,17 +61,26 @@ export function refreshTracker() {
   const p = hooks.getProgress();
   const qs = p.quests;
   const quest = questById(qs.active);
-  const title = qs.title ? el("span", { class: "qt-title", textContent: `🏅 ${qs.title}` }) : null;
+  // 한 줄로 접는다 (모바일에서 화면을 가리지 않게) — 단계 전체는 눌러서 여는 퀘스트 로그에 있다
   if (!quest) {
-    tracker.replaceChildren(el("div", { class: "qt-head" }, `📜 퀘스트 Q0~${QUESTS.at(-1).code} 완료 `, title), el("div", { class: "muted", textContent: `다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 다음 업데이트에서 열린다` }));
+    tracker.replaceChildren(el("span", { class: "qt-head", textContent: `📜 Q0~${QUESTS.at(-1).code} 완료` }),
+      el("span", { class: "qt-next", textContent: ` · 다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 업데이트에서` }));
+    tracker.title = "";
+    tracker.classList.remove("ready");
     return;
   }
   const ready = readyForWhatif(qs, p, quest);
+  const steps = quest.steps.filter((s) => s.kind !== "whatif");
+  const done = steps.filter((s) => stepDone(qs, p, quest, s)).length;
+  const next = steps.find((s) => !stepDone(qs, p, quest, s));
+  const n = next ? qs.progress[quest.id]?.[next.id] ?? 0 : 0;
+  const count = next && next.kind === "event" && (next.need ?? 1) > 1 ? ` (${Math.floor(n)}/${next.need})` : "";
+  const nextText = ready ? "🔮 예측해 보기 열림 — 눌러서 답하기" : `○ ${next?.text ?? ""}${count}`;
   tracker.replaceChildren(
-    el("div", { class: "qt-head" }, `📜 ${quest.code} ${quest.title} `, title),
-    el("ul", {}, quest.steps.map((s) => stepLine(qs, p, quest, s))),
-    ...(ready ? [el("div", { class: "qt-ready", textContent: "🔮 예측해 보기가 열렸다 — 눌러서 답하기 (Q)" })] : [])   // replaceChildren은 false를 글자로 넣는다
+    el("span", { class: "qt-head" }, `📜 ${quest.code} `, el("span", { class: "qt-name", textContent: `${quest.title} ` }), `${done}/${steps.length}`),
+    el("span", { class: "qt-next", textContent: ` › ${nextText}` })
   );
+  tracker.title = `${quest.code} ${quest.title} — ${nextText} (눌러서 퀘스트 로그 열기)`;
   tracker.classList.toggle("ready", ready);
 }
 
@@ -128,7 +137,7 @@ function render() {
     el("div", { class: "q-detail" },
       el("h3", { textContent: `${quest.code} ${quest.title}` }),
       el("div", { class: "muted", textContent: `📍 ${quest.region} · 📖 ${ch.title}` }),
-      el("ul", { class: "q-steps" }, quest.steps.map((s) => stepLine(qs, p, quest, s, true))),
+      el("ul", { class: "q-steps" }, quest.steps.map((s) => stepLine(qs, p, quest, s))),
       el("div", { class: "q-reward", textContent: `🎁 보상: ${quest.reward.label}` }),
       whatifBlock,
       el("div", { class: "lib-actions" },

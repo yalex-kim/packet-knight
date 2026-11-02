@@ -1185,6 +1185,9 @@ await page.waitForFunction(() => window.__PK);
   const tracker = () => page.locator("#quest-tracker").textContent();
   const t0 = await tracker();
   check("새 게임은 Q0 퀘스트 트래커가 보인다", t0.includes("Q0") && t0.includes("○"), t0.slice(0, 40));
+  const tBox = await page.locator("#quest-tracker").boundingBox();
+  check("퀘스트 트래커는 한 줄로 접혀 있다 (다음 단계 하나만, 화면을 덜 가린다)",
+    tBox.height < 40 && t0.includes("0/4") && (t0.match(/○/g) ?? []).length === 1, `${Math.round(tBox.height)}px · ${t0}`);
 
   await reset();
   await hold("KeyS", 1000); await reset(); await hold("KeyS", 1000);
@@ -1252,7 +1255,7 @@ await page.waitForFunction(() => window.__PK);
   await page.waitForFunction(() => window.__PK);
   const re = await qState();
   const t1 = await tracker();
-  check("퀘스트 진행·칭호가 저장되고 새로고침 후 유지된다 (트래커는 Q1)", closed && Boolean(re.done.Q0) && re.active === "Q1" && t1.includes("Q1") && t1.includes("패킷 나이트"), t1.slice(0, 50));
+  check("퀘스트 진행·칭호가 저장되고 새로고침 후 유지된다 (트래커는 Q1)", closed && Boolean(re.done.Q0) && re.active === "Q1" && t1.includes("Q1") && re.title === "패킷 나이트", `${t1.slice(0, 50)} · 칭호 ${re.title}`);
 
   // 모바일 폭: 트래커·퀘스트 버튼이 조이스틱·점프/발사 버튼과 겹치지 않는다
   await page.setViewportSize({ width: 390, height: 780 });
