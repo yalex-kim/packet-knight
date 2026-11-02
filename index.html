@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 8</title>
+<title>Packet Knight — Stage 9</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -318,6 +318,39 @@
   #chmap .cm-afh { background: #0e7a5a; border-color: #23b585; }
   #chmap .cm-btn:disabled { opacity: 0.55; cursor: default; }
 
+  /* 퀘스트 트래커 (좌측, 조이스틱 위) · 퀘스트 로그 (Stage 9) */
+  #quest-tracker {
+    position: fixed; left: 14px; bottom: 160px; z-index: 10; max-width: 300px;
+    font-size: 11.5px; line-height: 1.5; color: #d9ecff; cursor: pointer;
+    background: rgba(6, 16, 30, .82); border: 1px solid #1f3a5f; border-radius: 10px; padding: 7px 10px;
+    backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  #quest-tracker.ready { border-color: #b98cff; box-shadow: 0 0 14px rgba(185,140,255,.45); }
+  #quest-tracker .qt-head { font-weight: 700; color: #ffd76b; }
+  #quest-tracker .qt-title { color: #c9b8ff; font-weight: 400; }
+  #quest-tracker ul, .q-steps { list-style: none; padding: 0; margin: 3px 0 0; }
+  #quest-tracker li, .q-steps li { margin: 1px 0; color: #a4c7e8; }
+  #quest-tracker li.done, .q-steps li.done { color: #7dffb5; }
+  #quest-tracker .qt-ready { color: #d9c4ff; margin-top: 3px; }
+  #btn-quests {
+    position: fixed; right: 140px; bottom: 16px; z-index: 10;
+    background: rgba(40, 30, 10, 0.88); color: #ffd76b; border: 1px solid #6b5520; border-radius: 8px;
+    padding: 7px 13px; font-size: 11.5px; cursor: pointer; font-family: inherit;
+  }
+  .q-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .q-item { background: #12263f; color: #cfe8ff; border: 1px solid #23476e; border-radius: 6px; padding: 5px 9px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .q-item.on { border-color: #ffd76b; color: #ffd76b; }
+  .q-item:disabled { opacity: .5; cursor: default; }
+  .q-reward { color: #ffd76b; margin: 6px 0; }
+  .q-whatif { background: rgba(40, 24, 70, .55); border-left: 3px solid #b98cff; padding: 8px 11px; border-radius: 4px; margin-top: 8px; }
+  .q-whatif .opts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .q-whatif .opt { text-align: left; }
+  .q-explain { margin-top: 5px; color: #bcdaf5; }
+  .q-feedback.bad { color: #ff9a8f; margin-top: 6px; }
+  .q-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .q-badge { font-size: 11.5px; padding: 3px 7px; border-radius: 5px; background: #0f1d30; color: #5f7c99; border: 1px solid #1b3554; }
+  .q-badge.on { color: #ffd76b; border-color: #6b5520; background: #2a2210; }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
@@ -333,6 +366,9 @@
     #toast { top: 46%; }
     #chmap .cm { height: 26px; border-radius: 2px; }
     #chmap .cm-cells { gap: 1px; }
+    /* 트래커는 조이스틱 위에 한 줄 요약 + 단계 (화면을 덜 가리게) */
+    #quest-tracker { bottom: 152px; left: 8px; max-width: 58vw; font-size: 10.5px; padding: 5px 8px; }
+    #btn-quests { right: 128px; padding: 7px 10px; }
   }
 </style>
 </head>
@@ -340,7 +376,7 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 8: 간섭 전투</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 9: 퀘스트 ↔ 교과서</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
@@ -350,12 +386,15 @@
     📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)<br />
     ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
     🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
-    🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)
+    🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
+    📜 퀘스트: <b>Q 키 / 퀘스트 버튼 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지
   </div>
 </div>
 
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
 <div id="stats" aria-label="기사 스탯"></div>
+<div id="quest-tracker" role="button" tabindex="0" aria-label="진행 중인 퀘스트 (눌러서 퀘스트 로그 열기)"></div>
+<button id="btn-quests" type="button" aria-label="퀘스트 로그">📜 퀘스트 (Q)</button>
 
 <!-- 모바일 & 터치 가상 조이스틱 -->
 <div id="joystick-zone">
@@ -417,6 +456,10 @@
 </div>
 
 <!-- 교과서 원문 리더 -->
+<div id="quests" class="overlay" role="dialog" aria-modal="true" aria-labelledby="quests-title" hidden>
+  <div class="panel" id="quests-panel"></div>
+</div>
+
 <div id="reader" class="overlay" role="dialog" aria-modal="true" aria-label="교과서 원문" hidden>
   <div class="panel">
     <div class="head">

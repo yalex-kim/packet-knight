@@ -20,7 +20,9 @@ import * as knightView from "./render/knight.js";
 import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera } from "./render/camera.js";
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
-import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey } from "./ui/library.js";
+import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, openReader, isReaderOpen, readerUrl } from "./ui/library.js";
+import * as questLog from "./ui/questLog.js";
+import { questEvent, answerWhatif, questById, readyForWhatif, PERKS } from "./core/quests.js";
 import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
 } from "./core/progress.js";
@@ -83,9 +85,27 @@ if (loaded.status === "corrupt") {
 }
 let lastSaveOk = loaded.status !== "unavailable";
 
+let questsReady = false; // 퀘스트 UI 초기화 전에는 트래커를 건드리지 않는다
+let questWalk = 0; // 1 m 미만 걸은 거리 누적
+let questReadyShown = null; // 🔮 열림 안내를 한 번만 띄우려고 기억해 둔 퀘스트
 function persist() {
   lastSaveOk = saveProgress(storage, progress);
   if (!lastSaveOk) hud.setBadge("⚠️ 진행도를 저장할 수 없습니다 (브라우저 저장소 차단)");
+  refreshQuests();
+}
+/** 퀘스트 트래커 갱신 + 예측해 보기가 새로 열리면 안내 (상태 단계는 강좌·강화·던전에서 바뀐다) */
+function refreshQuests() {
+  if (!questsReady) return;
+  questLog.refreshTracker();
+  const q = questById(progress.quests.active);
+  if (q && questReadyShown !== q.id && readyForWhatif(progress.quests, progress, q)) {
+    questReadyShown = q.id;
+    fx.showToast(`🔮 ${q.code} 마지막 관문 — 예측해 보기가 열렸다! 왼쪽 퀘스트 트래커나 Q 키로 답해 보자`, 4.5);
+  }
+}
+/** 게임 사건 → 퀘스트 진행 (바뀌었을 때만 저장) */
+function questProgress(ev) {
+  if (questEvent(progress.quests, ev)) persist();
 }
 const wallet = () => ({ skillSlots: progress.skillSlots, cr2032: progress.cr2032, xp: progress.xp, statPoints: progress.statPoints });
 hud.renderStats(effectiveStats(progress), wallet());
@@ -132,7 +152,7 @@ function arriveAtTarget() {
 }
 
 function performJump() {
-  if (jump(motor)) hud.setBadge("🦘 점프!");
+  if (jump(motor)) { hud.setBadge("🦘 점프!"); questProgress({ type: "jump" }); }
 }
 
 // ---------- 클릭 / 탭 ----------
@@ -225,13 +245,44 @@ initLibrary({
   }
 });
 
+// ---------- 퀘스트 로그 (Stage 9) ----------
+questLog.initQuestLog({
+  seed: TEST_MODE ? 5 : undefined,
+  getProgress: () => progress,
+  openReader,
+  isReaderOpen,
+  onOpenChange: (open) => {
+    setInputEnabled(!open);
+    inputLocked = open;
+    if (open) { clearMoveTarget(); hud.hideModal(); }
+  },
+  onAnswer: (questId, originalIndex) => {
+    const r = answerWhatif(progress.quests, progress, questId, originalIndex);
+    if (r.completed) {
+      const rw = r.completed.reward;
+      persist();
+      hud.renderStats(effectiveStats(progress), wallet(), [...(rw.cr2032 ? ["cr2032"] : []), ...Object.keys(rw.bonus ?? {})]);
+      syncPlayerHp(battle, effectiveStats(progress).hp);
+      fx.showToast(`📜 ${r.completed.code} 완료 — ${r.completed.title}\n🎁 ${rw.label} · 📖 완독 배지 획득`, 5);
+    }
+    return r;
+  }
+});
+questsReady = true;
+refreshQuests();
+
 // ---------- 전투 이벤트 처리 ----------
 const battleRng = createRng(TEST_MODE ? 11 : Date.now() + 1);
 let inputLocked = false; // 오버레이가 열려 있으면 발사 금지
 
 function performFire(target = null) {
   if (inputLocked) return;
-  const shot = fireAdvPacket(activeBattle(), motor, target);
+  // 퀘스트 보상: DLE(사거리) · ADV 패킷 강화(데미지 계수) — Stage 9
+  const perks = progress.quests.perks;
+  const shot = fireAdvPacket(activeBattle(), motor, target, {
+    rangeMul: perks.dle ? PERKS.dle.rangeMul : 1,
+    ...(perks.advBoost ? { coef: PERKS.advBoost.coef } : {})
+  });
   if (shot) clearMoveTarget();
 }
 
@@ -244,6 +295,7 @@ function handleBattleEvents(events) {
         const m = e.monster;
         if (m.wifi && !m.revealed) m.revealed = true; // 스캔 = 대역 판명
         fx.floatText(m.x, m.y + 0.6, m.z, `${e.amount}${e.crit ? "!" : ""}`, e.crit ? "crit" : "");
+        questProgress({ type: "hit", monsterType: m.type });
         if (e.firstScan && recordScan(progress, m.type)) {
           const def = MONSTERS[m.type];
           fx.showToast(`🔍 도감 등록 — ${def.name} · ${def.role} · ${def.pdu}\n${def.scan}`, 6);
@@ -255,6 +307,7 @@ function handleBattleEvents(events) {
         const m = e.monster;
         battleView.burstAt(m.x, m.y, m.z);
         const { level, leveledUp } = applyKill(progress, m.type, e.xp);
+        questEvent(progress.quests, { type: "kill", monsterType: m.type });
         fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
         changed.push("xp");
         if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
@@ -474,6 +527,7 @@ let job = null;
 
 function onJobDone() {
   const paid = applyJobResult(progress, job.result);
+  questEvent(progress.quests, { type: "job", grade: job.result.grade });
   persist();
   hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
   jobPanel.showResult(job.result, paid, job.history);
@@ -555,6 +609,7 @@ initInput({
   surface: app,
   onJump: performJump,
   onFire: () => performFire(),
+  onQuests: () => questLog.openQuestLog(),
   onMoveKey: clearMoveTarget,
   onTap: handleTap,
   onOrbit: rotateOrbit,
@@ -597,6 +652,9 @@ function simulate(dt) {
   }
 
   const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), effectiveStats(progress).hop);
+  // 걸은 거리 (Q0) — 1 m 단위로 모아서 반영
+  questWalk += moved;
+  if (questWalk >= 1) { const m = Math.floor(questWalk); questWalk -= m; questProgress({ type: "walk", amount: m }); }
   // 클릭 이동 중 양 축이 모두 막히면 목표 도달 불가로 취소
   if (moveTarget && inputLen <= 0.05 && intent.speedScale > 0 && moved < 0.0001) clearMoveTarget();
   if (landed) {
@@ -683,7 +741,14 @@ window.__PK = {
   progress: () => structuredClone(progress),
   stats: () => effectiveStats(progress),
   saveStatus: () => ({ load: loaded.status, lastSaveOk }),
-  library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey },
+  library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, readerUrl, isReaderOpen },
+  quests: {
+    open: (id) => questLog.openQuestLog(id),
+    close: questLog.closeQuestLog,
+    isOpen: questLog.isQuestLogOpen,
+    shownOrder: questLog.shownOrder,
+    state: () => structuredClone(progress.quests)
+  },
   battle: {
     fire: () => performFire(),
     /** 테스트용: 플레이어 HP 직접 설정 (Connection Timeout 재현) */

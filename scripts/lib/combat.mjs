@@ -16,7 +16,7 @@ export const COMBAT_STRATEGIES = [
 ];
 
 /** 한 스텝의 봇 조작: 가장 가까운 적을 보고, 전략에 따라 이동, 쿨다운마다 발사 */
-function botStep(battle, pl, mode, dt, stats) {
+function botStep(battle, pl, mode, dt, stats, fire = {}) {
   const world = battle.world ?? VILLAGE;
   battle.sinceHit = (battle.sinceHit ?? 0) + dt;
   const alive = battle.monsters.filter((m) => m.state !== "dead");
@@ -38,7 +38,7 @@ function botStep(battle, pl, mode, dt, stats) {
     pl.rotY = Math.atan2(dx, dz);
   }
   stepMotor(pl, intent, dt, world, stats.hop);
-  if (near) fireAdvPacket(battle, pl, near);
+  if (near) fireAdvPacket(battle, pl, near, fire); // fire: 퀘스트 보상(DLE 사거리·ADV 강화 계수) — Stage 9
 }
 
 /** 훈련장 60초 사냥 (Stage 6) */
@@ -75,9 +75,10 @@ export function trainingSession(mode, stats, rng, seconds = 60) {
 export const AFH_DELAY = Object.freeze({ button: 1.5, manual: 6 });
 
 /**
- * @param {{ afh?: false|"button"|"manual" }} opts 스캔한 몬스터 대역을 채널맵에서 빼는가, 어떻게 (Stage 8)
+ * @param {{ afh?: false|"button"|"manual", fire?: { rangeMul?: number, coef?: number } }} opts
+ *   afh: 스캔한 몬스터 대역을 채널맵에서 빼는가, 어떻게 (Stage 8) · fire: 퀘스트 보상 (Stage 9)
  */
-export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush" ? false : "button" } = {}) {
+export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush" ? false : "button", fire = {} } = {}) {
   const layout = generateFloor(floor, Math.floor(rng() * 2 ** 31));
   const battle = createFloorBattle(layout);
   syncPlayerHp(battle, stats.hp);
@@ -90,7 +91,7 @@ export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush
     stepLink(link, COMBAT_DT);
     if (t >= afhAt) { applyAfh(link, battle); afhAt = Infinity; }
     for (const e of stepAcs(battle, floor, COMBAT_DT, rng)) if (afh && e.monster.revealed) afhAt = Math.min(afhAt, t + AFH_DELAY[afh]);
-    botStep(battle, pl, mode, COMBAT_DT, stats);
+    botStep(battle, pl, mode, COMBAT_DT, stats, fire);
     for (const e of stepBattle(battle, COMBAT_DT, { player: pl, stats, rng, interference })) {
       if (e.type === "hit") {
         battle.sinceHit = 0;

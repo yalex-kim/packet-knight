@@ -20,6 +20,7 @@ import { applyGear } from "../src/core/gear.js";
 import { RSSI_STRATEGIES, rssiSession } from "./lib/rssi.mjs";
 import { COMBAT_STRATEGIES, trainingSession, dungeonFloor } from "./lib/combat.mjs";
 import { PLAYER_STRATEGIES, buildPools, playHour, targetSpend, statsWithQuiz } from "./lib/economy.mjs";
+import { QUESTS } from "../src/core/quests.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT = path.join(ROOT, "scripts/report/balance-report.json");
@@ -115,6 +116,27 @@ function quizContribution(samples = 300) {
   return out;
 }
 
+// ---------- 퀘스트 완료 시간 (Stage 9) ----------
+/** 퀘스트별 1시간 안 완료율·평균 완료 시각, 퀘스트 하나에 걸린 시간(직전 퀘스트 완료부터, Q0은 시작부터) 평균 */
+function questSummary(runs, bots) {
+  const per = {};
+  const durations = [];
+  for (const q of QUESTS) {
+    const at = runs.map((r) => r.quest.doneAt[q.id]).filter((x) => x !== undefined);
+    per[q.id] = { donePct: pct(at.length / bots), meanMin: at.length ? r1(mean(at) / 60) : null };
+  }
+  for (const r of runs) {
+    let prev = 0;
+    for (const q of QUESTS) {
+      const at = r.quest.doneAt[q.id];
+      if (at === undefined) break;
+      durations.push(at - prev);
+      prev = at;
+    }
+  }
+  return { per, meanQuestMin: durations.length ? r1(mean(durations) / 60) : null, meanDone: r1(mean(runs.map((r) => Object.keys(r.quest.doneAt).length))) };
+}
+
 // ---------- 1시간 경제 (Stage 6.5) ----------
 function simulateEconomy(bots, strategies) {
   const pools = buildPools(createRng(SEED));
@@ -141,7 +163,8 @@ function simulateEconomy(bots, strategies) {
         firstClearMin: r1(mean(firstClear) / 60),
         kosBeforeFirstClear: r1(mean(runs.filter((r) => r.dungeon.firstClearAt !== null).map((r) => r.dungeon.kosBeforeFirstClear))),
         rollbacksPerClear: r1(mean(runs.flatMap((r) => r.dungeon.rollbacksPerClear))),
-        endBalance: r1(mean(runs.map((r) => r.cr)))
+        endBalance: r1(mean(runs.map((r) => r.cr))),
+        quests: questSummary(runs, bots)
       });
     }
   }
@@ -156,8 +179,10 @@ function judge(econ, quiz) {
   const within = (x, lo, hi) => x >= lo && x <= hi;
   return [
     { id: "clearRate", label: "던전 층 클리어율 (중간 전략, 도전 중인 가장 깊은 층 기준 1시간 전체 시도)", target: "40~70%", value: `${bal.dungeonClearPct}%`, pass: within(bal.dungeonClearPct, 40, 70) },
-    { id: "questTime", label: "첫 던전 클리어까지 시간 (퀘스트 완료 시간의 대리 지표, 중간 전략)", target: "10~20분", value: `${bal.firstClearMin}분`, pass: within(bal.firstClearMin, 10, 20),
-      note: "Stage 9 퀘스트 구현 후 실제 퀘스트 완료 시간으로 교체" },
+    { id: "questTime", label: "퀘스트 하나 완료에 걸리는 시간 평균 (중간 전략, 직전 퀘스트 완료부터 · 1시간 안에 끝낸 Q0~Q3)", target: "10~20분",
+      value: `${bal.quests.meanQuestMin}분 (1시간에 ${bal.quests.meanDone}개 · ${QUESTS.map((q) => `${q.id} ${bal.quests.per[q.id].donePct}%${bal.quests.per[q.id].meanMin !== null ? `@${bal.quests.per[q.id].meanMin}분` : ""}`).join(" · ")})`,
+      pass: within(bal.quests.meanQuestMin, 10, 20),
+      note: "Stage 9: 대리 지표(첫 던전 클리어 시간)를 실제 퀘스트 완료 시간(core/quests.js 판정)으로 교체" },
     { id: "surplus", label: "CR2032 수지 ((수급 − 입장료 − 페널티) / 목표 강화 비용 − 1, 중간 전략)", target: `+${ECONOMY.SURPLUS_MIN * 100}~+${ECONOMY.SURPLUS_MAX * 100}%`, value: `${bal.surplusVsTarget >= 0 ? "+" : ""}${bal.surplusVsTarget}%`,
       pass: within(bal.surplusVsTarget, ECONOMY.SURPLUS_MIN * 100, ECONOMY.SURPLUS_MAX * 100) },
     { id: "timeouts", label: "첫 클리어 전 타임아웃(KO) 횟수 평균 (중간 전략)", target: "≤ 3회", value: `${bal.kosBeforeFirstClear}회`, pass: bal.kosBeforeFirstClear <= 3 },

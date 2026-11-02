@@ -3,9 +3,10 @@
 
 import { WORLD } from "./config.js";
 import { groundHeightAt } from "./terrain.js";
+import { chapterUrl } from "./book.js";
 
 const S = WORLD.SURFACE_Y;
-const CHAPTER = (file) => `https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/${file}`;
+const CHAPTER = (file) => chapterUrl(file);
 
 /**
  * @typedef {{ x: number, y: number, z: number }} Vec3

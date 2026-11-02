@@ -63,8 +63,9 @@ const alive = (m) => m.state !== "dead";
  * (사방에서 다가오는 던전 방에서 발사 버튼이 엉뚱한 벽을 쏘지 않도록 — Stage 7)
  * @param {{x:number,z:number,rotY:number}} shooter
  */
-export function autoAimTarget(battle, shooter) {
-  const { range, aimConeDeg } = COMBAT.ADV_PACKET;
+export function autoAimTarget(battle, shooter, rangeMul = 1) {
+  const { aimConeDeg } = COMBAT.ADV_PACKET;
+  const range = COMBAT.ADV_PACKET.range * rangeMul;
   const cone = (aimConeDeg * Math.PI) / 180;
   let inCone = null, inConeD = Infinity, nearest = null, nearestD = Infinity;
   for (const m of battle.monsters) {
@@ -84,22 +85,23 @@ export function autoAimTarget(battle, shooter) {
  * 발사 방향으로 shooter.rotY를 돌린다.
  * @returns {Projectile|null} 쿨다운 중이면 null
  */
-export function fireAdvPacket(battle, shooter, target = null) {
+export function fireAdvPacket(battle, shooter, target = null, { rangeMul = 1, coef = COMBAT.SKILL_COEF.advPacket } = {}) {
   const p = battle.player;
   if (p.fireCooldown > 0 || p.hp <= 0) return null;
-  const aim = target && alive(target) ? target : autoAimTarget(battle, shooter);
+  const aim = target && alive(target) ? target : autoAimTarget(battle, shooter, rangeMul);
   const ang = aim ? Math.atan2(aim.x - shooter.x, aim.z - shooter.z) : shooter.rotY;
   shooter.rotY = ang;
   const dx = Math.sin(ang), dz = Math.cos(ang);
-  const proj = { id: nextId++, x: shooter.x + dx * 0.5, y: shooter.y + 0.55, z: shooter.z + dz * 0.5, dx, dz, traveled: 0 };
+  // 사거리·데미지 계수는 발사 순간 정해진다 (퀘스트 보상 DLE·ADV 패킷 강화 — Stage 9)
+  const proj = { id: nextId++, x: shooter.x + dx * 0.5, y: shooter.y + 0.55, z: shooter.z + dz * 0.5, dx, dz, traveled: 0, range: COMBAT.ADV_PACKET.range * rangeMul, coef };
   battle.projectiles.push(proj);
   p.fireCooldown = COMBAT.ADV_PACKET.cooldown;
   return proj;
 }
 
-function damageMonster(battle, m, ctx, events) {
+function damageMonster(battle, m, ctx, events, coef = COMBAT.SKILL_COEF.advPacket) {
   const def = MONSTERS[m.type];
-  const { amount, crit } = computeDamage(ctx.stats.tx, COMBAT.SKILL_COEF.advPacket, def.sec, ctx.rng);
+  const { amount, crit } = computeDamage(ctx.stats.tx, coef, def.sec, ctx.rng);
   m.hp -= amount;
   m.hitFlash = 0.12;
   const firstScan = !battle.scanned.has(m.type);
@@ -137,12 +139,12 @@ function stepProjectiles(battle, dt, ctx, events) {
         if (alive(m) && dist2D(pr, m) < hitRadius && Math.abs(pr.y - (m.y + 0.4)) < 1.0) {
           // 간섭 채널 위에서 보낸 패킷은 깨진다 (Stage 8 — ctx.interference가 있을 때만)
           if (ctx.interference?.packetLost(battle)) events.push({ type: "packetLost", monster: m });
-          else damageMonster(battle, m, ctx, events);
+          else damageMonster(battle, m, ctx, events, pr.coef);
           return false;
         }
       }
       if (battle.world.isBlocked(pr.x, pr.z, pr.y - 0.3)) { events.push({ type: "wall", x: pr.x, y: pr.y, z: pr.z }); return false; }
-      if (pr.traveled >= range) return false;
+      if (pr.traveled >= (pr.range ?? range)) return false;
     }
     return true;
   });

@@ -3,10 +3,11 @@
 
 import { RSSI_JOB } from "../core/balance.js";
 import { averageRssi, distanceFromRssi } from "../core/rssiJob.js";
+import { chapterUrl } from "../core/book.js";
 
 const overlay = document.getElementById("job");
 const panel = document.getElementById("job-panel");
-const LOCATION_URL = "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/location.html";
+const LOCATION_URL = chapterUrl("location.html");
 const Y_TOP = -40, Y_BOTTOM = -110; // 캔버스 dBm 범위
 const WINDOW = 5;                    // 캔버스 가로 = 5초
 

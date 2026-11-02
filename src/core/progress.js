@@ -6,11 +6,12 @@ import {
   GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS
 } from "./balance.js";
 import { applyGear, emptyGear, tryUpgrade } from "./gear.js";
+import { createQuestState, QUESTS } from "./quests.js";
 import { levelFromXp } from "./combat.js";
 import { fullCharges, useCharge, chargesAt } from "./jobCharges.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 6; // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7) · v6: 장비·스탯 분배 (Stage 7.5)
+export const SAVE_VERSION = 7; // v7: 퀘스트·배지·칭호 (Stage 9) · // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7) · v6: 장비·스탯 분배 (Stage 7.5)
 
 /**
  * @typedef {{
@@ -24,6 +25,7 @@ export const SAVE_VERSION = 6; // v2: CR2032·알바 기록 (Stage 5) · v3: XP�
  *   dungeon: { maxFloor: number, attempts: number, clears: number, kos: number, stars: Record<string, number> },
  *   gear: Record<string, number>, alloc: Record<string, number>,
  *   lab: { tries: number, success: number, spent: number },
+ *   quests: ReturnType<typeof createQuestState>,
  *   bestiary: Record<string, { kills: number, firstScan: string }>,
  *   metrics: { quizAttempts: Record<string, number>, quizPerfect: Record<string, number>, chapterOpens: Record<string, number> }
  * }} Progress
@@ -46,6 +48,7 @@ export function createProgress() {
     gear: emptyGear(),
     alloc: emptyAlloc(),
     lab: { tries: 0, success: 0, spent: 0 },
+    quests: createQuestState(),
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
   };
 }
@@ -60,6 +63,7 @@ function migrate(raw) {
   if (raw && raw.v === 3) raw = { ...raw, v: 4, job: { ...raw.job, charges: fullCharges(0) } };
   if (raw && raw.v === 4) raw = { ...raw, v: 5, dungeon: emptyDungeon() };
   if (raw && raw.v === 5) raw = { ...raw, v: 6, gear: emptyGear(), alloc: emptyAlloc(), lab: { tries: 0, success: 0, spent: 0 } };
+  if (raw && raw.v === 6) raw = { ...raw, v: 7, quests: createQuestState() };
   return raw;
 }
 
@@ -82,6 +86,8 @@ function validate(raw) {
   const intMap = (o, keys) => o && keys.every((k) => Number.isInteger(o[k] ?? 0) && (o[k] ?? 0) >= 0);
   if (!intMap(raw.gear, Object.keys(GEAR)) || Object.keys(GEAR).some((k) => (raw.gear[k] ?? 0) > UPGRADE.MAX_LEVEL)) return null;
   if (!intMap(raw.alloc, Object.keys(STAT_POINT_GAIN)) || !intMap(raw.lab, ["tries", "success", "spent"])) return null;
+  const q = raw.quests;
+  if (!q || typeof q !== "object" || (q.active !== null && !QUESTS.some((x) => x.id === q.active)) || typeof q.done !== "object" || typeof q.progress !== "object") return null;
   return {
     ...base,
     bonus: { ...base.bonus, ...raw.bonus },
@@ -98,6 +104,7 @@ function validate(raw) {
     gear: { ...emptyGear(), ...raw.gear },
     alloc: { ...emptyAlloc(), ...raw.alloc },
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
+    quests: { active: q.active, progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) } },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };

@@ -2,10 +2,11 @@
 // 성공률은 "링크 마진(SNR)" 막대로 보여 준다: 마진이 넉넉할수록 강화가 잘 붙는다. 실패해도 장비는 사라지지 않는다.
 
 import { GEAR, UPGRADE, upgradeCost, upgradeSuccess, STAT_META, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS } from "../core/balance.js";
+import { chapterUrl } from "../core/book.js";
 
 const overlay = document.getElementById("rflab");
 const panel = document.getElementById("rflab-panel");
-const CHAPTER_URL = (file) => `https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/${file}`;
+const CHAPTER_URL = (file) => chapterUrl(file);
 
 /** @type {{ getProgress: () => any, getStats: () => Record<string, number>, onUpgrade: (piece: string) => any, onAllocate: (stat: string) => boolean, onClose: () => void }} */
 let hooks;

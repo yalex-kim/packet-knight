@@ -40,6 +40,10 @@ export function initInput(h) {
       h.onJump();
       return;
     }
+    if (e.code === "KeyQ") {
+      if (!e.repeat) h.onQuests?.();
+      return;
+    }
     if (e.code === "KeyF" || e.code === "KeyJ") {
       e.preventDefault();
       if (!e.repeat) h.onFire();

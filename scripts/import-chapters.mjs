@@ -66,7 +66,22 @@ function parseChapter(id) {
   if (questions.length !== declared) throw new Error(`${file}: 퀴즈 ${declared}개 중 ${questions.length}개만 파싱됨`);
   if (questions.length < 3) throw new Error(`${file}: 문항이 3개 미만`);
 
-  return { id, file, title, lead, keypoints, questions };
+  // "예측해 보기" (본문 중간의 생각해 볼 질문) — 퀘스트 마지막 단계에 쓴다 (Stage 9)
+  const whatifs = [];
+  const wre = /<div class="whatif quiz-q">[\s\S]*?<p class="wi-q">([\s\S]*?)<\/p>\s*(?:<p class="wi-hint">([\s\S]*?)<\/p>)?\s*<div class="opts">([\s\S]*?)<\/div>\s*<div class="quiz-exp">([\s\S]*?)<\/div>/g;
+  for (const m of html.matchAll(wre)) {
+    const opts = [...m[3].matchAll(/<button class="opt"(\s+data-correct)?\s*>([\s\S]*?)<\/button>/g)];
+    const answers = opts.map((o, i) => (o[1] ? i : -1)).filter((i) => i >= 0);
+    if (answers.length !== 1) throw new Error(`${file}: 예측해 보기 정답이 ${answers.length}개 — "${toText(m[1])}"`);
+    // 문항이 들어 있는 절(section id) — 원문 리더에서 그 위치로 바로 연다
+    const before = html.slice(0, m.index);
+    const sec = [...before.matchAll(/<section[^>]*\bid="([^"]+)"/g)].pop()?.[1] ?? null;
+    whatifs.push({ q: toText(m[1]), hint: toText(m[2] ?? ""), options: opts.map((o) => toText(o[2])), answer: answers[0], explain: toText(m[4]), section: sec });
+  }
+  const declaredW = (html.match(/class="whatif quiz-q"/g) ?? []).length;
+  if (whatifs.length !== declaredW) throw new Error(`${file}: 예측해 보기 ${declaredW}개 중 ${whatifs.length}개만 파싱됨`);
+
+  return { id, file, title, lead, keypoints, questions, whatifs };
 }
 
 const chapters = CHAPTER_IDS.map(parseChapter);
@@ -76,17 +91,18 @@ try { commit = execFileSync("git", ["-C", BOOK, "rev-parse", "--short", "HEAD"],
 const out = `// ⚠️ 자동 생성 파일 — 직접 고치지 말고 scripts/import-chapters.mjs 를 다시 실행하세요.
 // 출처: connectivityBook / BluetoothBook (https://github.com/yalex-kim/connectivityBook) @ ${commit}
 // 라이선스: CC BY 4.0 / MIT 듀얼 (교과서 콘텐츠). 기준 사양: Bluetooth Core 6.3
-// 챕터 ${chapters.length}개 · 문항 ${chapters.reduce((n, c) => n + c.questions.length, 0)}개
+// 챕터 ${chapters.length}개 · 문항 ${chapters.reduce((n, c) => n + c.questions.length, 0)}개 · 예측해 보기 ${chapters.reduce((n, c) => n + c.whatifs.length, 0)}개
 
 export const CHAPTER_SOURCE = ${JSON.stringify({ repo: "https://github.com/yalex-kim/connectivityBook", commit, license: "CC BY 4.0 / MIT" })};
 
 /**
  * @typedef {{ q: string, options: string[], answer: number, explain: string }} QuizQuestion
- * @typedef {{ id: string, file: string, title: string, lead: string, keypoints: string[], questions: QuizQuestion[] }} Chapter
+ * @typedef {{ q: string, hint: string, options: string[], answer: number, explain: string, section: string|null }} Whatif
+ * @typedef {{ id: string, file: string, title: string, lead: string, keypoints: string[], questions: QuizQuestion[], whatifs: Whatif[] }} Chapter
  * @type {Chapter[]}
  */
 export const CHAPTERS = ${JSON.stringify(chapters, null, 2)};
 `;
 writeFileSync(OUT, out);
 console.log(`✅ ${path.relative(ROOT, OUT)} — 챕터 ${chapters.length}개, 문항 ${chapters.reduce((n, c) => n + c.questions.length, 0)}개 (connectivityBook@${commit})`);
-for (const c of chapters) console.log(`   ${c.id.padEnd(12)} ${String(c.questions.length).padStart(2)}문항  ${c.title}`);
+for (const c of chapters) console.log(`   ${c.id.padEnd(12)} ${String(c.questions.length).padStart(2)}문항 · 예측 ${c.whatifs.length}  ${c.title}`);

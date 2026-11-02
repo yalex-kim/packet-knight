@@ -286,6 +286,66 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
     LIBRARY_COURSES.some((c) => c.chapter === "hopping" && c.reward === "afh") && !no && P.hasAfhSkill(p) && r.reward?.stat === "afh" && Object.values(p.bonus).every((v) => v === 0));
 }
 
+// ---------- Stage 9: 퀘스트 ↔ 교과서 (Node) ----------
+const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).href);
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const P = await imp("progress.js");
+  const { CHAPTERS } = await imp("chapters.data.js");
+  const { chapterUrl } = await imp("book.js");
+  const B = await imp("battle.js");
+  const { COMBAT } = await imp("balance.js");
+
+  const wbad = Q9.QUESTS.filter((q) => { const w = Q9.whatifFor(q); return !w || !w.section || w.options.length < 2 || !(w.answer in w.options) || !w.explain; });
+  const total = CHAPTERS.reduce((n, c) => n + c.whatifs.length, 0);
+  check("퀘스트 Q0~Q3의 '예측해 보기'가 교과서에서 정답·해설·절 위치와 함께 임포트됐다", wbad.length === 0 && total >= 4, `예측해 보기 ${total}개`);
+  check("교과서 링크가 새 주소(connbook.yalex-k.com)를 쓰고 절 앵커를 붙인다",
+    chapterUrl("phy.html", "coded") === "https://connbook.yalex-k.com/bluetooth/chapters/phy.html#coded" && chapterUrl("intro.html") === "https://connbook.yalex-k.com/bluetooth/chapters/intro.html");
+
+  // Q0 → Q3를 순서대로 깬다
+  const p = P.createProgress();
+  const qs = p.quests;
+  const early = Q9.questEvent(qs, { type: "kill", monsterType: "trainingBot" }); // Q3 사건은 Q0 진행 중에는 세지 않는다
+  Q9.questEvent(qs, { type: "walk", amount: 10 }); Q9.questEvent(qs, { type: "jump" }); Q9.questEvent(qs, { type: "hit", monsterType: "trainingBot" });
+  const lockedWhatif = Q9.answerWhatif(qs, p, "Q0", Q9.whatifFor(Q9.QUESTS[0]).answer).completed === null; // 강좌 전에는 예측 불가
+  p.cleared.intro = "t";
+  const wrong = Q9.answerWhatif(qs, p, "Q0", (Q9.whatifFor(Q9.QUESTS[0]).answer + 1) % 2);
+  const q0 = Q9.answerWhatif(qs, p, "Q0", Q9.whatifFor(Q9.QUESTS[0]).answer);
+  check("Q0: 단계를 다 해야 예측해 보기가 열리고, 틀리면 완료되지 않으며, 맞히면 칭호·CR2032 보상 후 Q1이 열린다",
+    !early && lockedWhatif && !wrong.correct && q0.completed?.id === "Q0" && qs.title === "패킷 나이트" && p.cr2032 === 5 && qs.active === "Q1");
+
+  const tx0 = P.effectiveStats(p).tx;
+  Q9.questEvent(qs, { type: "job", grade: "C" });
+  const cOnly = !Q9.stepDone(qs, p, Q9.QUESTS[1], Q9.QUESTS[1].steps[0]);
+  Q9.questEvent(qs, { type: "job", grade: "S" });
+  p.cleared.radio = "t"; p.gear.antenna = 1;
+  Q9.answerWhatif(qs, p, "Q1", Q9.whatifFor(Q9.QUESTS[1]).answer);
+  p.cleared.phy = "t"; p.dungeon.maxFloor = 1;
+  Q9.answerWhatif(qs, p, "Q2", Q9.whatifFor(Q9.QUESTS[2]).answer);
+  p.cleared.advertising = "t";
+  for (let i = 0; i < 5; i++) Q9.questEvent(qs, { type: "kill", monsterType: "trainingBot" });
+  Q9.questEvent(qs, { type: "job", grade: "A" });
+  Q9.answerWhatif(qs, p, "Q3", Q9.whatifFor(Q9.QUESTS[3]).answer);
+  check("Q1~Q3: 알바 등급 조건(C는 불인정)·이미 해 둔 상태 단계 인정, 보상 TX+1·DLE·ADV 강화, 배지 4개",
+    cOnly && p.bonus.tx === 1 && P.effectiveStats(p).tx > tx0 && qs.perks.dle && qs.perks.advBoost && qs.active === null && Q9.badges(qs).join() === "intro,radio,phy,advertising",
+    `배지 ${Q9.badges(qs).join(",")}`);
+
+  // 보상 효과: DLE 사거리 ×1.5 · 데미지 계수 1.15
+  const bt = B.createBattle([]);
+  B.syncPlayerHp(bt, 100);
+  const shooter = { x: 0, y: 0, z: 0, rotY: 0 };
+  const s1 = B.fireAdvPacket(bt, shooter, null, { rangeMul: Q9.PERKS.dle.rangeMul, coef: Q9.PERKS.advBoost.coef });
+  const pr = bt.projectiles.at(-1);
+  check("퀘스트 보상이 전투에 적용된다 (DLE 사거리 ×1.5, 데미지 계수 1.15)",
+    Boolean(s1) && pr.range === COMBAT.ADV_PACKET.range * 1.5 && pr.coef === 1.15, `사거리 ${pr?.range} m`);
+
+  const v6 = P.createProgress(); delete v6.quests; v6.v = 6; v6.cr2032 = 13; v6.dungeon.maxFloor = 3;
+  const mem = new Map([[P.SAVE_KEY, JSON.stringify(v6)]]);
+  const l = P.loadProgress({ getItem: (k) => mem.get(k) ?? null });
+  check("Stage 8 세이브(v6)가 손실 없이 v7로 마이그레이션된다 (퀘스트는 Q0부터)",
+    l.status === "loaded" && l.progress.v === 7 && l.progress.cr2032 === 13 && l.progress.dungeon.maxFloor === 3 && l.progress.quests.active === "Q0");
+}
+
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
@@ -1001,8 +1061,90 @@ await reset();
   const allDisabled = await page.locator("#rflab-panel .lab-up").evaluateAll((bs) => bs.every((b) => b.disabled));
   const re = await page.evaluate(() => window.__PK.progress());
   check("CR2032가 없으면 강화 버튼이 막히고, 장비·분배는 새로고침 후에도 유지된다",
-    allDisabled && re.v === 6 && re.alloc.hop === 2 && re.gear.antenna === p1.gear.antenna);
+    allDisabled && re.v === 7 && re.alloc.hop === 2 && re.gear.antenna === p1.gear.antenna);
   await page.keyboard.press("Escape");
+}
+
+// ---------- Stage 9: 퀘스트 트래커 · 로그 · 예측해 보기 · 배지 ----------
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const qState = () => page.evaluate(() => window.__PK.quests.state());
+  const tracker = () => page.locator("#quest-tracker").textContent();
+  const t0 = await tracker();
+  check("새 게임은 Q0 퀘스트 트래커가 보인다", t0.includes("Q0") && t0.includes("○"), t0.slice(0, 40));
+
+  await reset();
+  await hold("KeyS", 1000); await reset(); await hold("KeyS", 1000);
+  await page.keyboard.press("Space"); await tick(1200);
+  await teleport(-9.0, 5.6); await tick(100);
+  await page.keyboard.press("KeyF"); await tick(1200);
+  const qs1 = await qState();
+  check("걷기·점프·훈련용 봇 명중이 Q0 단계로 기록된다", qs1.progress.Q0?.walk === 10 && qs1.progress.Q0?.jump === 1 && qs1.progress.Q0?.hit === 1,
+    JSON.stringify(qs1.progress.Q0));
+
+  await page.keyboard.press("KeyQ");
+  const lockedText = await page.locator("#quests-panel .q-whatif").textContent();
+  check("Q 키로 퀘스트 로그가 열리고, 강좌 전에는 예측해 보기가 잠겨 있다",
+    await page.evaluate(() => window.__PK.quests.isOpen()) && lockedText.includes("모두 마치면"));
+  await page.locator("#quests-panel .q-read").click();
+  const url = await page.evaluate(() => window.__PK.library.readerUrl());
+  const w0 = Q9.whatifFor(Q9.QUESTS[0]);
+  check("'원문 읽기'가 게임 안 리더로 교과서 새 주소의 그 절을 연다", url === `https://connbook.yalex-k.com/bluetooth/chapters/intro.html#${w0.section}`, url);
+  await page.keyboard.press("Escape");
+  const stillOpen = await page.evaluate(() => window.__PK.quests.isOpen() && !window.__PK.library.isReaderOpen());
+  check("Esc는 리더만 먼저 닫고 퀘스트 로그는 남는다", stillOpen);
+  await page.keyboard.press("Escape");
+
+  await page.evaluate(() => window.__PK.library.open());
+  await lib(".course").first().click();
+  await lib(".lib-btn.primary").click();
+  await answerQuiz();
+  await page.keyboard.press("Escape");
+  await tick(50);
+  const ready = await page.locator("#quest-tracker.ready").count();
+  const toastReady = await page.locator("#toast").textContent();
+  check("단계를 모두 마치면 트래커가 🔮 예측해 보기를 알린다", ready === 1 && toastReady.includes("예측해 보기"), toastReady);
+
+  await page.click("#quest-tracker");
+  const order = await page.evaluate(() => window.__PK.quests.shownOrder());
+  const opts = page.locator("#quests-panel .q-whatif .opt");
+  const shown = await opts.count();
+  const wrongOrig = order.find((o) => o !== w0.answer);
+  await page.locator(`#quests-panel .q-whatif .opt[data-orig="${wrongOrig}"]`).click();
+  const afterWrong = await qState();
+  const fb = await page.locator("#quests-panel .q-feedback").textContent();
+  check("예측해 보기: 보기가 섞여 나오고, 틀리면 완료되지 않고 힌트·원문을 권한다",
+    shown === w0.options.length && afterWrong.active === "Q0" && !afterWrong.done.Q0 && fb.includes("원문"), `보기 순서 ${order.join(",")}`);
+
+  const cr0 = (await page.evaluate(() => window.__PK.progress())).cr2032;
+  await page.locator(`#quests-panel .q-whatif .opt[data-orig="${w0.answer}"]`).click();
+  const done = await qState();
+  const cr1 = (await page.evaluate(() => window.__PK.progress())).cr2032;
+  const badgeOn = await page.locator('#quests-panel .q-badge.on[data-chapter="intro"]').count();
+  const toastDone = await page.locator("#toast").textContent();
+  check("정답이면 Q0 완료: 칭호·CR2032 +5·📖 완독 배지, 다음 퀘스트 Q1이 열린다",
+    Boolean(done.done.Q0) && done.title === "패킷 나이트" && cr1 === cr0 + 5 && badgeOn === 1 && done.active === "Q1" && toastDone.includes("Q0 완료"), toastDone);
+  await page.keyboard.press("Escape");
+  const closed = !(await page.evaluate(() => window.__PK.quests.isOpen()));
+
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const re = await qState();
+  const t1 = await tracker();
+  check("퀘스트 진행·칭호가 저장되고 새로고침 후 유지된다 (트래커는 Q1)", closed && Boolean(re.done.Q0) && re.active === "Q1" && t1.includes("Q1") && t1.includes("패킷 나이트"), t1.slice(0, 50));
+
+  // 모바일 폭: 트래커·퀘스트 버튼이 조이스틱·점프/발사 버튼과 겹치지 않는다
+  await page.setViewportSize({ width: 390, height: 780 });
+  await tick(50);
+  const boxes = await page.evaluate(() => Object.fromEntries(["quest-tracker", "btn-quests", "joystick-zone", "btn-jump", "btn-fire", "btn-reset", "hp", "stats"]
+    .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
+  const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const overlaps = [];
+  for (const a of ["quest-tracker", "btn-quests"]) for (const b of ["joystick-zone", "btn-jump", "btn-fire", "btn-reset", "hp", "stats"]) if (hit(boxes[a], boxes[b])) overlaps.push(`${a}×${b}`);
+  check("모바일 폭(390px)에서 퀘스트 트래커·버튼이 다른 조작 UI와 겹치지 않는다", overlaps.length === 0 && boxes["quest-tracker"].right <= 390, overlaps.join(", ") || "겹침 없음");
+  await page.setViewportSize({ width: 1000, height: 700 });
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));

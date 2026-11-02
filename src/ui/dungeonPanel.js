@@ -3,11 +3,12 @@
 import { DUNGEON } from "../core/balance.js";
 import { DATA_CHANNELS, MIN_USED_CHANNELS, usedChannels, dataChannelFreq } from "../core/hopping.js";
 import { LINK, wifiCountFor, interferenceSummary } from "../core/dungeon.js";
+import { chapterUrl } from "../core/book.js";
 
 const overlay = document.getElementById("dungeon");
 const panel = document.getElementById("dungeon-panel");
 const hudBar = document.getElementById("dungeon-hud");
-const HOPPING_URL = "https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/hopping.html";
+const HOPPING_URL = chapterUrl("hopping.html");
 
 /**
  * @type {{

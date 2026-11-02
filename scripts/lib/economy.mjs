@@ -16,6 +16,7 @@ import { STAT_POINTS_PER_LEVEL, STAT_CAPS, STAT_POINT_GAIN } from "../../src/cor
 import { rssiSession } from "./rssi.mjs";
 import { fullCharges, useCharge } from "../../src/core/jobCharges.js";
 import { trainingSession, dungeonFloor } from "./combat.mjs";
+import { createQuestState, questById, questEvent, answerWhatif, readyForWhatif, whatifFor, PERKS, QUESTS } from "../../src/core/quests.js";
 
 /** 각 활동의 실제 소요 시간(초) — 화면 이동·메뉴·읽기 포함 */
 export const TIME = Object.freeze({
@@ -24,8 +25,13 @@ export const TIME = Object.freeze({
   DUNGEON_OVERHEAD: 40,    // 입장·이동·정산
   ROLLBACK: 8,             // Connection Timeout 연출(감독 타임아웃) + 체크포인트 재연결
   LINK_PUZZLE: 60,         // 전투 클리어 뒤 링크 정비 콘솔(관찰 + 채널맵 수정 + 테스트) — Stage 7
-  UPGRADE: 10              // 강화 1회 시도
+  UPGRADE: 10,             // 강화 1회 시도
+  TUTORIAL: 60,            // Q0 튜토리얼: 걷기·점프·훈련용 봇 한 대 맞히기 (Stage 9)
+  WHATIF: 60,              // 🔮 예측해 보기: 질문·힌트 읽고 답하기
+  WHATIF_REREAD: 90        // 틀렸을 때 원문 그 절을 다시 읽고 재도전
 });
+/** 예측해 보기 첫 시도 오답 확률 (보기 2~3개, 강좌는 이미 들은 상태) */
+export const WHATIF_MISS = 0.3;
 
 /**
  * 플레이어 전략 (PRD §8.1 공격적/방어적/수집형). 루프(15분)마다 시간 배분.
@@ -54,12 +60,13 @@ export function buildPools(rng, size = 300) {
 }
 
 /** 스탯 조합별 던전 결과 풀 (지연 생성·캐시) */
-function dungeonOutcome(pools, mode, stats, floor, afh) {
+function dungeonOutcome(pools, mode, stats, floor, afh, perks = {}) {
   // 키에 결과를 바꾸는 스탯만: 광역 공격이라 RX(회피)는 무관, HOP는 봇이 투자하지 않아 늘 기본값 (Stage 8: 키가 많아 1분 초과)
-  const key = `${mode}|${floor}|${afh}|${stats.hp}|${stats.tx}|${stats.sec}|${stats.hop}`;
+  const key = `${mode}|${floor}|${afh}|${stats.hp}|${stats.tx}|${stats.sec}|${stats.hop}|${perks.dle ? 1 : 0}${perks.advBoost ? 1 : 0}`;
   let p = pools.dungeon.get(key);
   if (!p) {
-    p = pool(32, () => dungeonFloor(mode, stats, pools.rng, floor, { afh })); // 조합당 32판 — 1000명이 표본을 공유하므로 충분 (1분 제한)
+    const fire = { rangeMul: perks.dle ? PERKS.dle.rangeMul : 1, ...(perks.advBoost ? { coef: PERKS.advBoost.coef } : {}) };
+    p = pool(24, () => dungeonFloor(mode, stats, pools.rng, floor, { afh, fire })); // 조합당 24판 — 1000명이 표본을 공유하므로 충분 (1분 제한; Stage 9에서 퀘스트 보상으로 조합이 늘어 32→24)
     pools.dungeon.set(key, p);
   }
   return pick(p, pools.rng);
@@ -75,6 +82,7 @@ export function statsWithQuiz(base, coursesDone) {
 /** 게임과 같은 effectiveStats로 계산 (퀴즈 보너스 + 스탯 분배 + 장비) */
 function botStats(st) {
   const bonus = { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 };
+  for (const [k, v] of Object.entries(st.quest.p.bonus)) bonus[k] += v; // 퀘스트 보상 (Q1 TX+1)
   for (const c of LIBRARY_COURSES.slice(0, st.courses)) if (QUIZ_BONUS[c.reward]) bonus[c.reward] += QUIZ_BONUS[c.reward];
   return effectiveStats({ bonus, alloc: st.alloc, gear: st.gear });
 }
@@ -94,8 +102,11 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     cr: 0, gear: emptyGear(), courses: 0, xp: 0, level: 1, alloc: { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, allocTurn: 0,
     income: { job: 0, training: 0, dungeon: 0 }, spend: { fee: 0, upgrade: 0, penalty: 0 },
     upgrades: { tries: 0, success: 0 }, dungeon: { floor: 1, attempts: 0, clears: 0, kos: 0, kosBeforeFirstClear: 0, firstClearAt: null, clearTimes: [], rollbacks: 0, rollbacksPerClear: [] , floorRollbacks: 0 },
-    timeline: []
+    timeline: [],
+    // 퀘스트 (Stage 9): 게임과 같은 core/quests.js로 판정 — p는 퀘스트 판정에 필요한 진행도 그림자
+    quest: { qs: createQuestState(), p: { cleared: {}, gear: null, dungeon: { maxFloor: 0 }, cr2032: 0, bonus: {} }, doneAt: {} }
   };
+  st.quest.p.gear = st.gear;
   const loopLen = ECONOMY.HOUR / ECONOMY.LOOPS;
   let charges = fullCharges(0);
   let lastFailPower = null;
@@ -106,11 +117,25 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     charges = next;
     const r = pick(pools.rssi[strategy.rssiN], rng);
     st.cr += r.reward; st.income.job += r.reward;
+    questEvent(st.quest.qs, { type: "job", grade: r.grade });
     return true;
   }
   function doTraining() {
     const r = pick(pools.training, rng);
     st.cr += r.cr2032; st.income.training += r.cr2032; st.xp += r.xp;
+    if (r.kills) questEvent(st.quest.qs, { type: "kill", monsterType: "trainingBot", amount: r.kills });
+  }
+  /** 진행 중 퀘스트의 단계가 다 끝났으면 🔮 예측해 보기에 답한다 → 걸린 시간(초) */
+  function tryQuest(now) {
+    const { qs, p } = st.quest;
+    let spent = 0;
+    for (let q = questById(qs.active); q && readyForWhatif(qs, p, q); q = questById(qs.active)) {
+      spent += TIME.WHATIF + (rng() < WHATIF_MISS ? TIME.WHATIF_REREAD : 0);
+      answerWhatif(qs, p, q.id, whatifFor(q).answer);
+      st.cr += p.cr2032; p.cr2032 = 0; // 보상 CR2032 (Q0)
+      st.quest.doneAt[q.id] = now + spent;
+    }
+    return spent;
   }
 
   /** XP가 쌓이면 레벨업 → 스탯 포인트를 전략 순서대로 분배 */
@@ -142,23 +167,28 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     }
   }
 
+  // Q0 튜토리얼 (모든 봇): 걷기 10 m · 점프 · 훈련용 봇 명중
+  for (const ev of [{ type: "walk", amount: 10 }, { type: "jump" }, { type: "hit", monsterType: "trainingBot" }]) questEvent(st.quest.qs, ev);
   for (let loop = 0; loop < ECONOMY.LOOPS; loop++) {
-    let t = 0;
-    // ① 교육: 루프마다 강좌 1개 (4루프 = 4강좌). quiz=false면 그 시간에 알바
-    if (quiz && st.courses < LIBRARY_COURSES.length) { st.courses++; t += TIME.COURSE; }
+    let t = loop === 0 ? TIME.TUTORIAL : 0;
+    const quest = () => { t += tryQuest(loop * loopLen + t); };
+    // ① 교육: 루프마다 강좌 1개 (4루프 = 4강좌). quiz=false면 그 시간에 알바 (교과서를 안 읽으면 퀘스트도 Q0에서 멈춘다)
+    if (quiz && st.courses < LIBRARY_COURSES.length) { st.quest.p.cleared[LIBRARY_COURSES[st.courses].chapter] = true; st.courses++; t += TIME.COURSE; quest(); }
     const extraJobs = !quiz ? Math.floor(TIME.COURSE / TIME.JOB_SESSION) : 0;
     // ② 알바 (측정기 배터리가 남아 있는 만큼)
     for (let j = 0; j < strategy.jobs + extraJobs; j++) {
       if (!doJob(loop * loopLen + t)) break;
       t += TIME.JOB_SESSION;
+      quest();
     }
     // 훈련장
     for (let m = 0; m < strategy.trainMin; m++) { doTraining(); t += 60; }
     // ④ 강화 (던전 전에 한 번)
     shop();
+    quest();
     // ③ 남은 시간: 던전 ↔ (실패해서 장비를 올려야 하면) 알바·훈련
     while (t < loopLen) {
-      const power = Object.values(st.gear).reduce((a, b) => a + b, 0) * 10 + st.courses;
+      const power = Object.values(st.gear).reduce((a, b) => a + b, 0) * 10 + st.courses + 100 * Object.keys(st.quest.qs.done).length; // 퀘스트 보상도 전투력
       const canDungeon = st.cr >= DUNGEON.ENTRY_FEE && (strategy.retryAfterFail || power !== lastFailPower);
       if (canDungeon) {
         const stats = botStats(st);
@@ -168,7 +198,7 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
         for (let retry = 0; ; retry++) {
           // AFH: 돌격형은 안 쓰고, 나머지는 호핑 강좌를 이수했으면 버튼, 아니면 HUD에서 손으로
           const afh = strategy.dungeonMode === "rush" ? false : LIBRARY_COURSES.slice(0, st.courses).some((c) => c.reward === "afh") ? "button" : "manual";
-          const r = dungeonOutcome(pools, strategy.dungeonMode, stats, st.dungeon.floor, afh); // 아직 못 깬 가장 깊은 층
+          const r = dungeonOutcome(pools, strategy.dungeonMode, stats, st.dungeon.floor, afh, st.quest.qs.perks); // 아직 못 깬 가장 깊은 층
           t += r.time + (retry === 0 ? TIME.DUNGEON_OVERHEAD : TIME.ROLLBACK);
           st.cr += r.cr2032; st.income.dungeon += r.cr2032; st.xp += r.xp;
           if (r.cleared) {
@@ -177,6 +207,7 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
             st.dungeon.rollbacksPerClear.push(st.dungeon.floorRollbacks);
             st.dungeon.floorRollbacks = 0;
             st.dungeon.floor++;
+            st.quest.p.dungeon.maxFloor = st.dungeon.floor - 1;
             t += TIME.LINK_PUZZLE;
             lastFailPower = null;
             if (st.dungeon.firstClearAt === null) st.dungeon.firstClearAt = loop * loopLen + t;
@@ -198,6 +229,7 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
         doTraining(); t += 60;
       }
       shop();
+      quest();
     }
     st.timeline.push({ loop: loop + 1, cr: st.cr, gear: { ...st.gear }, clears: st.dungeon.clears });
   }

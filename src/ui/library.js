@@ -4,8 +4,9 @@
 import { LIBRARY_COURSES, QUIZ_BONUS, STAT_META, QUIZ, SKILL_REWARDS } from "../core/balance.js";
 import { CHAPTERS, CHAPTER_SOURCE } from "../core/chapters.data.js";
 import { chapterById, drawQuiz, gradeQuiz, createRng } from "../core/quiz.js";
+import { chapterUrl } from "../core/book.js";
 
-const CHAPTER_URL = (file) => `https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/${file}`;
+const CHAPTER_URL = (file, section) => chapterUrl(file, section);
 
 const overlay = document.getElementById("library");
 const panel = document.getElementById("library-panel");
@@ -218,9 +219,10 @@ function finishQuiz() {
 }
 
 // ---------- 원문 리더 ----------
-function openReader(chapter) {
+/** 교과서 원문을 게임 안 리더로 연다 — section이 있으면 그 절로 바로 (퀘스트 "원문 읽기"도 이것을 쓴다) */
+export function openReader(chapter, section = null) {
   hooks.onChapterOpen(chapter.id);
-  const url = CHAPTER_URL(chapter.file);
+  const url = CHAPTER_URL(chapter.file, section);
   readerTitle.textContent = `📖 ${chapter.title}`;
   readerNewTab.href = url;
   readerFrame.src = url;
@@ -247,6 +249,8 @@ export function closeLibrary() {
   lastFocus?.focus?.({ preventScroll: true });
 }
 export const isLibraryOpen = () => !overlay.hidden;
+export const isReaderOpen = () => !reader.hidden;
+export const readerUrl = () => readerFrame.getAttribute("src");
 
 /** 테스트 훅: 진행 중 퀴즈의 정답 인덱스 */
 export const currentAnswerKey = () => session?.questions.map((q) => q.answer) ?? null;
