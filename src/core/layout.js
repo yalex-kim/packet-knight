@@ -108,6 +108,34 @@ LANDMARKS.push({
   }
 });
 
+// Stage 10: 보안의 감옥(북동) · 전력 잃은 지하묘지(남동) — PRD §2.1·§6 Q7·Q8
+LANDMARKS.push({
+  id: "prison",
+  pos: { x: 10.0, y: S, z: -12.0 },
+  info: {
+    title: "🔒 보안의 감옥",
+    sub: "[페어링 시험장 · Q7]",
+    desc: "몰래 엿듣는 도청자와 쪽지를 바꿔치기하는 중간자가 갇힌 감옥입니다. 간수의 페어링 시험을 통과하세요: 두 기기의 입출력 능력으로 페어링 방식을 판정하고, 숫자 비교 화면이 다르면 '아니요'로 중간자를 잡아내야 합니다.",
+    lore: "LE Secure Connections는 P-256 ECDH로 도청을 막고, 숫자 비교·패스키로 중간자를 막습니다. 입출력이 없는 기기는 Just Works — 미인증입니다. ([Vol 3] Part H §2.3.5.1 Table 2.8)",
+    link: CHAPTER("security.html"),
+    action: { id: "prison", label: "🔐 페어링 시험" },
+    walkPos: { x: 10.0, y: S, z: -9.6 }
+  }
+});
+LANDMARKS.push({
+  id: "crypt",
+  pos: { x: 10.0, y: S, z: 12.0 },
+  info: {
+    title: "🪫 전력 잃은 지하묘지",
+    sub: "[CR2032 배터리 계약소 · Q8]",
+    desc: "배터리가 다해 잠든 센서들의 무덤입니다. 묘지기의 계약을 받아 센서 세 개의 연결 간격·페리페럴 지연·수면 시계를 골라, 요구 반응 시간 안에서 CR2032 하나로 약속한 햇수를 버티게 하세요.",
+    lore: "평균 전류 ≈ 수면 전류 + 이벤트 전하 ÷ 간격, 수명 ≈ 용량 ÷ 평균 전류. 간격이 길수록 창 넓히기((ppm÷10⁶)×시간 + 16 µs)가 커집니다.",
+    link: CHAPTER("power.html"),
+    action: { id: "crypt", label: "🔋 배터리 계약" },
+    walkPos: { x: 10.0, y: S, z: 9.8 }
+  }
+});
+
 export const landmark = (id) => LANDMARKS.find((l) => l.id === id);
 
 // 스폰은 분수대 충돌 반경(1.85 + 0.42) 바깥이어야 한다 (smoke: "스폰 지점이 충돌 영역 밖이다")
@@ -133,6 +161,8 @@ export const OBSTACLE_BOXES = [
   { id: "library",     minX: -10.6, maxX: -7.4,  minZ: -2.4,  maxZ: 0.4,  top: S + 3.2 },
   { id: "forge",       minX: 7.4,   maxX: 10.6,  minZ: -2.4,  maxZ: 0.4,  top: S + 2.8 },
   { id: "tower",       minX: 7.1,   maxX: 8.9,   minZ: 7.1,   maxZ: 8.9,  top: S + 8.0 },
+  { id: "prison",      minX: 8.5,   maxX: 11.5,  minZ: -13.3, maxZ: -10.7, top: S + 3.0 },
+  { id: "crypt",       minX: 9.0,   maxX: 11.0,  minZ: 11.2,  maxZ: 12.8,  top: S + 1.9 },
   // 던전 관문 — 던전 구현(Stage 7) 전까지는 통과 불가
   { id: "dungeonGate", minX: -10.6, maxX: -7.4,  minZ: -13.5, maxZ: -12.5, top: WORLD.DUNGEON_PIT_Y + 3.3 }
 ];

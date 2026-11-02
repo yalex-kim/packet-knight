@@ -3,7 +3,7 @@
 
 import {
   PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
-  GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS
+  GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, RSSI_JOB
 } from "./balance.js";
 import { applyGear, emptyGear, tryUpgrade } from "./gear.js";
 import { createQuestState, QUESTS } from "./quests.js";
@@ -11,7 +11,7 @@ import { levelFromXp } from "./combat.js";
 import { fullCharges, useCharge, chargesAt } from "./jobCharges.js";
 
 export const SAVE_KEY = "packetKnight.save";
-export const SAVE_VERSION = 7; // v7: 퀘스트·배지·칭호 (Stage 9) · // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7) · v6: 장비·스탯 분배 (Stage 7.5)
+export const SAVE_VERSION = 8; // v8: AFH가 퀘스트 보상으로 (Stage 10) · // v7: 퀘스트·배지·칭호 (Stage 9) · // v2: CR2032·알바 기록 (Stage 5) · v3: XP·스탯 포인트·도감 (Stage 6) · v4: 측정기 배터리 (Stage 6.5) · v5: 던전 (Stage 7) · v6: 장비·스탯 분배 (Stage 7.5)
 
 /**
  * @typedef {{
@@ -64,6 +64,8 @@ function migrate(raw) {
   if (raw && raw.v === 4) raw = { ...raw, v: 5, dungeon: emptyDungeon() };
   if (raw && raw.v === 5) raw = { ...raw, v: 6, gear: emptyGear(), alloc: emptyAlloc(), lab: { tries: 0, success: 0, spent: 0 } };
   if (raw && raw.v === 6) raw = { ...raw, v: 7, quests: createQuestState() };
+  // v7 → v8: AFH가 호핑 강좌 보상에서 Q4 퀘스트 보상으로 옮겨졌다 — 이미 강좌로 받은 사람은 그대로 쓴다
+  if (raw && raw.v === 7) raw = { ...raw, v: 8, quests: raw.quests && { ...raw.quests, perks: { ...(raw.quests.perks ?? {}), ...(raw.cleared?.hopping ? { afh: true } : {}) } } };
   return raw;
 }
 
@@ -104,7 +106,7 @@ function validate(raw) {
     gear: { ...emptyGear(), ...raw.gear },
     alloc: { ...emptyAlloc(), ...raw.alloc },
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
-    quests: { active: q.active, progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) } },
+    quests: { active: q.active, progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) }, claimed: { ...(q.claimed ?? {}) } },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };
@@ -227,11 +229,13 @@ export function applyPickup(progress, item, count) {
 }
 
 /** 측정기 배터리 현황 */
-export const jobChargesAt = (progress, now) => chargesAt(progress.job.charges, now);
+/** 측정기 충전 설정 — PWR(배터리 효율)이 높을수록 빨리 찬다: RECHARGE_SEC × 100 / PWR (Stage 10) */
+export const chargeCfg = (progress) => ({ ...RSSI_JOB, RECHARGE_SEC: Math.round(RSSI_JOB.RECHARGE_SEC * 100 / effectiveStats(progress).pwr) });
+export const jobChargesAt = (progress, now) => chargesAt(progress.job.charges, now, chargeCfg(progress));
 
 /** 알바 시작 시 배터리 1칸 사용 — 없으면 false (중도 이탈해도 돌려주지 않는다: 이탈 남용 방지) */
 export function startJobCharge(progress, now) {
-  const next = useCharge(progress.job.charges, now);
+  const next = useCharge(progress.job.charges, now, chargeCfg(progress));
   if (!next) return false;
   progress.job.charges = next;
   return true;
@@ -296,5 +300,5 @@ export function allocatePoint(progress, stat) {
   return true;
 }
 
-/** AFH 스킬 보유 — 도서관 "주파수 도약과 공존" 강좌 이수 (Stage 8) */
-export const hasAfhSkill = (progress) => Boolean(progress.cleared.hopping);
+/** AFH 스킬 보유 — 퀘스트 Q4 보상 (Stage 10; Stage 8~9에는 호핑 강좌 이수였다) */
+export const hasAfhSkill = (progress) => Boolean(progress.quests?.perks?.afh);

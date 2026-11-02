@@ -18,6 +18,7 @@ export const STAT_META = Object.freeze({
 
 /** 스탯이 아닌 기술 보상 (강좌 reward 키) */
 export const SKILL_REWARDS = Object.freeze({
+  // Stage 10: AFH는 도서관 강좌가 아니라 퀘스트 Q4(채널을 지어 날아라) 보상이다 (사용자 결정)
   afh: Object.freeze({ icon: "📶", label: "AFH 스킬", name: "간섭 채널 자동 빼기", desc: "던전 전투 중 스캔한 Wi-Fi 대역을 버튼 하나로 채널맵에서 뺀다 (적응형 주파수 도약)" })
 });
 
@@ -25,7 +26,7 @@ export const SKILL_REWARDS = Object.freeze({
  * 퀴즈 만점 보너스 크기 (PRD §8.4 "퀴즈 만점 보너스" 열) — 강좌 하나 = 장비 강화 1단계와 같은 가치.
  * (Stage 6.5 시뮬레이션: 원안 HP+5·TX+1·RX+1·PWR+5로는 퀴즈를 건너뛰고 알바한 쪽이 더 빨리 성장했다 — PRD §8.7)
  */
-export const QUIZ_BONUS = Object.freeze({ hp: 15, tx: 3, rx: 3, sec: 2, pwr: 5 });
+export const QUIZ_BONUS = Object.freeze({ hp: 15, tx: 5, rx: 3, hop: 0.3, sec: 3, pwr: 10 });
 
 export const QUIZ = Object.freeze({
   QUESTIONS_PER_QUIZ: 3,   // PRD §4.1 "레슨 후 3문제 퀴즈"
@@ -36,16 +37,20 @@ export const QUIZ = Object.freeze({
 /**
  * 도서관 강좌 (PRD §4.1 표). 챕터를 처음 만점 통과하면 reward 스탯이 영구 상승하고 스킬 슬롯이 1개 열린다.
  * 같은 챕터 재통과는 보상이 없다(파밍 방지 — 학습 동기는 "다시 읽고 도전"에 둔다).
- * Stage 4는 PRD §6 Q0~Q3 챕터만 연다. 나머지는 해당 지역 스테이지에서 추가한다.
+ * 순서 = 퀘스트 순서(PRD §6 Q0~Q8). Stage 10에서 Q4~Q8 챕터를 열었다.
+ * (Stage 8~9에는 호핑 강좌 보상이 AFH 스킬이었다 — Stage 10에서 Q4 퀘스트 보상으로 옮기고 강좌는 HOP 스탯)
  * @type {ReadonlyArray<{ chapter: string, reward: StatKey }>}
  */
 export const LIBRARY_COURSES = Object.freeze([
   { chapter: "intro",       reward: "hp"  }, // 블루투스의 큰 그림 → 연결 안정성
-  // Stage 8: 스탯이 아니라 "기술"을 준다 — 스캔한 간섭 대역을 버튼 하나로 채널맵에서 빼는 AFH (배우지 않으면 HUD에서 손으로)
-  { chapter: "hopping",     reward: "afh" },
   { chapter: "radio",       reward: "tx"  }, // 전파·데시벨 → 송신 출력
   { chapter: "phy",         reward: "rx"  }, // PHY·변조 → 수신 감도(회피)
-  { chapter: "advertising", reward: "sec" }  // 광고 채널 3개로 간섭을 견딘다 → 간섭 내성(방어). PWR는 스킬 배터리가 생기면 다시 검토
+  { chapter: "advertising", reward: "sec" }, // 광고 채널 3개로 간섭을 견딘다 → 간섭 내성(방어)
+  { chapter: "hopping",     reward: "hop" }, // 주파수 도약 → 속도
+  { chapter: "connection",  reward: "hp"  }, // 연결 유지·감독 타임아웃 → 연결 안정성
+  { chapter: "gatt",        reward: "tx"  }, // 데이터 교환 → 공격(보낼 수 있는 데이터)
+  { chapter: "security",    reward: "sec" }, // 페어링·암호화 → 방어
+  { chapter: "power",       reward: "pwr" }  // 전력 → 배터리 효율 (측정기 충전이 빨라진다)
 ]);
 
 /**
@@ -143,6 +148,17 @@ export const MONSTERS = Object.freeze({
 });
 
 /** 훈련장 (마을 남서쪽 풀밭) */
+/**
+ * 퀘스트 보상 스킬 (Stage 10, PRD §6)
+ *   DASH: Q5 "Connect Request 돌진" — CONNECT_IND처럼 짧고 빠르게 파고든다. 돌진 중에는 공격이 스친다(무적).
+ *   AES_SHIELD: Q7 "AES 암호화 실드" — AES-CCM의 MIC 검사가 위조 패킷을 버리듯, 몬스터 공격의 일부를 무효화한다.
+ *   PWR: 측정기 배터리 충전 시간 = RECHARGE_SEC × 100 / PWR (Q8·전력 강좌, 기본 PWR 100)
+ */
+export const QUEST_SKILLS = Object.freeze({
+  DASH: Object.freeze({ time: 0.18, speedMul: 3.2, cooldown: 3.0 }),
+  AES_SHIELD: Object.freeze({ blockChance: 0.2 })
+});
+
 export const TRAINING_GROUND = Object.freeze({ x: -9, z: 10, spawns: Object.freeze([[-10, 9], [-8, 11.5]]) });
 
 /**
@@ -181,7 +197,7 @@ export const TIMEOUT_PENALTY = 0.1;
  * HP 0이면 실패(타임아웃). 클리어하면 다음 층이 열린다 (PRD §7 Stage 7 DoD). 입장 1회 = 한 층 도전.
  * (층마다 몬스터 +1마리는 장비 1단계로 메울 수 없는 절벽이었다 — PRD §8.7)
  */
-export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.15, TIME_LIMIT: 180 });
+export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.18, TIME_LIMIT: 180 });
 export const floorHpScale = (floor) => 1 + DUNGEON.FLOOR_HP_SCALE * (floor - 1);
 /** 층마다 공격력도 오른다 — 체력만 오르면 방어(SEC)만 올려 깊은 층이 무의미해진다 (Stage 7.5 시뮬레이션) */
 export const floorAtkScale = (floor) => 1 + DUNGEON.FLOOR_ATK_SCALE * (floor - 1);

@@ -339,9 +339,65 @@ const trainingSign = new THREE.Group();
 }
 placeLandmark(trainingSign, "trainingSign");
 
+// ----- Stage 10: 🔒 보안의 감옥 (북동) -----
+const prison = new THREE.Group();
+{
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.4, 2.6), darkStone);
+  wall.position.y = 1.2;
+  prison.add(wall);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.4, 2.9), stoneMat);
+  roof.position.y = 2.6;
+  prison.add(roof);
+  // 정면 창살 (8개) + 자물쇠
+  const barMat = new THREE.MeshLambertMaterial({ color: 0x8a95a3 });
+  for (let i = 0; i < 8; i++) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, 0.08), barMat);
+    bar.position.set(-1.05 + i * 0.3, 1.0, 1.34);
+    prison.add(bar);
+  }
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.14), new THREE.MeshBasicMaterial({ color: 0xffb020 }));
+  lock.position.set(0, 2.0, 1.36);
+  prison.add(lock);
+  prison.userData.lock = lock;
+  // 감시탑 (모서리)
+  const turret = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.4, 0.8), darkStone);
+  turret.position.set(1.3, 1.7, -1.0);
+  prison.add(turret);
+  const eye = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+  eye.position.set(1.3, 3.6, -1.0);
+  prison.add(eye);
+}
+placeLandmark(prison, "prison");
+
+// ----- Stage 10: 🪫 전력 잃은 지하묘지 입구 (남동) -----
+const crypt = new THREE.Group();
+{
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.6, 1.6), stoneMat);
+  slab.position.y = 0.8;
+  crypt.add(slab);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.3, 1.9), darkStone);
+  cap.position.y = 1.75;
+  crypt.add(cap);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.06), new THREE.MeshBasicMaterial({ color: 0x0b0d12 }));
+  door.position.set(0, 0.6, -0.82); // 마을 쪽(북)을 향한다
+  crypt.add(door);
+  // 꺼져 가는 CR2032 (코인 전지 모양 원판)
+  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.1, 20), new THREE.MeshBasicMaterial({ color: 0x9aa3ad }));
+  coin.rotation.x = Math.PI / 2;
+  coin.position.set(0, 1.45, -0.84);
+  crypt.add(coin);
+  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.05), new THREE.MeshBasicMaterial({ color: 0x7dffb5 }));
+  glow.position.set(0, 1.45, -0.91);
+  crypt.add(glow);
+  crypt.userData.glow = glow;
+}
+placeLandmark(crypt, "crypt");
+
 animated.beacon = tower.userData.beacon;
 animated.rune = fountain.userData.rune;
 animated.portal = dungeonGate.userData.portal;
+animated.lock = prison.userData.lock;
+animated.cryptGlow = crypt.userData.glow;
 
 /** 매 프레임 장식 애니메이션 */
 export function animateWorld(t) {
@@ -350,6 +406,8 @@ export function animateWorld(t) {
   animated.rune.position.y = 1.5 + Math.sin(t * 2.5) * 0.08;
   animated.portal.scale.set(1 + 0.06 * Math.sin(t * 4), 1 + 0.06 * Math.cos(t * 3), 1); // 포털 맥동
   sea.position.z = Math.sin(t * 0.3) * 0.4;
+  animated.lock.rotation.z = Math.sin(t * 2) * 0.15;                                   // 흔들리는 자물쇠
+  animated.cryptGlow.material.color.setHSL(0.4, 0.9, 0.15 + 0.35 * Math.max(0, Math.sin(t * 0.8)) ** 4); // 가끔 깨어나는 센서
 }
 
 export { metalMat };

@@ -52,7 +52,7 @@ function chargeLine() {
   const cells = "🔋".repeat(c.count) + "▫️".repeat(RSSI_JOB.CHARGES_MAX - c.count);
   const wait = c.nextInSec === null ? "가득 참" : `다음 충전 ${fmtWait(c.nextInSec)}`;
   return el("p", { class: "charge-line", "data-charges": String(c.count),
-    textContent: `측정기 배터리 ${cells} ${c.count}/${RSSI_JOB.CHARGES_MAX} · ${wait} (한 판에 1칸, ${RSSI_JOB.RECHARGE_SEC / 60}분마다 1칸 충전)` });
+    textContent: `측정기 배터리 ${cells} ${c.count}/${RSSI_JOB.CHARGES_MAX} · ${wait} (한 판에 1칸, ${fmtWait(hooks.getRechargeSec?.() ?? RSSI_JOB.RECHARGE_SEC)}마다 1칸 충전 · 🔋 PWR가 높을수록 빠르다)` });
 }
 function startButton(label) {
   const c = hooks.getCharges();

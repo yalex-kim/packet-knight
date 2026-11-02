@@ -28,8 +28,13 @@ export const TIME = Object.freeze({
   UPGRADE: 10,             // 강화 1회 시도
   TUTORIAL: 60,            // Q0 튜토리얼: 걷기·점프·훈련용 봇 한 대 맞히기 (Stage 9)
   WHATIF: 60,              // 🔮 예측해 보기: 질문·힌트 읽고 답하기
-  WHATIF_REREAD: 90        // 틀렸을 때 원문 그 절을 다시 읽고 재도전
+  WHATIF_REREAD: 90,       // 틀렸을 때 원문 그 절을 다시 읽고 재도전
+  VISIT: 30,               // Q6 GATT 회관 방문
+  PAIRING_TRIAL: 180,      // Q7 보안의 감옥 페어링 시험 (6문제 + 해설)
+  POWER_CONTRACTS: 240     // Q8 지하묘지 배터리 계약 3건
 });
+/** 장소형 단계: 강좌를 들은 뒤 그 퀘스트가 진행 중이면 봇이 찾아가서 한다 (Stage 10) */
+const PLACE_STEPS = Object.freeze({ visit: { ev: { type: "visit", place: "hall" }, time: "VISIT" }, pairing: { ev: { type: "pairing" }, time: "PAIRING_TRIAL", retry: 0.3 }, power: { ev: { type: "power" }, time: "POWER_CONTRACTS" } });
 /** 예측해 보기 첫 시도 오답 확률 (보기 2~3개, 강좌는 이미 들은 상태) */
 export const WHATIF_MISS = 0.3;
 
@@ -129,6 +134,16 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
   function tryQuest(now) {
     const { qs, p } = st.quest;
     let spent = 0;
+    // 장소형 단계(방문·페어링 시험·배터리 계약)는 그 퀘스트의 강좌를 들은 뒤에 한다
+    const cur = questById(qs.active);
+    if (cur && p.cleared[cur.chapter]) {
+      for (const step of cur.steps) {
+        const place = PLACE_STEPS[step.event];
+        if (step.kind !== "event" || !place || (qs.progress[cur.id]?.[step.id] ?? 0) >= (step.need ?? 1)) continue;
+        spent += TIME[place.time] * (place.retry && rng() < place.retry ? 2 : 1);
+        questEvent(qs, place.ev);
+      }
+    }
     for (let q = questById(qs.active); q && readyForWhatif(qs, p, q); q = questById(qs.active)) {
       spent += TIME.WHATIF + (rng() < WHATIF_MISS ? TIME.WHATIF_REREAD : 0);
       answerWhatif(qs, p, q.id, whatifFor(q).answer);
@@ -197,7 +212,8 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
         // 한 번 입장 = 층 도전. 쓰러지면 Connection Timeout → 체크포인트(층 시작)에서 입장료 없이 롤백 재도전 (Stage 8)
         for (let retry = 0; ; retry++) {
           // AFH: 돌격형은 안 쓰고, 나머지는 호핑 강좌를 이수했으면 버튼, 아니면 HUD에서 손으로
-          const afh = strategy.dungeonMode === "rush" ? false : LIBRARY_COURSES.slice(0, st.courses).some((c) => c.reward === "afh") ? "button" : "manual";
+          // AFH: 돌격형은 안 쓰고, 나머지는 Q4 보상(스킬)이 있으면 버튼, 아니면 HUD에서 손으로 (Stage 10)
+          const afh = strategy.dungeonMode === "rush" ? false : st.quest.qs.perks.afh ? "button" : "manual";
           const r = dungeonOutcome(pools, strategy.dungeonMode, stats, st.dungeon.floor, afh, st.quest.qs.perks); // 아직 못 깬 가장 깊은 층
           t += r.time + (retry === 0 ? TIME.DUNGEON_OVERHEAD : TIME.ROLLBACK);
           st.cr += r.cr2032; st.income.dungeon += r.cr2032; st.xp += r.xp;

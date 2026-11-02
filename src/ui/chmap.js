@@ -58,8 +58,8 @@ export function updateChmap(run) {
   info.classList.toggle("danger", Boolean(danger));
   const skill = hooks.hasAfh();
   afhBtn.disabled = !skill;
-  afhBtn.textContent = skill ? "📶 간섭 채널 빼기 (AFH)" : "🔒 AFH — 도서관 '주파수 도약' 강좌";
-  afhBtn.title = skill ? "스캔한 Wi-Fi 대역을 채널맵에서 뺀다 (6 이벤트 뒤 적용)" : "도서관에서 '주파수 도약과 공존' 강좌를 만점 이수하면 열린다. 그 전엔 칸을 직접 눌러 빼자.";
+  afhBtn.textContent = skill ? "📶 간섭 채널 빼기 (AFH)" : "🔒 AFH — 퀘스트 Q4 보상";
+  afhBtn.title = skill ? "스캔한 Wi-Fi 대역을 채널맵에서 뺀다 (6 이벤트 뒤 적용)" : "퀘스트 Q4 '채널을 지어 날아라'를 완료하면 열린다. 그 전엔 칸을 직접 눌러 빼자.";
 }
 
 export const CHMAP_INTERVAL = LINK_COMBAT.INTERVAL;

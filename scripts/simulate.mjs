@@ -20,7 +20,7 @@ import { applyGear } from "../src/core/gear.js";
 import { RSSI_STRATEGIES, rssiSession } from "./lib/rssi.mjs";
 import { COMBAT_STRATEGIES, trainingSession, dungeonFloor } from "./lib/combat.mjs";
 import { PLAYER_STRATEGIES, buildPools, playHour, targetSpend, statsWithQuiz } from "./lib/economy.mjs";
-import { QUESTS } from "../src/core/quests.js";
+import { QUESTS, PERKS } from "../src/core/quests.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT = path.join(ROOT, "scripts/report/balance-report.json");
@@ -95,16 +95,24 @@ function dungeonCurve(samples = 200) {
   return rows;
 }
 
-/** 같은 장비에서 퀴즈 보너스 유무에 따른 "기대 클리어 소요 시간"(실패 재시도 포함) 비교 */
+/**
+ * 같은 장비에서 학습 유무에 따른 "기대 클리어 소요 시간"(실패 재시도 포함) 비교.
+ * Stage 10: "학습 O" = 1시간에 듣는 강좌 4개(퀘스트 순서: 블루투스란·전파·PHY·광고) + 그 강좌로 여는 퀘스트 Q0~Q3 보상(TX +1·DLE·ADV 강화).
+ * AFH는 Q4 보상이라 양쪽 모두 손으로 뺀다(manual). (Stage 8~9에는 호핑 강좌 = AFH 버튼이었다)
+ */
 function quizContribution(samples = 300) {
   const out = [];
+  const COURSES_PER_HOUR = ECONOMY.LOOPS;
   for (const lv of [1, 2]) {
     const gear = Object.fromEntries(Object.keys(GEAR).map((k) => [k, lv]));
     const row = { gear: lv };
-    for (const [label, courses] of [["without", 0], ["with", LIBRARY_COURSES.length]]) {
+    for (const [label, learned] of [["without", false], ["with", true]]) {
       const rng = createRng(SEED + 100 + lv);
-      const stats = applyGear(statsWithQuiz(PLAYER_BASE, courses), gear);
-      const rr = Array.from({ length: samples }, () => dungeonFloor("kite", stats, rng, 1, { afh: courses ? "button" : "manual" }));
+      const base = statsWithQuiz(PLAYER_BASE, learned ? COURSES_PER_HOUR : 0);
+      if (learned) base.tx += 1; // Q1 보상
+      const stats = applyGear(base, gear);
+      const fire = learned ? { rangeMul: PERKS.dle.rangeMul, coef: PERKS.advBoost.coef } : {};
+      const rr = Array.from({ length: samples }, () => dungeonFloor("kite", stats, rng, 1, { afh: "manual", fire }));
       const clears = rr.filter((r) => r.cleared).length;
       const totalTime = rr.reduce((a, r) => a + r.time + 40, 0); // 입장 오버헤드 포함
       row[label] = { clearPct: pct(clears / samples), expectedTimePerClear: clears ? Math.round(totalTime / clears) : Infinity };

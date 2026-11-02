@@ -56,7 +56,7 @@ export function refreshTracker() {
   const quest = questById(qs.active);
   const title = qs.title ? el("span", { class: "qt-title", textContent: `🏅 ${qs.title}` }) : null;
   if (!quest) {
-    tracker.replaceChildren(el("div", { class: "qt-head" }, "📜 퀘스트 Q0~Q3 완료 ", title), el("div", { class: "muted", textContent: "다음 퀘스트(Q4~)는 다음 업데이트에서 열린다" }));
+    tracker.replaceChildren(el("div", { class: "qt-head" }, `📜 퀘스트 Q0~${QUESTS.at(-1).code} 완료 `, title), el("div", { class: "muted", textContent: `다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 다음 업데이트에서 열린다` }));
     return;
   }
   const ready = readyForWhatif(qs, p, quest);

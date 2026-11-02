@@ -211,10 +211,14 @@ function stepMonster(battle, m, dt, ctx, events) {
       stepMotor(m, { dirX: 0, dirZ: 0, speedScale: 0 }, dt, battle.world);
       if (m.t <= 0) {
         if (d <= def.attackRange + 0.4 && p.hp > 0) {
-          if (!def.aoe && rollDodge(ctx.stats.rx, ctx.rng)) { // 광역 공격은 회피 불가 (PRD §8.4)
+          if (ctx.invulnerable) { // Connect Request 돌진 중 — 공격이 스친다 (Stage 10)
+            events.push({ type: "dodge", monster: m, dash: true });
+          } else if (!def.aoe && rollDodge(ctx.stats.rx, ctx.rng)) { // 광역 공격은 회피 불가 (PRD §8.4)
             events.push({ type: "dodge", monster: m });
           } else if (ctx.interference && !ctx.interference.playerHit(m)) {
             events.push({ type: "outOfBand", monster: m }); // 간섭 채널 밖 → 피해 0 (PRD §8.4)
+          } else if (ctx.shieldBlock && ctx.rng() < ctx.shieldBlock) {
+            events.push({ type: "shieldBlock", monster: m }); // AES 실드: MIC 검사 실패 → 위조 패킷 폐기 (Stage 10)
           } else {
             const { amount, crit } = computeDamage(m.atk ?? def.atk, 1, ctx.stats.sec, ctx.rng);
             p.hp = Math.max(0, p.hp - amount);

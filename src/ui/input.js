@@ -40,6 +40,10 @@ export function initInput(h) {
       h.onJump();
       return;
     }
+    if (e.code === "KeyE") {
+      if (!e.repeat) h.onDash?.();
+      return;
+    }
     if (e.code === "KeyQ") {
       if (!e.repeat) h.onQuests?.();
       return;
@@ -71,6 +75,13 @@ export function initInput(h) {
     e.preventDefault();
     e.stopPropagation();
     if (enabled) h.onFire();
+  });
+
+  // ---------- 돌진 버튼 (Q5 보상, Stage 10) ----------
+  document.getElementById("btn-dash").addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (enabled) h.onDash?.();
   });
 
   initJoystick();

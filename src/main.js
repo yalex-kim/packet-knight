@@ -12,7 +12,10 @@
 import * as THREE from "three";
 import { WORLD, PHYSICS } from "./core/config.js";
 import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
-import { SPAWN_POS } from "./core/layout.js";
+import { SPAWN_POS, landmark } from "./core/layout.js";
+import * as prisonUi from "./ui/prison.js";
+import * as cryptUi from "./ui/crypt.js";
+import { QUEST_SKILLS } from "./core/balance.js";
 import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
@@ -27,7 +30,7 @@ import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
 } from "./core/progress.js";
 import { CHAPTERS } from "./core/chapters.data.js";
-import { applyJobResult, jobChargesAt, startJobCharge } from "./core/progress.js";
+import { applyJobResult, jobChargesAt, startJobCharge, chargeCfg } from "./core/progress.js";
 import { createRng } from "./core/quiz.js";
 import { createJob, stepJob, confirmMeasurement } from "./core/rssiJob.js";
 import * as jobPanel from "./ui/jobPanel.js";
@@ -97,6 +100,7 @@ function persist() {
 function refreshQuests() {
   if (!questsReady) return;
   questLog.refreshTracker();
+  document.getElementById("btn-dash").hidden = !progress.quests.perks.dash;
   const q = questById(progress.quests.active);
   if (q && questReadyShown !== q.id && readyForWhatif(progress.quests, progress, q)) {
     questReadyShown = q.id;
@@ -151,6 +155,16 @@ function arriveAtTarget() {
   clearMoveTarget();
 }
 
+const dash = { t: 0, cooldown: 0 };
+const dashBtn = document.getElementById("btn-dash");
+function performDash() {
+  if (inputLocked || !progress.quests.perks.dash || dash.cooldown > 0) return;
+  dash.t = QUEST_SKILLS.DASH.time;
+  dash.cooldown = QUEST_SKILLS.DASH.cooldown;
+  clearMoveTarget();
+  hud.setBadge("⚡ Connect Request 돌진!");
+}
+
 function performJump() {
   if (jump(motor)) { hud.setBadge("🦘 점프!"); questProgress({ type: "jump" }); }
 }
@@ -158,6 +172,26 @@ function performJump() {
 // ---------- 클릭 / 탭 ----------
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+
+/** 모달 정보 — 퀘스트 보상으로 생기는 버튼(GATT 회관 서비스 상자)을 붙인다 (Stage 10) */
+function modalInfo(info) {
+  const qs = progress.quests;
+  if (info === landmark("hall").info && qs.perks.gattAccess && !qs.claimed?.gattBox) {
+    return { ...info, action: { id: "gattBox", label: `📦 서비스 상자 열기 (CR2032 ${GATT_BOX_REWARD})` } };
+  }
+  return info;
+}
+const GATT_BOX_REWARD = 20;
+function openGattBox() {
+  const qs = progress.quests;
+  if (!qs.perks.gattAccess || qs.claimed?.gattBox) return;
+  (qs.claimed ??= {}).gattBox = new Date().toISOString();
+  progress.cr2032 += GATT_BOX_REWARD;
+  persist();
+  hud.hideModal();
+  hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  fx.showToast(`📦 서비스 상자 (UUID 0x180F Battery Service) — 특성 'Battery Level'을 읽었다: CR2032 +${GATT_BOX_REWARD}`, 5);
+}
 
 function findInteractive(obj) {
   for (let o = obj; o; o = o.parent) if (o.userData.interactive) return o.userData.interactive;
@@ -194,7 +228,9 @@ function handleTap(clientX, clientY) {
 
   const info = findInteractive(hits[0].object);
   if (info) {
-    hud.showModal(info);
+    hud.showModal(modalInfo(info));
+    const place = ["hall", "prison", "crypt"].find((id) => landmark(id).info === info);
+    if (place) questProgress({ type: "visit", place });
     setMoveTarget(info.walkPos, `${info.title} 앞 도착`);
     hud.setBadge(`🚶 ${info.title}(으)로 이동 중`);
     return;
@@ -271,6 +307,22 @@ questLog.initQuestLog({
 questsReady = true;
 refreshQuests();
 
+// ---------- 보안의 감옥 · 지하묘지 (Stage 10) ----------
+const overlayChange = (open) => {
+  setInputEnabled(!open);
+  inputLocked = open;
+  if (open) { clearMoveTarget(); hud.hideModal(); }
+};
+prisonUi.initPrison({
+  rng: createRng(TEST_MODE ? 21 : Date.now() + 3),
+  onOpenChange: overlayChange,
+  onPassed: () => { questProgress({ type: "pairing" }); fx.showToast("🔓 페어링 시험 통과 — 도청자와 중간자를 구별했다", 3.5); }
+});
+cryptUi.initCrypt({
+  onOpenChange: overlayChange,
+  onAllDone: () => { questProgress({ type: "power" }); fx.showToast("🔋 배터리 계약 3건 완수 — 지하묘지의 센서들이 깨어났다", 3.5); }
+});
+
 // ---------- 전투 이벤트 처리 ----------
 const battleRng = createRng(TEST_MODE ? 11 : Date.now() + 1);
 let inputLocked = false; // 오버레이가 열려 있으면 발사 금지
@@ -324,7 +376,10 @@ function handleBattleEvents(events) {
         fx.floatText(motor.x, motor.y + 0.9, motor.z, `-${e.amount}`, "hurt");
         break;
       case "dodge":
-        fx.floatText(motor.x, motor.y + 0.9, motor.z, "회피!", "dodge");
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, e.dash ? "⚡ 돌진 회피!" : "회피!", "dodge");
+        break;
+      case "shieldBlock":
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, "🛡️ MIC 실패 — 위조 패킷 폐기", "dodge");
         break;
       case "packetLost": {
         // 간섭 채널 위에서 쏜 패킷이 깨졌다 — 이 몬스터의 대역이 드러난다(채널 분류)
@@ -536,6 +591,7 @@ function onJobDone() {
 jobPanel.initJobPanel({
   getProgress: () => progress,
   getCharges: () => jobChargesAt(progress, now()),
+  getRechargeSec: () => chargeCfg(progress).RECHARGE_SEC,
   onStart: () => {
     if (!startJobCharge(progress, now())) return; // 배터리 없음 (버튼도 비활성)
     persist();
@@ -597,6 +653,9 @@ hud.setModalHandlers({
     else if (id === "job") openJob();
     else if (id === "dungeon") openDungeonEntry();
     else if (id === "rflab") openRfLab();
+    else if (id === "prison") { hud.hideModal(); prisonUi.openPrison(); }
+    else if (id === "crypt") { hud.hideModal(); cryptUi.openCrypt(); }
+    else if (id === "gattBox") openGattBox();
   },
   // 모달의 "교과서 챕터 보기" 클릭도 학습 지표로 센다 (PRD §1.3 ②)
   link: (href) => {
@@ -610,6 +669,7 @@ initInput({
   onJump: performJump,
   onFire: () => performFire(),
   onQuests: () => questLog.openQuestLog(),
+  onDash: performDash,
   onMoveKey: clearMoveTarget,
   onTap: handleTap,
   onOrbit: rotateOrbit,
@@ -650,8 +710,17 @@ function simulate(dt) {
     if (seek.arrived) arriveAtTarget();
     else intent = seek;
   }
+  // Connect Request 돌진: 바라보는 방향으로 짧게 빠르게 (Stage 10)
+  dash.cooldown = Math.max(0, dash.cooldown - dt);
+  let speed = effectiveStats(progress).hop;
+  if (dash.t > 0) {
+    dash.t = Math.max(0, dash.t - dt);
+    intent = { dirX: Math.sin(motor.rotY), dirZ: Math.cos(motor.rotY), speedScale: 1 };
+    speed *= QUEST_SKILLS.DASH.speedMul;
+  }
+  dashBtn.classList.toggle("cooling", dash.cooldown > 0);
 
-  const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), effectiveStats(progress).hop);
+  const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), speed);
   // 걸은 거리 (Q0) — 1 m 단위로 모아서 반영
   questWalk += moved;
   if (questWalk >= 1) { const m = Math.floor(questWalk); questWalk -= m; questProgress({ type: "walk", amount: m }); }
@@ -672,7 +741,11 @@ function simulate(dt) {
     interference = interferenceFor(run.link);
   }
   if (run?.phase !== "timeout") {
-    handleBattleEvents(stepBattle(activeBattle(), dt, { player: motor, stats: effectiveStats(progress), rng: battleRng, interference }));
+    handleBattleEvents(stepBattle(activeBattle(), dt, {
+      player: motor, stats: effectiveStats(progress), rng: battleRng, interference,
+      invulnerable: dash.t > 0,
+      shieldBlock: progress.quests.perks.aesShield ? QUEST_SKILLS.AES_SHIELD.blockChance : 0
+    }));
   }
   if (run) {
     if (run.phase === "combat" && run.battle.monsters.every((m) => m.state === "dead")) onCombatCleared();
@@ -759,6 +832,10 @@ window.__PK = {
     })
   },
   rflab: { open: openRfLab, isOpen: rfLab.isRfLabOpen },
+  prison: { open: prisonUi.openPrison, isOpen: prisonUi.isPrisonOpen, answer: prisonUi.currentAnswer },
+  crypt: { open: cryptUi.openCrypt, isOpen: cryptUi.isCryptOpen, state: cryptUi.cryptState },
+  dash: () => ({ ...dash }),
+  chargeCfg: () => chargeCfg(progress),
   dungeon: {
     openEntry: openDungeonEntry,
     enter: enterNextFloor,

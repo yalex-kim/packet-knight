@@ -282,8 +282,15 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   const p = P.createProgress();
   const no = P.hasAfhSkill(p);
   const r = P.applyQuizResult(p, "hopping", true);
-  check("도서관 '주파수 도약과 공존' 만점 = AFH 스킬 (스탯 보너스 없음)",
-    LIBRARY_COURSES.some((c) => c.chapter === "hopping" && c.reward === "afh") && !no && P.hasAfhSkill(p) && r.reward?.stat === "afh" && Object.values(p.bonus).every((v) => v === 0));
+  const afterCourse = P.hasAfhSkill(p);
+  p.quests.perks.afh = true;
+  // v7 세이브: 호핑 강좌로 이미 AFH를 받은 플레이어는 v8 이전 후에도 유지
+  const v7 = P.createProgress(); v7.v = 7; v7.cleared.hopping = "x"; delete v7.quests.claimed;
+  const v7b = P.createProgress(); v7b.v = 7;
+  const ld = (o) => P.loadProgress({ getItem: () => JSON.stringify(o) }).progress;
+  check("AFH = 퀘스트 Q4 보상 (Stage 10): 호핑 강좌는 HOP 스탯, v7에서 강좌로 받은 AFH는 유지",
+    LIBRARY_COURSES.some((c) => c.chapter === "hopping" && c.reward === "hop") && !no && !afterCourse && r.reward?.stat === "hop" && P.hasAfhSkill(p)
+      && P.hasAfhSkill(ld(v7)) && !P.hasAfhSkill(ld(v7b)) && ld(v7).v === 8);
 }
 
 // ---------- Stage 9: 퀘스트 ↔ 교과서 (Node) ----------
@@ -327,7 +334,7 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
   Q9.questEvent(qs, { type: "job", grade: "A" });
   Q9.answerWhatif(qs, p, "Q3", Q9.whatifFor(Q9.QUESTS[3]).answer);
   check("Q1~Q3: 알바 등급 조건(C는 불인정)·이미 해 둔 상태 단계 인정, 보상 TX+1·DLE·ADV 강화, 배지 4개",
-    cOnly && p.bonus.tx === 1 && P.effectiveStats(p).tx > tx0 && qs.perks.dle && qs.perks.advBoost && qs.active === null && Q9.badges(qs).join() === "intro,radio,phy,advertising",
+    cOnly && p.bonus.tx === 1 && P.effectiveStats(p).tx > tx0 && qs.perks.dle && qs.perks.advBoost && qs.active === "Q4" && Q9.badges(qs).join() === "intro,radio,phy,advertising",
     `배지 ${Q9.badges(qs).join(",")}`);
 
   // 보상 효과: DLE 사거리 ×1.5 · 데미지 계수 1.15
@@ -342,8 +349,82 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
   const v6 = P.createProgress(); delete v6.quests; v6.v = 6; v6.cr2032 = 13; v6.dungeon.maxFloor = 3;
   const mem = new Map([[P.SAVE_KEY, JSON.stringify(v6)]]);
   const l = P.loadProgress({ getItem: (k) => mem.get(k) ?? null });
-  check("Stage 8 세이브(v6)가 손실 없이 v7로 마이그레이션된다 (퀘스트는 Q0부터)",
-    l.status === "loaded" && l.progress.v === 7 && l.progress.cr2032 === 13 && l.progress.dungeon.maxFloor === 3 && l.progress.quests.active === "Q0");
+  check("Stage 8 세이브(v6)가 손실 없이 최신(v8)으로 마이그레이션된다 (퀘스트는 Q0부터)",
+    l.status === "loaded" && l.progress.v === 8 && l.progress.cr2032 === 13 && l.progress.dungeon.maxFloor === 3 && l.progress.quests.active === "Q0");
+}
+
+// ---------- Stage 10: 페어링 판정 · 배터리 모델 · Q4~Q8 · 실드/돌진 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const S = await imp("pairing.js");
+  const W = await imp("powerBudget.js");
+  const P = await imp("progress.js");
+  const B = await imp("battle.js");
+  const { createRng } = await imp("quiz.js");
+  const m = (a, b, sc) => S.pairingMethod(a, b, sc);
+  // 교과서 security.html "해볼 것" ①~③ + 사양 Table 2.8 대표 칸
+  const tableOk = m("DisplayYesNo", "NoInputNoOutput", true).method === "Just Works"
+    && m("DisplayYesNo", "DisplayYesNo", true).method === "숫자 비교" && m("DisplayYesNo", "DisplayYesNo", false).method === "Just Works"
+    && m("KeyboardDisplay", "KeyboardOnly", true).who === "개시자가 보여 주고 응답자가 입력"
+    && m("KeyboardDisplay", "KeyboardOnly", false).auth.startsWith("미인증")
+    && m("KeyboardOnly", "KeyboardOnly", true).method === "패스키 입력" && m("DisplayOnly", "DisplayYesNo", true).method === "Just Works";
+  const t1 = S.createTrial(createRng(9)); let last1; for (const r of t1.rounds) last1 = S.answerTrial(t1, r.answer);
+  const t2 = S.createTrial(createRng(9)); let last2; t2.rounds.forEach((r, i) => { last2 = S.answerTrial(t2, i < 2 ? "틀린 답" : r.answer); });
+  const compares = t1.rounds.filter((r) => r.kind === "compare");
+  check("페어링 방식 판정이 교과서·사양 Table 2.8과 일치하고, 시험은 숫자 비교(중간자 잡기)를 섞어 5/6 이상이면 통과",
+    tableOk && last1.passed && !last2.passed && compares.length === S.PAIRING_TRIAL.COMPARE_ROUNDS && compares.every((r) => (r.a !== r.b) === r.mitm));
+
+  const ex = W.powerBudget({ intervalMs: 2000, latency: 0, clock: "rc" });
+  const book = W.POWER_MODEL.I_SLEEP_UA + W.POWER_MODEL.Q_BASE_UC / 1; // 책의 예: 15 µC/1 s + 2 µA = 17 µA
+  const sols = W.CONTRACTS.map((c) => W.solutions(c));
+  check("배터리 모델이 교과서와 일치하고(창 넓히기 2 s·500 ppm = 1 ms + 16 µs, 15 µC/1 s → 17 µA), 계약 3건 모두 풀 수 있다",
+    Math.abs(ex.widenUs - 1016) < 1e-6 && book === 17 && sols.every((x) => x.length > 0)
+      && sols[2].length === 1 && sols[2][0].latency === 3 && sols[2][0].clock === "crystal" && sols[1].every((x) => x.clock === "crystal"),
+    `계약별 해 ${sols.map((x) => x.length).join("/")}개 · 환경 센서 = 지연 3 + 수정 발진기`);
+
+  // Q4~Q8 진행
+  const p = P.createProgress();
+  const qs = p.quests;
+  Object.assign(qs, { active: "Q4", done: { Q0: "x", Q1: "x", Q2: "x", Q3: "x" } });
+  const ans = (id) => Q9.answerWhatif(qs, p, id, Q9.whatifFor(Q9.questById(id)).answer).completed?.id;
+  p.cleared.hopping = "x"; p.dungeon.maxFloor = 2;
+  const afhBefore = P.hasAfhSkill(p);
+  const r4 = ans("Q4");
+  p.cleared.connection = "x"; p.dungeon.maxFloor = 3;
+  const r5 = ans("Q5");
+  p.cleared.gatt = "x";
+  const r6early = ans("Q6");
+  Q9.questEvent(qs, { type: "visit", place: "prison" });
+  Q9.questEvent(qs, { type: "visit", place: "hall" });
+  Q9.questEvent(qs, { type: "job", grade: "A" });
+  Q9.questEvent(qs, { type: "job", grade: "S" });
+  const r6 = ans("Q6");
+  p.cleared.security = "x"; Q9.questEvent(qs, { type: "pairing" });
+  const r7 = ans("Q7");
+  const rc0 = P.chargeCfg(p).RECHARGE_SEC;
+  p.cleared.power = "x"; Q9.questEvent(qs, { type: "power" });
+  const r8 = ans("Q8");
+  check("Q4~Q8: AFH·돌진·서비스 상자 권한·AES 실드·PWR +20 보상, 다른 장소 방문·A등급은 불인정",
+    !afhBefore && r4 === "Q4" && P.hasAfhSkill(p) && r5 === "Q5" && qs.perks.dash && !r6early && r6 === "Q6" && qs.perks.gattAccess
+      && r7 === "Q7" && qs.perks.aesShield && r8 === "Q8" && qs.active === null && Q9.badges(qs).length === 9,
+    `완독 배지 ${Q9.badges(qs).length}개`);
+  check("PWR가 측정기 충전 시간을 줄인다 (RECHARGE_SEC × 100 / PWR)", rc0 === 300 && P.chargeCfg(p).RECHARGE_SEC === 250, `${rc0}초 → ${P.chargeCfg(p).RECHARGE_SEC}초`);
+
+  const strike = (ctx) => {
+    const b = B.createBattle([[0, 0]]);
+    B.syncPlayerHp(b, 100);
+    const mon = b.monsters[0];
+    mon.state = "windup"; mon.t = 0.0001;
+    const player = { x: mon.x, y: mon.y, z: mon.z + 0.6 };
+    const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
+    return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
+  };
+  const plain = strike({ rng: () => 0.99 });
+  const dashed = strike({ rng: () => 0.99, invulnerable: true });
+  const shielded = strike({ rng: () => 0, shieldBlock: 0.2 });
+  check("돌진 중에는 공격이 스치고(무적), AES 실드는 일부 공격을 위조 패킷으로 버린다",
+    plain.types.includes("playerHit") && dashed.dash && dashed.hp === 100 && shielded.types.includes("shieldBlock") && shielded.hp === 100,
+    `${plain.types.join()} / ${dashed.types.join()} / ${shielded.types.join()}`);
 }
 
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
@@ -922,10 +1003,11 @@ await reset();
   const bandCells = await page.locator("#chmap .cm.band").count();
   check("몬스터를 맞히면(스캔) 그 Wi-Fi 대역이 채널맵에 표시된다", scanned.some((m) => m.revealed) && bandCells >= 9, `대역 칸 ${bandCells}개`);
 
-  // AFH 버튼 (호핑 강좌 이수자만) → 6 이벤트 뒤에 적용, 이후 드러난 대역으로 도약하지 않는다
+  // AFH 버튼 (퀘스트 Q4 보상) → 6 이벤트 뒤에 적용, 이후 드러난 대역으로 도약하지 않는다
   const afhLocked = await page.locator("#chmap .cm-afh").isDisabled();
-  await page.evaluate(() => { const p = window.__PK.progress(); p.cleared.hopping = "2026-11-01"; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
-  check("AFH 버튼은 도서관 '주파수 도약' 강좌를 이수해야 열린다", afhLocked);
+  const afhLabel = await page.locator("#chmap .cm-afh").textContent();
+  await page.evaluate(() => { const p = window.__PK.progress(); p.quests.perks.afh = true; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+  check("AFH 버튼은 퀘스트 Q4를 완료해야 열린다", afhLocked && afhLabel.includes("Q4"), afhLabel);
 }
 // AFH 스킬을 가진 세이브로 다시 시작해 2층을 이어서 검증
 await page.reload();
@@ -1061,7 +1143,7 @@ await reset();
   const allDisabled = await page.locator("#rflab-panel .lab-up").evaluateAll((bs) => bs.every((b) => b.disabled));
   const re = await page.evaluate(() => window.__PK.progress());
   check("CR2032가 없으면 강화 버튼이 막히고, 장비·분배는 새로고침 후에도 유지된다",
-    allDisabled && re.v === 7 && re.alloc.hop === 2 && re.gear.antenna === p1.gear.antenna);
+    allDisabled && re.v === 8 && re.alloc.hop === 2 && re.gear.antenna === p1.gear.antenna);
   await page.keyboard.press("Escape");
 }
 
@@ -1144,6 +1226,135 @@ await page.waitForFunction(() => window.__PK);
   const overlaps = [];
   for (const a of ["quest-tracker", "btn-quests"]) for (const b of ["joystick-zone", "btn-jump", "btn-fire", "btn-reset", "hp", "stats"]) if (hit(boxes[a], boxes[b])) overlaps.push(`${a}×${b}`);
   check("모바일 폭(390px)에서 퀘스트 트래커·버튼이 다른 조작 UI와 겹치지 않는다", overlaps.length === 0 && boxes["quest-tracker"].right <= 390, overlaps.join(", ") || "겹침 없음");
+  await page.setViewportSize({ width: 1000, height: 700 });
+}
+
+// ---------- Stage 10: 보안의 감옥 · 지하묘지 · 돌진 · 서비스 상자 ----------
+await page.evaluate(() => {
+  const p = window.__PK.progress();
+  p.quests.active = "Q6";
+  for (const id of ["Q0", "Q1", "Q2", "Q3", "Q4", "Q5"]) p.quests.done[id] = "2026-11-02";
+  Object.assign(p.quests.perks, { dle: true, advBoost: true, afh: true, dash: true });
+  for (const c of ["intro", "radio", "phy", "advertising", "hopping", "connection", "gatt", "security", "power"]) p.cleared[c] = "2026-11-02";
+  p.dungeon.maxFloor = 3;
+  localStorage.setItem("packetKnight.save", JSON.stringify(p));
+});
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const qState = () => page.evaluate(() => window.__PK.quests.state());
+  const crNow = async () => (await page.evaluate(() => window.__PK.progress())).cr2032;
+  const answerWhatif = async (id) => {
+    const w = Q9.whatifFor(Q9.questById(id));
+    await page.evaluate((q) => window.__PK.quests.open(q), id);
+    await page.locator(`#quests-panel .q-whatif .opt[data-orig="${w.answer}"]`).click();
+    await page.keyboard.press("Escape");
+  };
+
+  // 돌진 (Q5 보상): E 키 → 짧고 빠른 이동, 쿨다운
+  await reset();
+  const dashVisible = await page.locator("#btn-dash").isVisible();
+  const a = await state();
+  await page.keyboard.press("KeyE");
+  await tick(250);
+  const b = await state();
+  const d1 = await page.evaluate(() => window.__PK.dash());
+  await page.keyboard.press("KeyE");
+  await tick(250);
+  const c = await state();
+  const dashDist = Math.hypot(b.x - a.x, b.z - a.z), again = Math.hypot(c.x - b.x, c.z - b.z);
+  check("Q5 보상 돌진: E 키로 0.18초에 약 3.7 m 파고들고, 쿨다운 중엔 다시 안 된다", dashVisible && dashDist > 3 && again < 0.01 && d1.cooldown > 2,
+    `${dashDist.toFixed(2)} m · 재사용 ${again.toFixed(2)} m`);
+
+  // Q6: GATT 회관 방문 (클릭) + S등급 알바 → 서비스 상자
+  await reset();
+  const hp = await page.evaluate(() => window.__PK.projectToScreen(0, 5.0, -8.5));
+  await page.mouse.click(hp.x, hp.y);
+  await tick(20);
+  const visited = (await qState()).progress.Q6?.visit === 1;
+  await page.evaluate(() => { const p = window.__PK.progress(); p.quests.progress.Q6 = { visit: 1, job: 1 }; p.quests.active = "Q6"; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  await answerWhatif("Q6");
+  await reset();
+  const cr0 = await crNow();
+  await page.mouse.click(hp.x, hp.y);
+  await tick(20);
+  const boxLabel = await page.locator("#modal-action").textContent();
+  await page.click("#modal-action");
+  const cr1 = await crNow();
+  await page.mouse.click(hp.x, hp.y);
+  await tick(20);
+  const boxGone = await page.locator("#modal-action").isHidden();
+  check("Q6: GATT 회관 방문이 기록되고, 완료하면 서비스 상자(CR2032 20)를 한 번 열 수 있다", visited && boxLabel.includes("서비스 상자") && cr1 === cr0 + 20 && boxGone, `${cr0} → ${cr1}`);
+  await page.click("#modal-close");
+
+  // Q7: 보안의 감옥 — 랜드마크 클릭 → 페어링 시험 (1문제 틀려도 5/6 통과)
+  await reset();
+  const pp = await page.evaluate(() => window.__PK.projectToScreen(10, 4.7, -12));
+  await page.mouse.click(pp.x, pp.y);
+  await tick(20);
+  const prisonModal = (await state()).modal;
+  await page.click("#modal-action");
+  const opened = await page.evaluate(() => window.__PK.prison.isOpen());
+  await page.locator("#prison-panel .lib-btn.primary").click();
+  let rounds = 0, firstWrongShown = false;
+  for (; rounds < 6; rounds++) {
+    const right = await page.evaluate(() => window.__PK.prison.answer());
+    const opts = await page.locator("#prison-panel .opt").evaluateAll((bs) => bs.map((x) => x.dataset.choice));
+    const pick = rounds === 0 ? opts.find((o) => o !== right) : right;
+    await page.locator(`#prison-panel .opt[data-choice="${pick}"]`).click();
+    if (rounds === 0) firstWrongShown = (await page.locator("#prison-panel .lab-result.bad").count()) === 1;
+  }
+  const endText = await page.locator("#prison-panel").textContent();
+  await page.keyboard.press("Escape");
+  const q7 = await qState();
+  check("보안의 감옥: 랜드마크에서 페어링 시험을 열고, 틀리면 해설을 보여 주며, 5/6이면 Q7 단계가 채워진다",
+    prisonModal?.includes("감옥") && opened && firstWrongShown && endText.includes("5/6") && q7.progress.Q7?.trial === 1, prisonModal);
+  await answerWhatif("Q7");
+  const q7done = await qState();
+  check("Q7 완료 → AES 암호화 실드, Q8 시작", Boolean(q7done.done.Q7) && q7done.perks.aesShield && q7done.active === "Q8");
+
+  // Q8: 지하묘지 — 계약 3건을 손잡이로 맞춘다
+  await page.evaluate(() => window.__PK.crypt.open());
+  const setKnobs = async (interval, latency, clock) => {
+    if (interval !== null) await page.locator('#crypt-panel select[data-field="연결 간격"]').selectOption(String(interval));
+    await page.locator('#crypt-panel select[data-field="페리페럴 지연"]').selectOption(String(latency));
+    await page.locator('#crypt-panel select[data-field="수면 시계"]').selectOption(clock);
+  };
+  await setKnobs(4000, 0, "rc");
+  const lockedWrong = await page.locator("#crypt-panel .crypt-submit").isDisabled(); // 심박: 4 s는 반응 한도 초과
+  await setKnobs(1000, 0, "crystal");
+  await page.locator("#crypt-panel .crypt-submit").click();
+  await setKnobs(4000, 0, "rc");
+  const rcFails = await page.locator("#crypt-panel .crypt-submit").isDisabled(); // 문 센서: RC 발진기면 창 넓히기로 3년 못 감
+  await setKnobs(4000, 0, "crystal");
+  await page.locator("#crypt-panel .crypt-submit").click();
+  const fixedDisabled = await page.locator('#crypt-panel select[data-field="연결 간격"]').isDisabled();
+  await setKnobs(null, 3, "crystal");
+  await page.locator("#crypt-panel .crypt-submit").click();
+  const cs = await page.evaluate(() => window.__PK.crypt.state());
+  await page.keyboard.press("Escape");
+  const q8 = await qState();
+  check("지하묘지: 조건이 안 맞으면 계약 불가(RC 발진기·반응 한도), 3건 완수하면 Q8 단계가 채워진다 (환경 센서는 간격 고정)",
+    lockedWrong && rcFails && fixedDisabled && cs.done.length === 3 && q8.progress.Q8?.contracts === 1, cs.done.join(","));
+  await answerWhatif("Q8");
+  const fin = await page.evaluate(() => ({ q: window.__PK.quests.state(), pwr: window.__PK.stats().pwr, rc: window.__PK.chargeCfg().RECHARGE_SEC }));
+  const badgesOn = await (async () => { await page.evaluate(() => window.__PK.quests.open()); const n = await page.locator("#quests-panel .q-badge.on").count(); await page.keyboard.press("Escape"); return n; })();
+  check("Q8 완료 → PWR +20(측정기 충전 300 → 250초), Q0~Q8 완독 배지 9개", Boolean(fin.q.done.Q8) && fin.pwr === 120 && fin.rc === 250 && badgesOn === 9,
+    `PWR ${fin.pwr} · 충전 ${fin.rc}초 · 배지 ${badgesOn}`);
+
+  // 새로고침 유지 + 모바일 폭에서 돌진 버튼이 다른 조작 UI와 겹치지 않는다
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const kept = await page.evaluate(() => window.__PK.quests.state());
+  await page.setViewportSize({ width: 390, height: 780 });
+  await tick(50);
+  const boxes = await page.evaluate(() => Object.fromEntries(["btn-dash", "btn-fire", "btn-jump", "btn-reset", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"]
+    .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
+  const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
+  const ov = ["btn-fire", "btn-jump", "btn-reset", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"].filter((k) => hit(boxes["btn-dash"], boxes[k]));
+  check("Stage 10 진행이 저장되고, 모바일 폭에서 돌진 버튼이 겹치지 않는다", kept.active === null && kept.perks.aesShield && boxes["btn-dash"].width > 0 && ov.length === 0, ov.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
