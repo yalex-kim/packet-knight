@@ -8,6 +8,7 @@ import { QUESTS, UPCOMING_QUESTS, questById, whatifFor, stepDone, readyForWhatif
 const overlay = document.getElementById("quests");
 const panel = document.getElementById("quests-panel");
 const tracker = document.getElementById("quest-tracker");
+const pop = document.getElementById("quest-pop");
 
 /**
  * @type {{ getProgress: () => any, onAnswer: (questId: string, originalIndex: number) => { correct: boolean, completed: any },
@@ -52,7 +53,7 @@ function stepLine(qs, p, quest, step) {
   return el("li", { class: done ? "done" : "" }, `${done ? "✓" : "○"} ${step.text}${count}`,
     place ? el("button", {
       type: "button", class: "q-go", "data-place": place, textContent: "📍 길 안내",
-      title: "이 단계를 하는 곳으로 걸어갑니다", on: { click: () => { closeQuestLog(); hooks.guideTo(place); } }
+      title: "이 단계를 하는 곳으로 걸어갑니다", on: { click: () => { closeQuestLog(); closeQuestPop(); hooks.guideTo(place); } }
     }) : null);
 }
 
@@ -80,8 +81,9 @@ export function refreshTracker() {
     el("span", { class: "qt-head" }, `📜 ${quest.code} `, el("span", { class: "qt-name", textContent: `${quest.title} ` }), `${done}/${steps.length}`),
     el("span", { class: "qt-next", textContent: ` › ${nextText}` })
   );
-  tracker.title = `${quest.code} ${quest.title} — ${nextText} (눌러서 퀘스트 로그 열기)`;
+  tracker.title = `${quest.code} ${quest.title} — ${nextText} (눌러서 펼치기)`;
   tracker.classList.toggle("ready", ready);
+  if (!pop.hidden) renderPop();
 }
 
 // ---------- 퀘스트 로그 ----------
@@ -167,7 +169,54 @@ function answer(questId, orig) {
   refreshTracker();
 }
 
+// ---------- 트래커 팝오버 (Stage 11.3) ----------
+// 한 줄 트래커를 누르면 진행 중인 퀘스트 하나만 트래커 바로 위로 펼친다 (전체 로그는 "퀘스트 (Q)" 버튼).
+function renderPop() {
+  const p = hooks.getProgress();
+  const qs = p.quests;
+  const quest = questById(qs.active);
+  const close = el("button", { type: "button", class: "close", textContent: "×", "aria-label": "접기", on: { click: closeQuestPop } });
+  const fullLog = button("📜 전체 퀘스트 로그", () => { closeQuestPop(); openQuestLog(); }, "lib-btn qp-log");
+  if (!quest) {
+    pop.replaceChildren(el("div", { class: "qp-head" }, el("b", { textContent: `📜 Q0~${QUESTS.at(-1).code} 모두 완료` }), close),
+      el("div", { class: "muted", textContent: `다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 다음 업데이트에서 열린다` }),
+      el("div", { class: "lib-actions" }, fullLog));
+    return;
+  }
+  const ch = chapter(quest.chapter);
+  const w = whatifFor(quest);
+  const ready = readyForWhatif(qs, p, quest);
+  pop.replaceChildren(...[   // replaceChildren은 null을 글자로 넣으므로 걸러 낸다
+    el("div", { class: "qp-head" }, el("b", { textContent: `📜 ${quest.code} ${quest.title}` }), close),
+    el("div", { class: "muted", textContent: `📍 ${quest.region} · 📖 ${ch.title}` }),
+    el("ul", { class: "q-steps" }, quest.steps.map((s) => stepLine(qs, p, quest, s))),
+    el("div", { class: "q-reward", textContent: `🎁 보상: ${quest.reward.label}` }),
+    ready ? button("🔮 예측해 보기 답하기", () => { closeQuestPop(); openQuestLog(quest.id); }, "lib-btn primary qp-whatif") : null,
+    el("div", { class: "lib-actions" }, hooks.chapterLink(ch, w.section, "📖 원문 ↗", "lib-btn"), fullLog)
+  ].filter(Boolean));
+}
+/** 트래커 바로 위에 붙인다 — 트래커 위치는 화면 크기(데스크톱/모바일)마다 다르다 */
+function placePop() {
+  const r = tracker.getBoundingClientRect();
+  pop.style.left = `${Math.max(8, r.left)}px`;
+  pop.style.bottom = `${Math.round(window.innerHeight - r.top + 8)}px`;
+}
+export function openQuestPop() {
+  renderPop();
+  placePop();
+  pop.hidden = false;
+  tracker.setAttribute("aria-expanded", "true");
+  pop.querySelector(".qp-whatif, .close")?.focus({ preventScroll: true });
+}
+export function closeQuestPop() {
+  if (pop.hidden) return;
+  pop.hidden = true;
+  tracker.setAttribute("aria-expanded", "false");
+}
+export const isQuestPopOpen = () => !pop.hidden;
+
 export function openQuestLog(questId = null) {
+  closeQuestPop();
   lastFocus = document.activeElement;
   viewId = questId ?? hooks.getProgress().quests.active;
   order = null;
@@ -189,12 +238,21 @@ export const shownOrder = () => (order ? [...order] : null);
 export function initQuestLog(h) {
   hooks = h;
   rngState = (h.seed ?? Date.now()) >>> 0 || 1;
-  tracker.addEventListener("click", () => openQuestLog());
+  tracker.addEventListener("click", () => (pop.hidden ? openQuestPop() : closeQuestPop()));
+  tracker.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pop.hidden ? openQuestPop() : closeQuestPop(); }
+  });
+  // 팝오버 바깥을 누르면 접는다 (트래커는 위의 토글이 처리)
+  document.addEventListener("pointerdown", (e) => {
+    if (!pop.hidden && !pop.contains(e.target) && !tracker.contains(e.target)) closeQuestPop();
+  }, { capture: true });
+  window.addEventListener("resize", () => { if (!pop.hidden) placePop(); });
   document.getElementById("btn-quests").addEventListener("click", () => openQuestLog());
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closeQuestLog(); });
   // 캡처 단계: 다른 팝업의 Esc 처리보다 먼저 퀘스트 로그를 닫는다
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !overlay.hidden) closeQuestLog();
+    else if (e.key === "Escape" && !pop.hidden) { e.stopPropagation(); closeQuestPop(); }
   }, { capture: true });
   refreshTracker();
 }

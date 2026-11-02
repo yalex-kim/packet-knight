@@ -5,7 +5,9 @@ import * as THREE from "three";
 export const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 400);
 
 export const DEFAULT_PITCH = 0.52;
-export const orbit = { yaw: 0, pitch: DEFAULT_PITCH, distance: 15 };
+// 기본 줌 (Stage 11.3: 15 → 20, 사용자 요청 "좀 더 줌 아웃"). 세로 화면은 가로 시야가 좁아 더 멀리서 본다.
+export const DEFAULT_DISTANCE = window.innerWidth / window.innerHeight < 0.75 ? 25 : 20;
+export const orbit = { yaw: 0, pitch: DEFAULT_PITCH, distance: DEFAULT_DISTANCE };
 const DIST_MIN = 6, DIST_MAX = 36;
 const PITCH_MIN = 0.15, PITCH_MAX = 1.2;
 

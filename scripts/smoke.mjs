@@ -1253,7 +1253,25 @@ await page.waitForFunction(() => window.__PK);
   const toastReady = await page.locator("#toast").textContent();
   check("단계를 모두 마치면 트래커가 🔮 예측해 보기를 알린다", ready === 1 && toastReady.includes("예측해 보기"), toastReady);
 
+  // 트래커를 누르면 전체 로그가 아니라 진행 중인 퀘스트만 트래커 위로 펼쳐진다 (Stage 11.3)
   await page.click("#quest-tracker");
+  await page.waitForTimeout(350);   // 펼침 애니메이션(0.22초)이 끝난 뒤 위치를 잰다
+  const pop = await page.evaluate(() => {
+    const el = document.getElementById("quest-pop"), r = el.getBoundingClientRect(), t = document.getElementById("quest-tracker").getBoundingClientRect();
+    return { shown: !el.hidden, text: el.textContent, above: r.bottom <= t.top + 1 && Math.abs(r.left - t.left) < 2, logOpen: window.__PK.quests.isOpen(),
+      anim: getComputedStyle(el).animationName, whatif: !!el.querySelector(".qp-whatif") };
+  });
+  check("트래커를 누르면 진행 중인 퀘스트(Q0)만 트래커 바로 위로 펼쳐진다 (애니메이션, 전체 로그는 안 열림)",
+    pop.shown && pop.above && !pop.logOpen && pop.text.includes("Q0") && !pop.text.includes("Q1 ") && pop.anim === "qpopIn" && pop.whatif && !/null|false|undefined/.test(pop.text),
+    `${pop.text.slice(0, 40)} · 위치 ${pop.above} · ${pop.anim}`);
+  await page.click("#quest-tracker");
+  const toggled = await page.evaluate(() => document.getElementById("quest-pop").hidden);
+  await page.click("#quest-tracker");
+  await page.evaluate(() => document.getElementById("hp").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));   // 바깥을 누르면 접힌다
+  const outside = await page.evaluate(() => document.getElementById("quest-pop").hidden);
+  check("트래커를 다시 누르거나 바깥을 누르면 팝오버가 접힌다", toggled && outside);
+  await page.click("#quest-tracker");
+  await page.click("#quest-pop .qp-whatif");   // 팝오버의 '예측해 보기 답하기' → 퀘스트 로그의 그 문항
   const order = await page.evaluate(() => window.__PK.quests.shownOrder());
   const opts = page.locator("#quests-panel .q-whatif .opt");
   const shown = await opts.count();
