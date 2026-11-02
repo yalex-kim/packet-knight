@@ -2,7 +2,7 @@
 
 > **2.4GHz RF 세계를 탐험하며 배우는 3D 무선통신 RPG**
 > ConnectivityBook(connectivityBook) 연동 인터랙티브 학습 게임
-> 문서 버전: v1.1 · 작성일: 2026-11-01 · 최종 수정: 2026-11-01 (Stage 3.1 리뷰 반영) · 소유자: @yalex-kim
+> 문서 버전: v1.1 · 작성일: 2026-11-01 · 최종 수정: 2026-11-02 (NAS 서빙 전환) · 소유자: @yalex-kim
 
 ---
 
@@ -306,7 +306,7 @@
 | 9 | 퀘스트 ↔ 교과서 연동 | 챕터 매핑 데이터, 원문 모달, 배지 | Q0~Q3이 플레이 가능하고 교과서 링크가 동작한다 ✅ (§6 — 트래커·퀘스트 로그·🔮 예측해 보기·완독 배지·보상 DLE/ADV 강화, 세이브 v7, 시뮬레이터 questTime을 실제 퀘스트 완료 시간으로 교체, 기준선 8/8) |
 | 10 | 보안 · 전력 콘텐츠 | 보안 감옥, 지하묘지, AES 실드 (+ AFH를 Q4 보상으로 이동, Q4~Q6) | Q7~Q8 퀘스트가 플레이 가능하다 ✅ (§6 Stage 10 — 감옥 페어링 시험·지하묘지 배터리 계약·AES 실드·돌진·서비스 상자, 강좌 9개 퀘스트 순서, 세이브 v8, 기준선 8/8) |
 | 11 | 사운드와 폴리싱 | Web Audio API 효과음·BGM, UI 폴리싱 | 모든 상호작용에 음향 피드백이 있다 ✅ (§4.5 — 합성 효과음 36종·생성형 BGM·음소거, 스모크가 상황 11개에서 기대 효과음을 확인, 팝업 위 휠 줌 버그 수정) |
-| 12 | **서재 웹사이트 임베드** | connectivityBook 사이트에 iframe/링크 임베드, 배포(GitHub Pages). 이 시점에 번들러(Vite) 필요성을 재평가 | 교과서 사이트에서 게임이 실행되고 퀘스트→챕터 양방향 이동이 된다 |
+| 12 | **서재 웹사이트 임베드** | connectivityBook 사이트에 iframe/링크 임베드. 게임 주소는 `https://packetknight.yalex-k.com`(NAS 서빙, 2026-11-02 GitHub Pages에서 전환). 이 시점에 번들러(Vite) 필요성을 재평가 | 교과서 사이트에서 게임이 실행되고 퀘스트→챕터 양방향 이동이 된다 |
 
 ### 7.1 스테이지 완료 체크리스트 (모든 스테이지 공통)
 
@@ -512,7 +512,8 @@ Lv1 기본 스탯 봇이 훈련장 입구에서 60초 사냥(봇 2마리). 전�
 | 오디오 | Web Audio API | 외부 파일 없이 신디사이즈 기반 효과음 가능 (패킷 비프음 은유에도 유리) |
 | 언어 | JavaScript(ESM) + JSDoc 타입 주석 — TypeScript 도입은 번들러 재평가(Stage 12) 때 함께 검토 | 빠른 프로토타이핑 우선 |
 | 빌드 | 없음 — Stage 1~3: 단일 index.html + CDN import map, Stage 3.5~: import map 기반 무빌드 ESM 모듈. Vite 등 번들러는 Stage 12에서 필요성 재평가 | 김플립 방법론: 초기에는 번들러조차 최소화. 빌드 전환과 기능 추가를 한 스테이지에 섞지 않는다 |
-| 로컬 실행 | `npm start` (무의존 정적 서버 `scripts/serve.mjs`) | ES 모듈은 `file://`에서 로드되지 않는다(브라우저 CORS 정책). GitHub Pages 배포에는 영향 없음 |
+| 로컬 실행 | `npm start` (무의존 정적 서버 `scripts/serve.mjs`) | ES 모듈은 `file://`에서 로드되지 않는다(브라우저 CORS 정책). 배포에는 영향 없음 |
+| 배포 | `https://packetknight.yalex-k.com` — NAS 공용 Cloudflare 터널(`yalex-kim/edge`)의 nginx가 `index.html`·`src/`만 서빙, 수동 배포(`docker compose run --rm packetknight-deploy`), 모든 파일 `no-cache`(ETag 재검증). GitHub Pages는 2026-11-02에 껐다 | 교과서(connbook.yalex-k.com)와 같은 NAS·같은 방식으로 운영. 무빌드 정적 파일이라 서버 코드가 없다. 진행도는 origin별 localStorage라 Pages에서 하던 진행도는 따라오지 않는다 |
 | 계층 규칙 | `src/core/` → `src/render/`·`src/ui/` → `src/main.js` 단방향 의존. `core/`는 THREE·DOM import 금지(스모크 테스트가 검사) | 게임 로직을 봇 시뮬레이터(§8)가 Node에서 그대로 재사용하기 위함 |
 | 테스트 | Playwright 헤드리스 스모크 테스트(`npm run smoke`) | DoD를 손이 아니라 자동으로 검증 (§7.1) |
 | 상태 | localStorage (진행도), 이후 필요 시 IndexedDB | 서버 없이 저장 |
@@ -538,7 +539,8 @@ Lv1 기본 스탯 봇이 훈련장 입구에서 60초 사냥(봇 2마리). 전�
 - [x] Stage 9: 퀘스트 ↔ 교과서 연동 — Q0~Q3(사건·상태·🔮 예측해 보기 단계), 퀘스트 트래커·로그(Q 키), 원문 리더 절 앵커, 📖 완독 배지·칭호, 보상 DLE·ADV 강화, 세이브 v7, 교과서 주소 connbook.yalex-k.com 이전(`core/book.js`), 시뮬레이터 실제 퀘스트 완료 시간(16.8분), 스모크 125항목
 - [x] Stage 10: 보안 · 전력 콘텐츠 — AFH를 Q4 보상으로 이동(사용자 결정)·강좌 퀘스트 순서 9개, Q4~Q8, 보안의 감옥(페어링 시험, Table 2.8), 전력 잃은 지하묘지(CR2032 배터리 계약, 창 넓히기), AES 실드·돌진·서비스 상자·PWR 효과, 세이브 v8, 시뮬레이터 재보정(퀴즈 TX +5·SEC +3, 층 공격력 +18%), 스모크 137항목
 - [x] Stage 11: 사운드와 폴리싱 — Web Audio 합성 효과음 36종·생성형 BGM(마을/던전)·음소거(M 키), 팝업 열림/닫힘·클릭음 공통 처리, 팝업 위 휠이 맵을 줌하던 버그 수정, 팝업 애니메이션·포커스 링·reduced-motion, 스모크 142항목
-- [ ] Stage 12: 서재 웹사이트 임베드 — **다음 작업**
+- [x] NAS 서빙 전환 (2026-11-02) — `packetknight.yalex-k.com`(edge 스택, 수동 배포), GitHub Pages 끔, 교과서 챕터 링크 14개·절 앵커 2개 응답 확인
+- [ ] Stage 12: 서재 웹사이트 임베드 — **다음 작업** (사용자 보류)
 - [ ] (권장) 2시간 봇 시뮬레이션 — Q4~Q8 보상 구간 밸런스 (§8.7 Stage 10)
 - [ ] (결정 대기) §8.7 "공부 시간까지 따진 퀴즈 이득" 목표치
 - [ ] (보류) 레벨업 스탯 포인트 분배 UI — RF 랩(장비 강화) 단계에서 함께

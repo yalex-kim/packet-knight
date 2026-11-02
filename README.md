@@ -37,11 +37,24 @@ npm start                # → http://localhost:5173  (Node만 있으면 됨, np
 ```
 
 - 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
-- GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
+- 라이브: **https://packetknight.yalex-k.com** (NAS 서빙, 아래 「배포」 참고). 2026-11-02에 GitHub Pages(`yalex-kim.github.io/packet-knight`)를 껐다 — 진행도는 도메인(origin)별 localStorage라 Pages에서 하던 진행도는 새 주소로 따라오지 않는다.
 - 현재 진행: **Stage 11 완료** (Web Audio 합성 효과음·생성형 BGM — 🔊 버튼/M 키로 음소거, 팝업 위 휠이 맵을 줌하던 버그 수정, UI 폴리싱. 퀘스트 Q0~Q8: 🔒 보안의 감옥·🪫 지하묘지, Q 키로 퀘스트 로그) → 다음: Stage 12 서재(교과서 사이트) 임베드
 - 지금 할 수 있는 것: 📚 도서관 퀴즈로 스탯 올리기 · 📡 등대 알바로 CR2032 벌기(측정기 배터리 3칸, 5분마다 충전) · ⚔️ 훈련장에서 봇 사냥 · 🌀 북서쪽 관문에서 호핑 던전 도전(입장료 CR2032 3개) · 🔨 패킷 대장간 RF 랩에서 장비 강화·스탯 분배 (진행도는 브라우저에 자동 저장)
 - 전투: **F/J 키 · 📡 발사 버튼 · 몬스터 클릭** → ADV 패킷 발사. 봇의 LED가 빨개지면 공격 예고 — 뒤로 물러나면 피합니다.
 - 빌드 도구 없이 CDN import map + ES 모듈로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
+
+### 배포
+
+`https://packetknight.yalex-k.com` 은 NAS의 공용 Cloudflare 터널 스택([yalex-kim/edge](https://github.com/yalex-kim/edge))이 서빙한다. **수동 배포**라 `main`에 머지해도 바로 바뀌지 않는다.
+
+```bash
+# NAS의 edge 폴더에서 — main 최신 커밋을 releases/<sha> 에 풀고 current 링크를 원자적으로 교체
+docker compose run --rm packetknight-deploy
+```
+
+- 서빙하는 것은 `index.html`과 `src/`뿐이다(PRD·scripts·package.json은 404).
+- ES 모듈 주소에 버전이 붙지 않으므로 모든 파일을 `Cache-Control: no-cache`(ETag 재검증)로 내린다.
+- 배포 전에 `npm run smoke`가 통과해야 한다(CI 게이트 없음).
 
 ## 🤖 봇 시뮬레이션
 
