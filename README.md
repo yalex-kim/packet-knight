@@ -27,18 +27,90 @@
 
 ## 🚀 빠른 실행
 
-저장소를 클론하고 `index.html`을 브라우저로 열면 끝입니다. 빌드도 서버도 필요 없습니다.
+빌드는 필요 없습니다. 다만 ES 모듈(`src/*.js`)은 `file://`로 열면 브라우저가 막기 때문에, 의존성 없는 로컬 서버로 엽니다.
 
 ```bash
 git clone https://github.com/yalex-kim/packet-knight.git
 cd packet-knight
-open index.html          # macOS (Windows: start index.html)
+npm start                # → http://localhost:5173  (Node만 있으면 됨, npm install 불필요)
+# 또는: python3 -m http.server 5173
 ```
 
-- 조작: **WASD** / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
+- 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
 - GitHub Pages 라이브 데모: https://yalex-kim.github.io/packet-knight/
-- 현재 진행: **Stage 3 완료** (점프 물리, 건물/나무 충돌 판정 및 슬라이딩, 계단 단차 자연 보행, 착지 충격파 & 스쿼시 애니메이션)
-- Stage 1~3은 단일 `index.html`(CDN import map)로 동작하며, Stage 4부터 Vite 프로젝트로 전환됩니다.
+- 현재 진행: **Stage 10 완료** (퀘스트 Q0~Q8 — 🔒 보안의 감옥(북동) 페어링 시험, 🪫 전력 잃은 지하묘지(남동) CR2032 배터리 계약, 보상 AFH(Q4)·⚡ 돌진(E 키)·📦 서비스 상자·🛡️ AES 실드·PWR. Q 키로 퀘스트 로그) → 다음: Stage 11 사운드와 폴리싱
+- 지금 할 수 있는 것: 📚 도서관 퀴즈로 스탯 올리기 · 📡 등대 알바로 CR2032 벌기(측정기 배터리 3칸, 5분마다 충전) · ⚔️ 훈련장에서 봇 사냥 · 🌀 북서쪽 관문에서 호핑 던전 도전(입장료 CR2032 3개) · 🔨 패킷 대장간 RF 랩에서 장비 강화·스탯 분배 (진행도는 브라우저에 자동 저장)
+- 전투: **F/J 키 · 📡 발사 버튼 · 몬스터 클릭** → ADV 패킷 발사. 봇의 LED가 빨개지면 공격 예고 — 뒤로 물러나면 피합니다.
+- 빌드 도구 없이 CDN import map + ES 모듈로 동작합니다. 번들러 도입은 Stage 12에서 재평가합니다.
+
+## 🤖 봇 시뮬레이션
+
+밸런스는 손으로 느끼지 않고 수치로 검증합니다. 게임과 같은 `src/core` 로직을 Node에서 수천 판 돌립니다.
+
+```bash
+node scripts/simulate.mjs                           # 전체: 알바 + 훈련장 + 던전 곡선 + 1시간 경제 → PRD §8.3 판정 (봇 1000명, 약 40초)
+node scripts/simulate.mjs --game=economy --strategy=balanced   # 1시간 경제만, 중간 전략만
+node scripts/simulate.mjs --game=rssi --bots=2000   # 알바 전략별 점수·등급·CR2032 분포
+node scripts/simulate.mjs --game=combat --bots=300  # 훈련장 전략별 처치·피해·회복·KO·수입
+```
+
+결과는 `scripts/report/balance-report.json`(커밋)에, 보정 이력과 발견은 [PRD.md §8.5~8.7](PRD.md)에 기록합니다. 보고서에는 `balance.js` 해시가 들어 있어서, 수치를 고치고 시뮬레이션을 다시 돌리지 않으면 스모크 테스트가 실패합니다.
+
+## 🧱 코드 구조
+
+```
+index.html            DOM 오버레이(HUD·조이스틱·모달) + import map + 엔트리
+src/
+  main.js             조립: 씬·게임 상태·메인 루프·테스트 훅(window.__PK)
+  core/               순수 로직 — THREE·DOM 의존 금지, Node에서 import 가능 (봇 시뮬레이터 재사용)
+    config.js         월드·물리 상수
+    terrain.js        칸 단위 높이맵 (시각·물리 단일 진실 공급원)
+    layout.js         랜드마크 위치·문구·충돌 형상 데이터
+    collision.js      높이 인식 충돌 (STEP_MAX)
+    motor.js          이동·점프·낙하 물리
+    balance.js        밸런스 수치 (PRD §8.4 원본)
+    quiz.js           퀴즈 출제(시드 고정 가능)·채점
+    progress.js       진행도 저장/복원·보상·학습 지표·유효 스탯·강화·분배 (저장소 주입, 세이브 v6)
+    chapters.data.js  교과서 레슨·퀴즈 데이터 (자동 생성)
+    rssiJob.js        알바: RSSI 거리 측정 미니게임 상태 기계
+    combat.js         데미지·회피·치명타·레벨 공식
+    battle.js         전투 월드: 봇 AI·ADV 패킷·드롭·HP 회복 (충돌 세계 주입식)
+    gear.js           장비 강화: 스탯 반영·기대 비용
+    arena.js          장애물 없는 원형 방 충돌 세계 (던전 층 템플릿)
+    jobCharges.js     측정기 배터리 (알바 횟수 제한, 실시간 충전)
+    hopping.js        LE 채널 선택 알고리즘 #1·채널맵·Wi-Fi 간섭 (교과서 hopping.html과 일치)
+    dungeon.js        호핑 던전: 층 절차 생성·링크 퍼즐·ACS·층 전투 생성
+    link.js           전투 중 링크: 연결 이벤트 도약·채널맵 instant 갱신·간섭 판정·AFH
+    quests.js         퀘스트 Q0~Q3: 사건·상태·🔮 예측해 보기 단계, 보상(칭호·TX·DLE·ADV 강화), 완독 배지
+    pairing.js        페어링 방식 판정(Table 2.8)·감옥 시험 문제
+    powerBudget.js    CR2032 수명 모델(창 넓히기)·지하묘지 계약
+    book.js           교과서 주소 (connbook.yalex-k.com) — 모든 챕터 링크를 여기서 만든다
+  render/             THREE 렌더링 — world(지형·건물), knight(기사·이펙트), camera(오빗 카메라)
+  render/battleView   봇·Wi-Fi 몬스터·광역 예고·투사체·드롭·HP 바 렌더링
+  render/dungeonView  지하 방·채널 기둥 37개·링크 콘솔·포털
+  ui/                 DOM — input(키보드·조이스틱·포인터), hud(배지·스탯·모달), library(강의실), jobPanel(알바), dungeonPanel(던전 입장·채널맵 콘솔·Connection Timeout), chmap(전투 실시간 채널맵), rfLab(장비 강화·스탯 분배), questLog(퀘스트 트래커·로그·예측해 보기·배지), prison(페어링 시험), crypt(배터리 계약), fx(데미지 숫자·토스트·HP 바)
+scripts/
+  serve.mjs           무의존 로컬 정적 서버 (npm start)
+  import-chapters.mjs connectivityBook 챕터 → chapters.data.js 생성
+  simulate.mjs        봇 시뮬레이션 엔트리 (게임과 같은 core 로직을 Node에서 실행)
+  lib/                봇 행동: rssi(알바) · combat(훈련장·던전 층) · economy(1시간 루프)
+  report/             balance-report.json — 시뮬레이션 결과·§8.3 판정
+  smoke.mjs           DoD 자동 검증 (npm run smoke)
+```
+
+의존 방향은 `core → render/ui → main` 한 방향입니다. `core/`가 THREE나 DOM을 import 하면 스모크 테스트가 실패합니다.
+
+## ✅ DoD 자동 검증 (스모크 테스트)
+
+각 스테이지의 완료 기준(DoD)은 Playwright 헤드리스 테스트로 검증합니다. 스테이지를 커밋하기 전에 반드시 통과시킵니다.
+
+```bash
+npm install          # playwright, three(오프라인용 사본)
+npx playwright install chromium   # 최초 1회
+npm run smoke        # → 137/137 통과
+```
+
+- 게임을 `index.html?test`로 열면 실시간 시뮬레이션이 멈추고, 테스트가 `window.__PK.tick(초)`로 고정 1/60초 스텝을 진행시킵니다. 헤드리스 FPS와 무관하게 결정적으로 검증됩니다.
 
 ## 📚 connectivityBook 연동
 
@@ -46,17 +118,24 @@ open index.html          # macOS (Windows: start index.html)
 
 | 게임 | 교과서 |
 |---|---|
-| 광고의 숲 (채널 37/38/39) | [bluetooth/chapters/advertising.html](https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/advertising.html) |
-| 37채널 호핑 던전 | [bluetooth/chapters/hopping.html](https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/hopping.html) |
-| 연결의 다리 | [bluetooth/chapters/connection.html](https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/connection.html) |
-| GATT 빌리지 | [bluetooth/chapters/gatt.html](https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/gatt.html) |
-| 보안의 감옥 | [bluetooth/chapters/security.html](https://yalex-kim.github.io/connectivityBook/bluetooth/chapters/security.html) |
+| 광고의 숲 (채널 37/38/39) | [bluetooth/chapters/advertising.html](https://connbook.yalex-k.com/bluetooth/chapters/advertising.html) |
+| 37채널 호핑 던전 | [bluetooth/chapters/hopping.html](https://connbook.yalex-k.com/bluetooth/chapters/hopping.html) |
+| 연결의 다리 | [bluetooth/chapters/connection.html](https://connbook.yalex-k.com/bluetooth/chapters/connection.html) |
+| GATT 빌리지 | [bluetooth/chapters/gatt.html](https://connbook.yalex-k.com/bluetooth/chapters/gatt.html) |
+| 보안의 감옥 | [bluetooth/chapters/security.html](https://connbook.yalex-k.com/bluetooth/chapters/security.html) |
 
 전체 매핑은 [PRD.md §6](PRD.md)를 참고하세요.
 
+도서관 강의실의 레슨(핵심 정리)과 퀴즈는 교과서 원문 각 챕터의 "핵심 정리"·"확인 퀴즈"를 그대로 가져온 것입니다. 교과서가 바뀌면 다시 생성합니다.
+
+```bash
+git clone --depth 1 https://github.com/yalex-kim/connectivityBook ../connectivityBook
+node scripts/import-chapters.mjs ../connectivityBook   # → src/core/chapters.data.js
+```
+
 ## 🗺️ 로드맵 (요약)
 
-Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 → Stage 3 컨트롤 고도화 → Stage 4 교육 루프 → Stage 5 알바 미니게임 → Stage 6 첫 전투 → Stage 7 호핑 던전 → Stage 8 간섭 전투 → Stage 9 교과서 연동 → Stage 10 보안·전력 콘텐츠 → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
+Stage 1 빈 복셀 섬 ✅ → Stage 2 건물 배치 ✅ → Stage 3 컨트롤 고도화 ✅ (3.1 결함 수정 ✅) → Stage 3.5 모듈 분리 ✅ → Stage 4 교육 루프 ✅ → Stage 5 알바 미니게임 ✅ → Stage 6 첫 전투 ✅ → Stage 6.5 봇 시뮬레이션 v1 ✅ → Stage 7 호핑 던전 ✅ → Stage 7.5 RF 랩 ✅ → Stage 8 간섭 전투 ✅ → Stage 9 교과서 연동 ✅ → Stage 10 보안·전력 콘텐츠 ✅ → Stage 11 사운드 → Stage 12 서재(교과서 사이트) 임베드
 
 각 단계의 완료 기준(DoD)은 [PRD.md §7](PRD.md)에 정의되어 있습니다.
 
