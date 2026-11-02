@@ -1,5 +1,6 @@
 // 전력 잃은 지하묘지 — CR2032 배터리 계약 UI (Stage 10, Q8) (DOM)
 
+import { sfx } from "./audio.js";
 import { CONTRACTS, CLOCKS, INTERVALS_MS, MAX_LATENCY, judgeContract, POWER_MODEL } from "../core/powerBudget.js";
 import { chapterUrl } from "../core/book.js";
 
@@ -80,6 +81,7 @@ function submit() {
   const c = CONTRACTS[index];
   if (!judgeContract(c, setting).pass) return;
   done.push(c.id);
+  sfx("coin");
   index++;
   setting = null;
   if (index >= CONTRACTS.length) hooks.onAllDone();

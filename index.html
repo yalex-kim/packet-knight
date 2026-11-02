@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Packet Knight — Stage 10</title>
+<title>Packet Knight — Stage 11</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -371,11 +371,40 @@
   .crypt-check { list-style: none; padding: 0; }
   .crypt-check .ok { color: #7dffb5; } .crypt-check .bad { color: #ff9a8f; }
 
+  /* Stage 11: 사운드 버튼 · UI 폴리싱 */
+  #btn-sound {
+    position: fixed; right: 14px; top: 14px; z-index: 11; width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(6, 16, 30, .85); border: 1px solid #1f3a5f; color: #e2f1ff; font-size: 17px; cursor: pointer;
+    backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); padding: 0; line-height: 1;
+  }
+  #btn-sound[aria-pressed="false"] { opacity: .6; }
+  #badge { right: 60px; }
+  /* 팝업이 열릴 때 살짝 떠오르며 나타난다 */
+  .overlay:not([hidden]) { animation: overlayIn .16s ease-out; }
+  .overlay:not([hidden]) > .panel { animation: panelIn .2s cubic-bezier(.2, .9, .3, 1.2); }
+  #info-modal { animation: modalIn .2s ease-out; }
+  @keyframes modalIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translateX(-50%); } }
+  #toast:not([hidden]) { animation: toastIn .25s ease-out; }
+  @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes panelIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translateX(-50%); } }
+  /* 눌림 피드백 · 키보드 포커스 */
+  button:not(:disabled):active, .lib-btn:not(:disabled):active { transform: translateY(1px) scale(.98); }
+  button:focus-visible, select:focus-visible, a:focus-visible, #quest-tracker:focus-visible { outline: 2px solid #7dd8ff; outline-offset: 2px; }
+  .panel .close { min-width: 36px; min-height: 36px; border-radius: 8px; }
+  .panel .close:hover { background: rgba(125, 216, 255, .12); color: #e2f1ff; }
+  .opt:not(:disabled):hover, .course:hover, .q-item:not(:disabled):hover { border-color: #7dd8ff; }
+  #quest-tracker:hover { border-color: #ffd76b; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
     #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
     #hud .stage-label, #hud .control-desc { display: none; }
-    #badge { max-width: calc(60vw - 40px); font-size: 11.5px; padding: 6px 10px; }
+    #badge { max-width: calc(60vw - 60px); font-size: 11.5px; padding: 6px 10px; right: 56px; }
+    #btn-sound { right: 10px; top: 10px; width: 36px; height: 36px; }
     #stats { top: 50px; font-size: 11px; }
     /* HP 바는 조이스틱·버튼과 겹치지 않게 좌상단 제목 아래로 */
     #hp { bottom: auto; top: 50px; left: 14px; transform: none; width: 40vw; }
@@ -396,7 +425,7 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 10: 보안 · 전력</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 11: 사운드 · 폴리싱</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
@@ -408,10 +437,12 @@
     🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
     📜 퀘스트: <b>Q 키 / 퀘스트 버튼 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지<br />
-    ⚡ 돌진: <b>E 키 / 돌진 버튼</b> (Q5 보상) · 🔒 보안의 감옥(북동) · 🪫 지하묘지(남동)
+    ⚡ 돌진: <b>E 키 / 돌진 버튼</b> (Q5 보상) · 🔒 보안의 감옥(북동) · 🪫 지하묘지(남동)<br />
+    🔊 소리: <b>M 키 / 우상단 버튼</b> · 휠 줌은 맵 위에서만
   </div>
 </div>
 
+<button id="btn-sound" type="button" aria-label="소리 켜기/끄기 (M)" aria-pressed="true">🔊</button>
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
 <div id="stats" aria-label="기사 스탯"></div>
 <div id="quest-tracker" role="button" tabindex="0" aria-label="진행 중인 퀘스트 (눌러서 퀘스트 로그 열기)"></div>

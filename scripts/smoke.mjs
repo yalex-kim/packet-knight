@@ -1358,6 +1358,120 @@ await page.waitForFunction(() => window.__PK);
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
+// ---------- Stage 11: 휠 줌 수정 · 사운드 ----------
+{
+  await reset();
+  const zoom = () => page.evaluate(() => window.__PK.zoom());
+  // 휠 이벤트는 비동기로 도착하므로 도착 횟수를 세어 기다린다
+  await page.evaluate(() => { window.__w = 0; window.addEventListener("wheel", () => { window.__w++; }, { passive: true }); });
+  const wheelAt = async (dy, n) => { await page.mouse.wheel(0, dy); await page.waitForFunction((k) => window.__w >= k, n, { timeout: 3000 }); await tick(30); };
+  // ① 팝업(강의실) 위 휠 → 팝업만 스크롤, 맵 줌은 그대로
+  await page.evaluate(() => window.__PK.library.open());
+  const z0 = await zoom();
+  const panelBox = await page.locator("#library-panel").boundingBox();
+  await page.mouse.move(panelBox.x + panelBox.width / 2, panelBox.y + panelBox.height / 2);
+  await wheelAt(400, 1);
+  const z1 = await zoom();
+  await page.keyboard.press("Escape");
+  // ② 정보 모달(입력은 막지 않는 팝업) 위 휠도 줌하지 않는다
+  const lp = await page.evaluate(() => window.__PK.projectToScreen(-9.0, 4.6, -1.0));
+  await page.mouse.click(lp.x, lp.y);
+  await tick(20);
+  const mb = await page.locator("#info-modal").boundingBox();
+  await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2);
+  await wheelAt(400, 2);
+  const z2 = await zoom();
+  await page.click("#modal-close");
+  // ③ 맵 위 휠은 줌한다
+  await page.mouse.move(500, 120);
+  await wheelAt(-300, 3); // 줌 인 (기본 거리가 최대값일 수 있어 안쪽으로)
+  const z3 = await zoom();
+  check("팝업(강의실·정보 모달) 위에서 휠을 굴리면 맵이 줌되지 않고, 맵 위에서만 줌된다", z1 === z0 && z2 === z0 && z3 !== z0, `${z0} → 팝업 ${z1} · 모달 ${z2} · 맵 ${z3.toFixed(2)}`);
+  await wheelAt(300, 4);
+
+  // ④ 첫 입력 뒤 AudioContext가 깨어나고, 모든 효과음이 에러 없이 합성된다
+  const au = await page.evaluate(() => window.__PK.audio.state());
+  const synth = await page.evaluate(async () => {
+    const A = await import("/src/ui/audio.js");
+    const errs = [];
+    for (const n of A.SFX_NAMES) { try { A.sfx(n); } catch (e) { errs.push(`${n}: ${e.message}`); } }
+    return { n: A.SFX_NAMES.length, errs };
+  });
+  check("첫 사용자 입력 뒤 AudioContext가 동작하고, 효과음 전부가 에러 없이 합성된다", au.ctx === "running" && synth.errs.length === 0 && synth.n >= 35, `${au.ctx} · 효과음 ${synth.n}종`);
+
+  // ⑤ DoD: 상호작용마다 음향 피드백 (행동 → 기대 효과음)
+  const heard = async (fn) => { await page.evaluate(() => window.__PK.audio.clear()); await fn(); await tick(30); return page.evaluate(() => window.__PK.audio.log()); };
+  const cases = [];
+  const expect = (label, log, names) => cases.push({ label, ok: names.every((n) => log.includes(n)), miss: names.filter((n) => !log.includes(n)) });
+  await reset();
+  expect("점프·착지", await heard(async () => { await page.keyboard.press("Space"); await tick(1200); }), ["jump", "land"]);
+  expect("걷기 발소리", await heard(() => hold("KeyS", 800)), ["step"]);
+  expect("돌진", await heard(async () => { await page.keyboard.press("KeyE"); await tick(300); }), ["dash"]);
+  await teleport(-9.0, 5.6); await tick(100);
+  expect("발사(F 키)", await heard(async () => { await page.keyboard.press("KeyF"); await tick(300); }), ["fire"]);
+  expect("명중·처치", await heard(async () => { await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 300 && !pk.battle.state().monsters.some((m) => m.state === "dead"); i++) { pk.battle.fire(); pk.tick(0.1); } }); }), ["hit", "kill"]);
+  expect("랜드마크 클릭 → 정보 모달", await heard(async () => { await reset(); await page.mouse.click(lp.x, lp.y); }), ["open"]);
+  await page.click("#modal-close");
+  expect("팝업 열기·버튼·닫기", await heard(async () => { await page.keyboard.press("KeyQ"); await page.locator("#quests-panel .close").click(); }), ["open", "click", "close"]);
+  expect("퀴즈 정답/오답", await heard(async () => {
+    await page.evaluate(() => window.__PK.library.open());
+    await lib(".course").first().click();
+    await lib(".lib-btn.primary").click();
+    const key = await page.evaluate(() => window.__PK.library.answerKey());
+    await lib(".opt").nth(key[0]).click();
+    await lib(".lib-btn.primary").click();
+    await lib(".opt").nth((key[1] + 1) % (await lib(".opt").count())).click();
+    await page.keyboard.press("Escape");
+  }), ["correct", "wrong"]);
+  expect("RF 랩 강화", await heard(async () => {
+    await page.evaluate(() => { window.__PK.rflab.open(); });
+    await page.locator("#rflab-panel .lab-up").first().click();
+    await page.keyboard.press("Escape");
+  }), ["open"]);
+  const labLog = await page.evaluate(() => window.__PK.audio.log());
+  expect("알바: 비콘 핑·측정 확정", await heard(async () => {
+    await page.evaluate(() => { const p = window.__PK.progress(); window.__PK.advanceClock(3600e3); return p; });
+    await page.evaluate(() => window.__PK.job.open());
+    await page.locator("#job-panel .lib-btn.primary").click();
+    await tick(1500);
+    await page.keyboard.press("Space");
+    await tick(100);
+    await page.keyboard.press("Escape");
+  }), ["beacon", "measure"]);
+  expect("던전 입장(포털·BGM 전환)·채널 토글·귀환", await heard(async () => {
+    await page.evaluate(() => { const p = window.__PK.progress(); p.cr2032 = 50; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+    await page.evaluate(() => window.__PK.dungeon.enter());
+    await tick(200);
+    await page.locator("#chmap .cm").nth(5).dispatchEvent("pointerdown");
+    await page.evaluate(() => window.__PK.dungeon.leave());
+    await tick(50);
+  }), ["portal", "bgm:dungeon", "channelToggle", "bgm:village"]);
+  const failed = cases.filter((c) => !c.ok);
+  check("DoD: 모든 상호작용에 음향 피드백이 있다 (이동·전투·팝업·퀴즈·알바·던전)", failed.length === 0,
+    failed.map((c) => `${c.label}: ${c.miss.join("/")} 없음`).join(", ") || `${cases.length}개 상황 모두 소리남`);
+  void labLog;
+
+  // ⑥ 음소거: M 키 · 버튼, 설정은 새로고침 후에도 유지
+  await page.keyboard.press("KeyM");
+  const muted = await page.evaluate(() => window.__PK.audio.state().muted);
+  const icon = await page.locator("#btn-sound").textContent();
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const keptMute = await page.evaluate(() => window.__PK.audio.state().muted);
+  await page.click("#btn-sound");
+  const unmuted = !(await page.evaluate(() => window.__PK.audio.state().muted));
+  check("M 키·🔊 버튼으로 음소거하고, 설정이 새로고침 후에도 유지된다", muted && icon === "🔇" && keptMute && unmuted);
+
+  // ⑦ 모바일 폭: 사운드 버튼이 배지·스탯과 겹치지 않는다
+  await page.setViewportSize({ width: 390, height: 780 });
+  await tick(50);
+  const bx = await page.evaluate(() => Object.fromEntries(["btn-sound", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
+  const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
+  const ov = ["badge", "stats", "hud", "hp"].filter((k) => hit(bx["btn-sound"], bx[k]));
+  check("모바일 폭에서 사운드 버튼이 다른 HUD와 겹치지 않는다", ov.length === 0, ov.join(", ") || "겹침 없음");
+  await page.setViewportSize({ width: 1000, height: 700 });
+}
+
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));
 
 await browser.close();

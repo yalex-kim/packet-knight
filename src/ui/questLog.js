@@ -1,6 +1,7 @@
 // 퀘스트 트래커(HUD) · 퀘스트 로그 오버레이 — 단계 ✓, 원문 읽기, 🔮 예측해 보기, 📖 완독 배지 (PRD §6, Stage 9) (DOM)
 // 교과서 문항은 textContent로만 넣는다.
 
+import { sfx } from "./audio.js";
 import { CHAPTERS } from "../core/chapters.data.js";
 import { QUESTS, UPCOMING_QUESTS, questById, whatifFor, stepDone, readyForWhatif, badges } from "../core/quests.js";
 
@@ -143,6 +144,7 @@ function answer(questId, orig) {
     order = null;
   } else {
     // 틀리면 보기를 다시 섞고, 원문을 다시 읽어 보라고 권한다 (해설은 맞힌 뒤에 보여 준다)
+    sfx("wrong");
     feedback = { cls: "bad", text: "✗ 아직 아니다 — 💡 힌트를 다시 보거나 📖 원문의 그 절을 읽고 다시 예측해 보자." };
     order = shuffled(order.length);
   }
