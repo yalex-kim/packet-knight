@@ -34,7 +34,7 @@ import {
 import { CHAPTERS } from "./core/chapters.data.js";
 import { applyJobResult, jobChargesAt, startJobCharge, chargeCfg } from "./core/progress.js";
 import { createRng } from "./core/quiz.js";
-import { createJob, stepJob, confirmMeasurement } from "./core/rssiJob.js";
+import { createJob, stepJob, markBeacon } from "./core/rssiJob.js";
 import * as jobPanel from "./ui/jobPanel.js";
 import { TRAINING_GROUND, MONSTERS, GEAR, STAT_POINTS_PER_LEVEL } from "./core/balance.js";
 import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket, revivePlayer } from "./core/battle.js";
@@ -528,6 +528,7 @@ function leaveDungeon(ko = false) {
 }
 
 function openDungeonEntry() {
+  if (job && job.phase !== "done") { fx.showToast("📡 비콘 찾기 알바 중에는 던전에 들어갈 수 없다 — 끝내거나 ✖로 그만두자", 3); return; }
   setInputEnabled(false);
   inputLocked = true;
   clearMoveTarget();
@@ -623,7 +624,7 @@ dungeonUi.initDungeonPanel({
   }
 });
 
-// ---------- 알바: 비콘 신호 측정소 ----------
+// ---------- 알바: 비콘 찾기 (Stage 11.2) ----------
 // 실시간 시계 (테스트는 __PK.advanceClock으로 앞당긴다 — 측정기 배터리 충전 검증용)
 let clockOffset = 0;
 const now = () => Date.now() + clockOffset;
@@ -631,7 +632,23 @@ const jobRng = createRng(TEST_MODE ? 7 : Date.now());
 /** @type {import("./core/rssiJob.js").Job | null} */
 let job = null;
 
+/** 비콘을 숨길 수 있는 자리: 마을 안, 걸어서 닿는 평지, 장애물에서 조금 떨어진 곳 (훈련장·던전 입구 제외) */
+function isBeaconSpot(x, z) {
+  if (Math.hypot(x, z) > WORLD.VILLAGE_RADIUS - 1.5 || isDungeonCell(x, z)) return false;
+  if (Math.hypot(x - TRAINING_GROUND.x, z - TRAINING_GROUND.z) < 5) return false;
+  const y = groundHeightAt(x, z);
+  if (!Number.isFinite(y) || y > SPAWN_POS.y + 0.6) return false;
+  return [[0, 0], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8]].every(([dx, dz]) => !isBlocked(x + dx, z + dz, y));
+}
+let huntRevealShown = false;
+
+function endHunt() {
+  huntBeacon.visible = false;
+  huntRevealShown = false;
+}
+
 function onJobDone() {
+  endHunt();
   const paid = applyJobResult(progress, job.result);
   questEvent(progress.quests, { type: "job", grade: job.result.grade });
   persist();
@@ -647,19 +664,57 @@ jobPanel.initJobPanel({
   onStart: () => {
     if (!startJobCharge(progress, now())) return; // 배터리 없음 (버튼도 비활성)
     persist();
-    job = createJob(jobRng);
+    job = createJob(jobRng, { start: { x: motor.x, z: motor.z }, isSpotOk: isBeaconSpot });
     jobPanel.showRunning();
     jobPanel.updateJob(job);
+    // 모달은 닫히고 기사는 걸어 다니며 찾는다
+    setInputEnabled(true);
+    inputLocked = false;
+    hud.setBadge("📡 비콘 찾는 중 — 멈춰 서서 평균을 내 보자");
   },
-  onConfirm: () => { if (job) { confirmMeasurement(job); sfx("measure"); jobPanel.updateJob(job); } },
+  onMark: () => {
+    if (!job || job.phase !== "search") return;
+    markBeacon(job, motor);
+    sfx("measure");
+    jobPanel.updateJob(job);
+  },
+  onAbort: () => {
+    job = null; // 찾는 도중 그만두면 보수 없이 중단
+    endHunt();
+    hud.setBadge(regionLabel());
+  },
   onClose: () => {
-    job = null; // 측정 도중 닫으면 보수 없이 중단
     setInputEnabled(true);
     inputLocked = false;
   }
 });
 
+// 정답 공개 때 비콘 위치를 보여 주는 기둥 (판정 색)
+const huntBeacon = new THREE.Group();
+{
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.2, 10), new THREE.MeshBasicMaterial({ color: 0x7dffb5, transparent: true, opacity: 0.75 }));
+  pillar.position.y = 1.6;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.0, 32), new THREE.MeshBasicMaterial({ color: 0x7dffb5, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), new THREE.MeshBasicMaterial({ color: 0x39d0ff }));
+  box.position.y = 0.25;
+  huntBeacon.add(pillar, ring, box);
+  huntBeacon.visible = false;
+  scene.add(huntBeacon);
+}
+const TIER_COLOR = { precise: 0x7dffb5, good: 0xb5f07d, near: 0xffb36b, miss: 0xff7a70 };
+function showHuntBeacon() {
+  const b = job.beacon;
+  huntBeacon.position.set(b.x, groundHeightAt(b.x, b.z), b.z);
+  const color = TIER_COLOR[b.tier?.id] ?? 0x7dffb5;
+  huntBeacon.children[0].material.color.setHex(color);
+  huntBeacon.children[1].material.color.setHex(color);
+  huntBeacon.visible = true;
+}
+
 function openJob() {
+  if (job && job.phase !== "done") { fx.showToast("📡 이미 비콘을 찾는 중이다", 2); return; }
   setInputEnabled(false);
   inputLocked = true;
   clearMoveTarget();
@@ -744,10 +799,11 @@ btnReset.addEventListener("click", () => {
 
 // ---------- 시뮬레이션 한 스텝 ----------
 function simulate(dt) {
-  if (job && job.phase !== "done") {
-    const heard = job.beacon?.samples.length ?? 0;
-    stepJob(job, dt, jobRng);
-    if ((job.beacon?.samples.length ?? 0) > heard) sfx("beacon"); // 광고 패킷 하나 수신 = 짧은 핑
+  if (job && job.phase !== "done" && !run) {
+    const got = stepJob(job, dt, jobRng, motor);
+    if (got.length) sfx("beacon"); // 광고 패킷 하나 수신 = 짧은 핑
+    if (job.phase === "reveal" && !huntRevealShown) { showHuntBeacon(); huntRevealShown = true; }
+    if (job.phase === "search" && huntRevealShown) endHunt();
     if (job.phase === "done") onJobDone();
     else jobPanel.updateJob(job);
   }
@@ -921,8 +977,11 @@ window.__PK = {
     /** 테스트용 관찰: 현재 세션 요약 (실제 거리 포함) */
     state: () => job && {
       phase: job.phase, timeLeft: job.timeLeft, score: job.score, rounds: job.history.length,
-      samples: job.beacon.samples.length, distance: job.beacon.distance, result: job.result
-    }
+      samples: job.beacon.samples.length, beacon: { x: job.beacon.x, z: job.beacon.z }, err: job.beacon.err, result: job.result,
+      revealShown: huntBeacon.visible
+    },
+    isHunting: jobPanel.isMeasuring,
+    mark: () => jobPanel.isMeasuring() && window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyB", key: "b" }))
   },
   teleport: (x, z, y) => Object.assign(motor, { x, z, y: y ?? (run ? DUNGEON_ROOM.floorY : groundHeightAt(x, z)), vy: 0, grounded: true }),
   /** 시뮬레이션을 seconds 만큼 고정 스텝으로 진행 (테스트 모드용) */

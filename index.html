@@ -143,6 +143,7 @@
   #stats .coins, #stats .level { border-top: none; margin-top: 0; padding-top: 0; }
   #stats .coins { color: #ffd76b; }
   #stats .level { color: #c9b8ff; }
+  #stats .st-sum { display: none; }   /* 모바일에서만 보이는 한 줄 요약 */
   @keyframes statUp { 0%, 40% { color: #fff36b; text-shadow: 0 0 8px #fff36b; } 100% { color: inherit; text-shadow: none; } }
 
   /* 도서관 강의실 & 원문 리더 오버레이 */
@@ -214,6 +215,19 @@
   .job-estimate.tier-miss { color: #ff7a70; }
   .job-confirm { font-size: 15px; padding: 11px 18px; min-height: 46px; }
   .job-confirm:disabled, .job-start:disabled { opacity: 0.45; cursor: default; }
+  /* 비콘 찾기 측정기 (Stage 11.2) — 화면 위 가운데, 걸어 다니며 본다 */
+  #hunt {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 12; width: min(380px, 92vw);
+    background: rgba(6, 16, 30, .88); border: 1px solid #2b6a9c; border-radius: 12px; padding: 8px 10px;
+    color: #d9ecff; backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0,0,0,.5);
+  }
+  #hunt .job-bar { font-size: 12px; margin-bottom: 6px; align-items: center; }
+  #hunt .rssi-canvas { aspect-ratio: 360 / 90; }
+  #hunt .job-readout { font-size: 12px; margin-top: 5px; }
+  #hunt .job-estimate { font-size: 15px; margin-top: 3px; min-height: 22px; }
+  #hunt .lib-actions { margin-top: 6px; display: flex; justify-content: flex-end; }
+  #hunt .job-confirm { min-height: 40px; padding: 8px 16px; font-size: 14px; }
+  #hunt .job-quit { padding: 2px 9px; min-height: 0; font-size: 13px; }
   .charge-line { font-size: 12.5px; color: #b5f07d; }
 
   /* 전투: 발사 버튼, 플레이어 HP 바, 떠오르는 숫자, 토스트 */
@@ -402,16 +416,25 @@
 
   /* 좁은 화면: 조작 안내는 접고(조이스틱·버튼이 자명) 배지·스탯과 겹치지 않게 */
   @media (max-width: 640px) {
-    #hud { padding: 6px 10px; font-size: 12px; max-width: 40vw; }
-    #hud .stage-label, #hud .control-desc { display: none; }
-    #badge { max-width: calc(60vw - 60px); font-size: 11.5px; padding: 6px 10px; right: 56px; }
-    #btn-sound { right: 10px; top: 10px; width: 36px; height: 36px; }
-    #stats { top: 50px; font-size: 11px; }
-    /* HP 바는 조이스틱·버튼과 겹치지 않게 좌상단 제목 아래로 */
-    #hp { bottom: auto; top: 50px; left: 14px; transform: none; width: 40vw; }
+    /* 모바일 상단 (Stage 11.2): 1줄 = HP 바(가로 전체) + 🔊, 2줄 = 스탯 요약(왼쪽) + 상태 배지(오른쪽).
+       제목 상자는 숨기고, 스탯은 한 줄로 접어 두었다가 누르면 펼친다 — 화면을 덜 가리게 */
+    #hud { display: none; }
+    #btn-sound { right: 8px; top: 8px; width: 32px; height: 32px; font-size: 15px; }
+    #hp { bottom: auto; top: 12px; left: 8px; transform: none; width: calc(100vw - 56px); height: 22px; }
     #hp.hurt { animation: none; }
-    /* 던전 바는 HP 바 아래 왼쪽 (오른쪽은 스탯 패널) */
-    #dungeon-hud { top: 80px; left: 14px; transform: none; max-width: 55vw; font-size: 11.5px; flex-wrap: wrap; gap: 4px; }
+    #stats { top: 44px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; pointer-events: auto; cursor: pointer; max-width: 56vw; }
+    #stats .st-sum { display: block; grid-column: 1 / -1; appearance: none; background: none; border: 0; padding: 0; color: #d9ecff; font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+    #stats .st-sum::after { content: " ▾"; color: #7dd8ff; }
+    #stats.open .st-sum::after { content: " ▴"; }
+    #stats .st-sum.up { animation: statUp 1.6s ease-out; }
+    #stats:not(.open) > :not(.st-sum) { display: none; }
+    #stats.open .st-sum { border-bottom: 1px solid #1b3554; margin-bottom: 3px; padding-bottom: 3px; }
+    #badge { top: 44px; right: 8px; max-width: calc(44vw - 20px); font-size: 11px; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 비콘 찾기 측정기: 스탯 요약 아래, 조이스틱·버튼 위 */
+    #hunt { top: 74px; width: calc(100vw - 16px); padding: 6px 8px; }
+    #hunt .rssi-canvas { aspect-ratio: 360 / 60; }
+    /* 던전 바는 스탯 요약 아래 왼쪽 */
+    #dungeon-hud { top: 76px; left: 8px; transform: none; max-width: 60vw; font-size: 11.5px; flex-wrap: wrap; gap: 4px; }
     #chmap { top: 180px; bottom: auto; left: 8px; right: 8px; width: auto; transform: none; padding: 5px; font-size: 10.5px; }
     #toast { top: 46%; }
     #chmap .cm { height: 26px; border-radius: 2px; }
@@ -427,14 +450,14 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 11: 사운드 · 폴리싱</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 11.2: 비콘 찾기 알바 · 모바일 HUD</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
     🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />
     🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌<br />
     📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
-    📡 알바: <b>전파의 등대</b> 클릭 → RSSI 측정 (CR2032 획득)<br />
+    📡 알바: <b>전파의 등대</b> 클릭 → 비콘 찾기 (RSSI, B 키로 신고 · CR2032 획득)<br />
     ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
     🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
@@ -491,9 +514,11 @@
 </div>
 
 <!-- 알바: 비콘 신호 측정소 (Stage 5) -->
-<div id="job" class="overlay" role="dialog" aria-modal="true" aria-label="비콘 신호 측정소 알바" hidden>
+<div id="job" class="overlay" role="dialog" aria-modal="true" aria-label="비콘 찾기 알바" hidden>
   <div class="panel" id="job-panel"></div>
 </div>
+<!-- 비콘 찾기 중 측정기 창 (모달 아님 — 걸어 다니며 본다) -->
+<div id="hunt" role="region" aria-label="비콘 찾기 측정기" hidden></div>
 
 <!-- 37채널 호핑 던전 (Stage 7) -->
 <div id="dungeon" class="overlay" role="dialog" aria-modal="true" aria-label="호핑 던전" hidden>

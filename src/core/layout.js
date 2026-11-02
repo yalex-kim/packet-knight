@@ -64,10 +64,10 @@ export const LANDMARKS = [
       sign: "📡 전파의 등대 · 알바",  // 건물 위 이름 표지판 (render/world.js)
       title: "📡 전파의 등대 (안테나 타워)",
       sub: "[비콘 채널 37 송출탑]",
-      desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 신호를 수신해 RSSI 거리를 측정하는 알바 미니게임을 진행할 수 있습니다.",
+      desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 등대지기에게서 측정기를 받아, 마을에 숨겨진 비콘을 RSSI로 찾아내는 60초 알바를 할 수 있습니다.",
       lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
       link: CHAPTER("advertising.html"),
-      action: { id: "job", label: "📡 알바 시작 (60초)" },
+      action: { id: "job", label: "📡 비콘 찾기 알바 (60초)" },
       walkPos: { x: 6.4, y: S, z: 6.4 }
     }
   },

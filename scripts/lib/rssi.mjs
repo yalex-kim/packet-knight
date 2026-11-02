@@ -1,10 +1,23 @@
-// 알바(RSSI 측정) 봇 — 게임과 같은 core/rssiJob.js를 돌린다
-import { createJob, stepJob, confirmMeasurement } from "../../src/core/rssiJob.js";
+// 알바(비콘 찾기) 봇 — 게임과 같은 core/rssiJob.js를 돌린다 (Stage 11.2)
+//
+// 봇은 사람이 하는 방법을 흉내 낸다: 멈춰 서서 패킷 targetN개를 평균해 거리 r을 재고(반응 지연 포함),
+//   ① r이 MARK_R 이하면 "여기다!"
+//   ② 잰 자리가 1~2곳뿐이면 STEP m 옆으로 (두 번째는 직각으로) 옮겨 다시 잰다
+//   ③ 3곳 이상이면 최근 자리들의 거리로 삼변측량(최소제곱)해 그 점으로 걸어가 다시 잰다
+//   ④ MAX_PROBES번 재도 못 찾으면 추정 위치에서 그냥 신고한다
+// 지도는 마을처럼 반경 VILLAGE_R m 원판이고 장애물은 없다고 본다 (실제 게임은 건물을 돌아가야 해서 조금 더 느리다).
+import { createJob, stepJob, markBeacon, distanceFromRssi, averageRssi } from "../../src/core/rssiJob.js";
+import { PLAYER_BASE } from "../../src/core/balance.js";
 
 export const DT = 1 / 60;
-export const REACTION = 0.35; // 사람 반응 지연 (초)
+export const REACTION = 0.35;   // 사람 반응 지연 (초)
+const SPEED = PLAYER_BASE.hop;  // 걷는 속도 (m/s)
+const VILLAGE_R = 15;
+const MARK_R = 1.2;             // 이 거리 안이라고 재면 신고
+const STEP = 3;                 // 처음 두 번 옮겨 재는 거리 (m)
+const MAX_PROBES = 7;
 
-/** 봇 전략: 패킷 targetN개를 모으면 반응 지연 뒤 확정 */
+/** 봇 전략: 한 자리에서 패킷 targetN개를 평균한다 (이름은 Stage 5와 같게 — 스모크·보고서가 이름으로 찾는다) */
 export const RSSI_STRATEGIES = [
   { name: "성급 (N=1)", targetN: 1 },
   { name: "조급 (N=3)", targetN: 3 },
@@ -15,14 +28,73 @@ export const RSSI_STRATEGIES = [
   { name: "과신중 (N=40)", targetN: 40 }
 ];
 
+const inVillage = (x, z) => Math.hypot(x, z) <= VILLAGE_R;
+function clampToVillage(p) {
+  const r = Math.hypot(p.x, p.z);
+  return r <= VILLAGE_R - 0.5 ? p : { x: (p.x / r) * (VILLAGE_R - 0.5), z: (p.z / r) * (VILLAGE_R - 0.5) };
+}
+
+/** 최소제곱 삼변측량 — Σ(|p − pᵢ| − rᵢ)² 최소점 (가우스–뉴턴, 거리가 가까운 측정에 가중치) */
+export function trilaterate(probes) {
+  let wsum = 0, x = 0, z = 0;
+  for (const p of probes) { const w = 1 / Math.max(0.5, p.r); wsum += w; x += p.x * w; z += p.z * w; }
+  x /= wsum; z /= wsum;
+  for (let it = 0; it < 30; it++) {
+    let a = 0, b = 0, c = 0, gx = 0, gz = 0;
+    for (const p of probes) {
+      const dx = x - p.x, dz = z - p.z, d = Math.max(1e-6, Math.hypot(dx, dz));
+      const w = 1 / Math.max(0.5, p.r) ** 2;
+      const jx = dx / d, jz = dz / d, res = d - p.r;
+      a += w * jx * jx; b += w * jx * jz; c += w * jz * jz; gx += w * jx * res; gz += w * jz * res;
+    }
+    const det = a * c - b * b;
+    if (Math.abs(det) < 1e-9) break;
+    const sx = (c * gx - b * gz) / det, sz = (a * gz - b * gx) / det;
+    x -= sx; z -= sz;
+    if (Math.hypot(sx, sz) < 1e-3) break;
+  }
+  return { x, z };
+}
+
 export function rssiSession(targetN, rng) {
-  const job = createJob(rng);
-  let readyAt = null;
+  const pos = { x: 0, z: 0 };
+  const job = createJob(rng, { start: pos, isSpotOk: inVillage });
+  let probes = [], target = null, readyAt = null, markAt = null, markOnArrive = false, round = -1, dir = 0;
   while (job.phase !== "done") {
-    stepJob(job, DT, rng);
-    if (job.phase !== "measure") { readyAt = null; continue; }
+    if (job.phase === "search" && round !== job.history.length) {   // 새 비콘
+      round = job.history.length; probes = []; target = null; readyAt = null; markAt = null; markOnArrive = false; dir = rng() * Math.PI * 2;
+    }
+    if (job.phase === "search" && target) {                          // 걷는 중
+      const dx = target.x - pos.x, dz = target.z - pos.z, d = Math.hypot(dx, dz), step = SPEED * DT;
+      if (d <= step) {
+        pos.x = target.x; pos.z = target.z; target = null;
+        if (markOnArrive) { markOnArrive = false; markAt = job.phaseTime + REACTION; }
+      }
+      else { pos.x += (dx / d) * step; pos.z += (dz / d) * step; }
+    }
+    stepJob(job, DT, rng, pos);
+    if (job.phase !== "search" || target) continue;
+
+    if (markAt !== null) {
+      if (job.phaseTime >= markAt) { markBeacon(job, pos); markAt = null; }
+      continue;
+    }
     if (readyAt === null && job.beacon.samples.length >= targetN) readyAt = job.phaseTime + REACTION;
-    if (readyAt !== null && job.phaseTime >= readyAt) confirmMeasurement(job);
+    if (readyAt === null || job.phaseTime < readyAt) continue;
+    readyAt = null;
+
+    const r = distanceFromRssi(averageRssi(job));
+    probes.push({ x: pos.x, z: pos.z, r });
+    if (r <= MARK_R) { markAt = job.phaseTime; continue; }
+    if (probes.length >= MAX_PROBES) {
+      target = clampToVillage(trilaterate(probes.slice(-4)));
+      markOnArrive = true;   // 도착하면 신고
+      continue;
+    }
+    if (probes.length === 1) target = clampToVillage({ x: pos.x + STEP * Math.cos(dir), z: pos.z + STEP * Math.sin(dir) });
+    else if (probes.length === 2) target = clampToVillage({ x: pos.x + STEP * Math.cos(dir + Math.PI / 2), z: pos.z + STEP * Math.sin(dir + Math.PI / 2) });
+    else target = clampToVillage(trilaterate(probes.slice(-4)));
+    if (Math.hypot(target.x - pos.x, target.z - pos.z) < 0.4) target = null;   // 제자리 → 다시 잰다
   }
   return job.result;
 }

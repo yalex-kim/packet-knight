@@ -47,7 +47,7 @@ forEachCell((i, j, top) => {
     return;
   }
   // 하부 층: 이웃 칸보다 낮아지는 절벽 면이 비지 않도록 충분히 깊게 쌓는다
-  const depth = type === "sand" ? 2 : 4;
+  const depth = 4;   // 섬 가장자리 절벽이 바다 아래까지 꽉 차 보이게 (해안도 평지 — Stage 11.2)
   for (let d = 1; d <= depth; d++) {
     const y = top - d;
     if (y <= WORLD.BEDROCK_Y) break;
