@@ -200,8 +200,6 @@
   .reward { color: #fff36b; font-weight: 700; }
   .source { margin-top: 14px; font-size: 11px; color: #6f8fb0; }
   .source a { color: #8fc4ff; }
-  #reader .panel { max-width: 920px; height: calc(100vh - 32px); display: flex; flex-direction: column; padding: 12px; }
-  #reader iframe { flex: 1; width: 100%; border: 0; border-radius: 8px; background: #fff; }
 
   /* 알바: 비콘 신호 측정소 */
   .formula { font-size: 12.5px; background: rgba(14, 34, 60, 0.7); border: 1px solid #234b78; border-radius: 6px; padding: 7px 10px; color: #ffd76b; overflow-x: auto; white-space: nowrap; }
@@ -331,6 +329,8 @@
   #quest-tracker ul, .q-steps { list-style: none; padding: 0; margin: 3px 0 0; }
   #quest-tracker li, .q-steps li { margin: 1px 0; color: #a4c7e8; }
   #quest-tracker li.done, .q-steps li.done { color: #7dffb5; }
+  .q-go { margin-left: 8px; padding: 1px 8px; font: inherit; font-size: 12px; color: #ffd36b; background: rgba(255, 211, 107, .1); border: 1px solid rgba(255, 211, 107, .45); border-radius: 999px; cursor: pointer; vertical-align: 1px; }
+  .q-go:hover, .q-go:focus-visible { background: rgba(255, 211, 107, .22); }
   #quest-tracker .qt-ready { color: #d9c4ff; margin-top: 3px; }
   #btn-quests {
     position: fixed; right: 140px; bottom: 16px; z-index: 10;
@@ -520,18 +520,6 @@
   <div class="panel" id="quests-panel"></div>
 </div>
 
-<div id="reader" class="overlay" role="dialog" aria-modal="true" aria-label="교과서 원문" hidden>
-  <div class="panel">
-    <div class="head">
-      <h2 id="reader-title">교과서 원문</h2>
-      <div>
-        <a class="lib-btn" id="reader-newtab" href="#" target="_blank" rel="noopener">↗ 새 탭</a>
-        <button type="button" class="close" id="reader-close" aria-label="닫기">&times;</button>
-      </div>
-    </div>
-    <iframe id="reader-frame" title="connectivityBook 챕터 원문" loading="lazy"></iframe>
-  </div>
-</div>
 
 <script type="importmap">
 {

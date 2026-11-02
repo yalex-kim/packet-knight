@@ -16,6 +16,17 @@ const GRADE_RANK = { "-": 0, C: 1, B: 2, A: 3, S: 4 };
  * @typedef {{ id: string, code: string, title: string, chapter: string, region: string, reward: { label: string, cr2032?: number, title?: string, bonus?: Record<string, number>, perk?: string }, steps: QuestStep[] }} Quest
  * @type {Quest[]}
  */
+/**
+ * 단계를 하는 장소(layout.js 랜드마크 id) — 퀘스트 로그의 "📍 길 안내"가 여기로 데려간다.
+ * 단계 id가 퀘스트마다 같은 뜻으로 쓰이므로 id로 정한다. 장소가 없는 단계(걷기·점프·예측해 보기)는 null.
+ */
+const STEP_PLACE = {
+  hit: "trainingSign", kills: "trainingSign", course: "library", job: "tower", antenna: "forge",
+  floor: "dungeonGate", visit: "hall", trial: "prison", contracts: "crypt"
+};
+/** @param {QuestStep} step @returns {string|null} */
+export const stepPlace = (step) => STEP_PLACE[step.id] ?? null;
+
 export const QUESTS = [
   {
     id: "Q0", code: "Q0", title: "세계에 첫 패킷을 쏘다", chapter: "intro", region: "GATT 빌리지 (튜토리얼)",
@@ -29,12 +40,12 @@ export const QUESTS = [
     ]
   },
   {
-    id: "Q1", code: "Q1", title: "전파는 어떻게 날까?", chapter: "radio", region: "전파의 등대 · RF 랩",
+    id: "Q1", code: "Q1", title: "전파는 어떻게 날까?", chapter: "radio", region: "전파의 등대 · 도서관 · 패킷 대장간(RF 랩)",
     reward: { label: "TX +1 (PRD §6)", bonus: { tx: 1 } },
     steps: [
       { id: "job", text: "등대 알바: RSSI 측정 B등급 이상 1회", kind: "event", event: "job", match: { minGrade: "B" }, need: 1 },
       { id: "course", text: "도서관: '2.4 GHz 전파와 데시벨' 만점 이수", kind: "state", check: (p) => Boolean(p.cleared.radio) },
-      { id: "antenna", text: "RF 랩: 안테나 강화 1단계 (링크 버짓의 '안테나 이득')", kind: "state", check: (p) => (p.gear?.antenna ?? 0) >= 1 },
+      { id: "antenna", text: "패킷 대장간 RF 랩: 안테나 강화 1단계 (링크 버짓의 '안테나 이득')", kind: "state", check: (p) => (p.gear?.antenna ?? 0) >= 1 },
       { id: "whatif", text: "🔮 예측해 보기: 송신 전력 +6 dB vs 앞주머니", kind: "whatif", whatif: 0 }
     ]
   },

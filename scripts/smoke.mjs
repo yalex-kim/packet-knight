@@ -1147,6 +1147,35 @@ await reset();
   await page.keyboard.press("Escape");
 }
 
+// ---------- Stage 11.1: 건물 표지판 · 퀘스트 "📍 길 안내" ----------
+await page.evaluate(() => {           // 안테나 강화 단계를 미완료로 — 그래야 그 단계에 길 안내 버튼이 뜬다
+  const p = window.__PK.progress();
+  p.gear.antenna = 0;
+  localStorage.setItem("packetKnight.save", JSON.stringify(p));
+});
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const signs = await page.evaluate(() => window.__PK.signs());
+  check("건물 위 이름 표지판이 뜨고, 대장간 표지판이 RF 랩을 함께 알린다",
+    signs.includes("🔨 패킷 대장간 · RF 랩") && signs.includes("📚 도서관") && signs.includes("📡 전파의 등대 · 알바") && signs.length >= 7, signs.join(" | "));
+  await reset();
+  await page.evaluate(() => window.__PK.quests.open("Q1"));
+  const goes = await page.locator("#quests-panel .q-go").evaluateAll((bs) => bs.map((b) => b.dataset.place));
+  await page.locator('#quests-panel .q-go[data-place="forge"]').click();
+  const s0 = await state();
+  const closed = await page.evaluate(() => !window.__PK.quests.isOpen());
+  for (let i = 0; i < 40 && !(await state()).badge.includes("앞 도착"); i++) await tick(300);
+  const s1 = await state();
+  const trackerText = await page.locator("#quest-tracker").textContent();
+  check("HUD 퀘스트 트래커에는 길 안내 버튼도, 새어 나온 'false' 글자도 없다",
+    (await page.locator("#quest-tracker .q-go").count()) === 0 && !trackerText.includes("false"), trackerText.slice(-40));
+  check("퀘스트 로그의 '📍 길 안내'가 그 단계의 건물(RF 랩 → 패킷 대장간)로 데려간다",
+    goes.includes("forge") && goes.includes("tower") && closed && s0.modal.includes("패킷 대장간") && s1.badge.includes("패킷 대장간") && Math.hypot(s1.x - 6.6, s1.z + 1.0) < 1.2,
+    `${goes.join(",")} · ${s0.modal} · ${s1.badge} @ (${s1.x.toFixed(1)}, ${s1.z.toFixed(1)})`);
+  await page.keyboard.press("Escape");
+}
+
 // ---------- Stage 9: 퀘스트 트래커 · 로그 · 예측해 보기 · 배지 ----------
 await page.evaluate(() => localStorage.clear());
 await page.reload();
@@ -1170,13 +1199,21 @@ await page.waitForFunction(() => window.__PK);
   const lockedText = await page.locator("#quests-panel .q-whatif").textContent();
   check("Q 키로 퀘스트 로그가 열리고, 강좌 전에는 예측해 보기가 잠겨 있다",
     await page.evaluate(() => window.__PK.quests.isOpen()) && lockedText.includes("모두 마치면"));
-  await page.locator("#quests-panel .q-read").click();
-  const url = await page.evaluate(() => window.__PK.library.readerUrl());
+  // 실제 탭은 열지 않는다 — 우리 click 핸들러(열람 기록)는 돌고, 기본 동작(새 탭)만 막는다
+  const read = await page.evaluate(() => {
+    const a = document.querySelector("#quests-panel .q-read");
+    const before = window.__PK.progress().metrics.chapterOpens.intro ?? 0;
+    a.addEventListener("click", (e) => e.preventDefault(), { once: true });
+    a.click();
+    return { tag: a.tagName, href: a.getAttribute("href"), target: a.target, rel: a.rel, url: window.__PK.library.lastChapterUrl(),
+      opened: (window.__PK.progress().metrics.chapterOpens.intro ?? 0) - before, overlay: document.querySelector("#reader") !== null,
+      logOpen: window.__PK.quests.isOpen() };
+  });
   const w0 = Q9.whatifFor(Q9.QUESTS[0]);
-  check("'원문 읽기'가 게임 안 리더로 교과서 새 주소의 그 절을 연다", url === `https://connbook.yalex-k.com/bluetooth/chapters/intro.html#${w0.section}`, url);
-  await page.keyboard.press("Escape");
-  const stillOpen = await page.evaluate(() => window.__PK.quests.isOpen() && !window.__PK.library.isReaderOpen());
-  check("Esc는 리더만 먼저 닫고 퀘스트 로그는 남는다", stillOpen);
+  const want = `https://connbook.yalex-k.com/bluetooth/chapters/intro.html#${w0.section}`;
+  check("'원문 읽기'는 교과서 그 절을 새 탭 링크로 열고(게임 안 리더 없음) 열람을 기록한다",
+    read.tag === "A" && read.href === want && read.target === "_blank" && read.rel.includes("noopener") && read.url === want && read.opened === 1 && !read.overlay && read.logOpen,
+    JSON.stringify(read));
   await page.keyboard.press("Escape");
 
   await page.evaluate(() => window.__PK.library.open());

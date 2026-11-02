@@ -23,7 +23,7 @@ import * as knightView from "./render/knight.js";
 import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera } from "./render/camera.js";
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
-import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, openReader, isReaderOpen, readerUrl } from "./ui/library.js";
+import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, chapterLink, lastChapterUrl } from "./ui/library.js";
 import * as questLog from "./ui/questLog.js";
 import * as audio from "./ui/audio.js";
 import { sfx } from "./ui/audio.js";
@@ -162,6 +162,16 @@ function regionLabel() {
   return "🛡️ GATT 빌리지 광장";
 }
 
+/** 랜드마크 안내 모달을 띄우고 그 앞으로 걸어간다 — 건물 클릭과 퀘스트 "📍 길 안내"가 같이 쓴다 */
+function goToLandmark(info) {
+  hud.showModal(modalInfo(info));
+  sfx("open");
+  const place = ["hall", "prison", "crypt"].find((id) => landmark(id).info === info);
+  if (place) questProgress({ type: "visit", place });
+  setMoveTarget(info.walkPos, `${info.title} 앞 도착`);
+  hud.setBadge(`🚶 ${info.title}(으)로 이동 중`);
+}
+
 function setMoveTarget(pos, arrivalLabel) {
   moveTarget = pos;
   pendingArrivalLabel = arrivalLabel;
@@ -251,15 +261,7 @@ function handleTap(clientX, clientY) {
   if (run) { tapDungeonFloor(); return; }
 
   const info = findInteractive(hits[0].object);
-  if (info) {
-    hud.showModal(modalInfo(info));
-    sfx("open");
-    const place = ["hall", "prison", "crypt"].find((id) => landmark(id).info === info);
-    if (place) questProgress({ type: "visit", place });
-    setMoveTarget(info.walkPos, `${info.title} 앞 도착`);
-    hud.setBadge(`🚶 ${info.title}(으)로 이동 중`);
-    return;
-  }
+  if (info) { goToLandmark(info); return; }
 
   const p = hits[0].point;
   const y = groundHeightAt(p.x, p.z);
@@ -310,8 +312,11 @@ initLibrary({
 questLog.initQuestLog({
   seed: TEST_MODE ? 5 : undefined,
   getProgress: () => progress,
-  openReader,
-  isReaderOpen,
+  chapterLink,
+  guideTo: (id) => {
+    if (run) { fx.showToast("📍 던전 안에서는 길 안내를 할 수 없다 — 마을로 돌아간 뒤 다시 눌러 보자", 3); return; }
+    goToLandmark(landmark(id).info);
+  },
   onOpenChange: (open) => {
     setInputEnabled(!open);
     inputLocked = open;
@@ -867,7 +872,8 @@ window.__PK = {
   progress: () => structuredClone(progress),
   stats: () => effectiveStats(progress),
   saveStatus: () => ({ load: loaded.status, lastSaveOk }),
-  library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, readerUrl, isReaderOpen },
+  library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, lastChapterUrl },
+  signs: () => world.signs.map((s) => s.userData.signText),
   quests: {
     open: (id) => questLog.openQuestLog(id),
     close: questLog.closeQuestLog,
