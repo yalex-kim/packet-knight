@@ -212,6 +212,10 @@ function initPointer(h) {
   window.addEventListener("pointerup", end);
   window.addEventListener("pointercancel", end);
 
-  window.addEventListener("wheel", (e) => h.onZoom((d) => d + e.deltaY * 0.015), { passive: true });
+  // 휠 줌은 맵(surface) 위에서만, 팝업이 열려 있지 않을 때만 — 팝업 위 휠은 팝업 스크롤에 쓴다 (Stage 11 수정)
+  window.addEventListener("wheel", (e) => {
+    if (!enabled || !h.surface.contains(/** @type {Node} */ (e.target))) return;
+    h.onZoom((d) => d + e.deltaY * 0.015);
+  }, { passive: true });
   window.addEventListener("contextmenu", (e) => e.preventDefault());
 }

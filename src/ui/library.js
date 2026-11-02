@@ -1,6 +1,7 @@
 // 도서관 강의실 UI — 강좌 목록 → 레슨(핵심 정리) → 3문제 퀴즈 → 결과 (PRD §4.1)
 // 콘텐츠는 connectivityBook 원문에서 가져온 데이터(core/chapters.data.js)이므로 textContent로만 넣는다.
 
+import { sfx } from "./audio.js";
 import { LIBRARY_COURSES, QUIZ_BONUS, STAT_META, QUIZ, SKILL_REWARDS } from "../core/balance.js";
 import { CHAPTERS, CHAPTER_SOURCE } from "../core/chapters.data.js";
 import { chapterById, drawQuiz, gradeQuiz, createRng } from "../core/quiz.js";
@@ -149,6 +150,7 @@ function showQuestion() {
       else if (j === i) b.classList.add("wrong");
     });
     explain.textContent = `${i === q.answer ? "⭕ 정답!" : "❌ 아쉬워요."} ${q.explain}`;
+    sfx(i === q.answer ? "correct" : "wrong");
     explain.hidden = false;
     next.hidden = false;
     next.focus({ preventScroll: true });
@@ -171,6 +173,7 @@ function finishQuiz() {
   const result = gradeQuiz(questions, picks);
   const before = hooks.getStats();
   const outcome = hooks.onQuizFinished(chapterId, result.perfect);
+  if (result.perfect) sfx("perfect");
   const after = hooks.getStats();
   const progress = hooks.getProgress();
 

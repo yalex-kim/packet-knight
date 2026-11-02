@@ -1,5 +1,6 @@
 // 보안의 감옥 — 페어링 시험 UI (Stage 10, Q7) (DOM)
 
+import { sfx } from "./audio.js";
 import { createTrial, answerTrial, explainRound, METHODS, IO_CAPS, PAIRING_TRIAL } from "../core/pairing.js";
 import { chapterUrl } from "../core/book.js";
 
@@ -90,6 +91,7 @@ function answer(choice) {
   const r = trial.rounds[trial.index];
   const res = answerTrial(trial, choice);
   last = { correct: res.correct, text: explainRound(r) };
+  sfx(res.correct ? "correct" : "wrong");
   if (res.passed) hooks.onPassed();
   render();
 }

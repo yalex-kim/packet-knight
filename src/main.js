@@ -25,6 +25,8 @@ import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
 import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, openReader, isReaderOpen, readerUrl } from "./ui/library.js";
 import * as questLog from "./ui/questLog.js";
+import * as audio from "./ui/audio.js";
+import { sfx } from "./ui/audio.js";
 import { questEvent, answerWhatif, questById, readyForWhatif, PERKS } from "./core/quests.js";
 import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
@@ -74,6 +76,24 @@ scene.add(battleView.battleRoot);
 scene.add(dungeonView.dungeonRoot);
 knightView.addKnightTo(scene);
 
+// ---------- 사운드 (Stage 11) ----------
+audio.initAudio({ bgm: !new URLSearchParams(location.search).has("test") });
+audio.setBgm("village");
+const btnSound = document.getElementById("btn-sound");
+function renderSoundButton() {
+  const m = audio.isMuted();
+  btnSound.textContent = m ? "🔇" : "🔊";
+  btnSound.setAttribute("aria-pressed", String(!m));
+  btnSound.title = m ? "소리 켜기 (M)" : "소리 끄기 (M)";
+}
+btnSound.addEventListener("click", () => { audio.toggleMute(); renderSoundButton(); btnSound.blur(); });
+window.addEventListener("keydown", (e) => {
+  if (e.code !== "KeyM" || e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+  audio.toggleMute();
+  renderSoundButton();
+});
+renderSoundButton();
+
 // ---------- 진행도 (localStorage) ----------
 // 사생활 보호 모드 등에서 localStorage 접근 자체가 예외를 던질 수 있다
 let storage = null;
@@ -90,6 +110,7 @@ let lastSaveOk = loaded.status !== "unavailable";
 
 let questsReady = false; // 퀘스트 UI 초기화 전에는 트래커를 건드리지 않는다
 let questWalk = 0; // 1 m 미만 걸은 거리 누적
+let stepDist = 0;  // 발소리 간격
 let questReadyShown = null; // 🔮 열림 안내를 한 번만 띄우려고 기억해 둔 퀘스트
 function persist() {
   lastSaveOk = saveProgress(storage, progress);
@@ -104,6 +125,7 @@ function refreshQuests() {
   const q = questById(progress.quests.active);
   if (q && questReadyShown !== q.id && readyForWhatif(progress.quests, progress, q)) {
     questReadyShown = q.id;
+    sfx("questReady");
     fx.showToast(`🔮 ${q.code} 마지막 관문 — 예측해 보기가 열렸다! 왼쪽 퀘스트 트래커나 Q 키로 답해 보자`, 4.5);
   }
 }
@@ -160,13 +182,14 @@ const dashBtn = document.getElementById("btn-dash");
 function performDash() {
   if (inputLocked || !progress.quests.perks.dash || dash.cooldown > 0) return;
   dash.t = QUEST_SKILLS.DASH.time;
+  sfx("dash");
   dash.cooldown = QUEST_SKILLS.DASH.cooldown;
   clearMoveTarget();
   hud.setBadge("⚡ Connect Request 돌진!");
 }
 
 function performJump() {
-  if (jump(motor)) { hud.setBadge("🦘 점프!"); questProgress({ type: "jump" }); }
+  if (jump(motor)) { hud.setBadge("🦘 점프!"); sfx("jump"); questProgress({ type: "jump" }); }
 }
 
 // ---------- 클릭 / 탭 ----------
@@ -190,6 +213,7 @@ function openGattBox() {
   persist();
   hud.hideModal();
   hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  sfx("coin");
   fx.showToast(`📦 서비스 상자 (UUID 0x180F Battery Service) — 특성 'Battery Level'을 읽었다: CR2032 +${GATT_BOX_REWARD}`, 5);
 }
 
@@ -229,6 +253,7 @@ function handleTap(clientX, clientY) {
   const info = findInteractive(hits[0].object);
   if (info) {
     hud.showModal(modalInfo(info));
+    sfx("open");
     const place = ["hall", "prison", "crypt"].find((id) => landmark(id).info === info);
     if (place) questProgress({ type: "visit", place });
     setMoveTarget(info.walkPos, `${info.title} 앞 도착`);
@@ -299,6 +324,7 @@ questLog.initQuestLog({
       persist();
       hud.renderStats(effectiveStats(progress), wallet(), [...(rw.cr2032 ? ["cr2032"] : []), ...Object.keys(rw.bonus ?? {})]);
       syncPlayerHp(battle, effectiveStats(progress).hp);
+      sfx("questComplete");
       fx.showToast(`📜 ${r.completed.code} 완료 — ${r.completed.title}\n🎁 ${rw.label} · 📖 완독 배지 획득`, 5);
     }
     return r;
@@ -316,11 +342,11 @@ const overlayChange = (open) => {
 prisonUi.initPrison({
   rng: createRng(TEST_MODE ? 21 : Date.now() + 3),
   onOpenChange: overlayChange,
-  onPassed: () => { questProgress({ type: "pairing" }); fx.showToast("🔓 페어링 시험 통과 — 도청자와 중간자를 구별했다", 3.5); }
+  onPassed: () => { sfx("perfect"); questProgress({ type: "pairing" }); fx.showToast("🔓 페어링 시험 통과 — 도청자와 중간자를 구별했다", 3.5); }
 });
 cryptUi.initCrypt({
   onOpenChange: overlayChange,
-  onAllDone: () => { questProgress({ type: "power" }); fx.showToast("🔋 배터리 계약 3건 완수 — 지하묘지의 센서들이 깨어났다", 3.5); }
+  onAllDone: () => { sfx("perfect"); questProgress({ type: "power" }); fx.showToast("🔋 배터리 계약 3건 완수 — 지하묘지의 센서들이 깨어났다", 3.5); }
 });
 
 // ---------- 전투 이벤트 처리 ----------
@@ -335,7 +361,7 @@ function performFire(target = null) {
     rangeMul: perks.dle ? PERKS.dle.rangeMul : 1,
     ...(perks.advBoost ? { coef: PERKS.advBoost.coef } : {})
   });
-  if (shot) clearMoveTarget();
+  if (shot) { clearMoveTarget(); sfx("fire"); }
 }
 
 function handleBattleEvents(events) {
@@ -347,6 +373,7 @@ function handleBattleEvents(events) {
         const m = e.monster;
         if (m.wifi && !m.revealed) m.revealed = true; // 스캔 = 대역 판명
         fx.floatText(m.x, m.y + 0.6, m.z, `${e.amount}${e.crit ? "!" : ""}`, e.crit ? "crit" : "");
+        sfx(e.crit ? "crit" : "hit");
         questProgress({ type: "hit", monsterType: m.type });
         if (e.firstScan && recordScan(progress, m.type)) {
           const def = MONSTERS[m.type];
@@ -358,10 +385,12 @@ function handleBattleEvents(events) {
       case "kill": {
         const m = e.monster;
         battleView.burstAt(m.x, m.y, m.z);
+        sfx("kill");
         const { level, leveledUp } = applyKill(progress, m.type, e.xp);
         questEvent(progress.quests, { type: "kill", monsterType: m.type });
         fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
         changed.push("xp");
+        if (leveledUp) sfx("levelUp");
         if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
         dirty = true;
         break;
@@ -369,29 +398,39 @@ function handleBattleEvents(events) {
       case "pickup":
         applyPickup(progress, e.item, e.count);
         fx.floatText(motor.x, motor.y + 0.8, motor.z, `🪙 CR2032 +${e.count}`, "loot");
+        sfx("pickup");
         changed.push("cr2032");
         dirty = true;
         break;
       case "playerHit":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, `-${e.amount}`, "hurt");
+        sfx("hurt");
         break;
       case "dodge":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, e.dash ? "⚡ 돌진 회피!" : "회피!", "dodge");
+        sfx("dodge");
         break;
       case "shieldBlock":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, "🛡️ MIC 실패 — 위조 패킷 폐기", "dodge");
+        sfx("shield");
         break;
       case "packetLost": {
         // 간섭 채널 위에서 쏜 패킷이 깨졌다 — 이 몬스터의 대역이 드러난다(채널 분류)
         const m = e.monster;
         if (!m.revealed) { m.revealed = true; fx.showToast(`🔍 Wi-Fi ${m.wifi}번 대역 발견 — 채널 ${run?.link?.channel}에서 패킷이 깨졌다. 채널맵에서 빼면 피할 수 있다`, 3.5); }
         fx.floatText(m.x, m.y + 0.8, m.z, `패킷 손실 ✗ch${run?.link?.channel ?? "?"}`, "dodge");
+        sfx("packetLost");
         break;
       }
       case "outOfBand":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, `간섭 밖 ch${run?.link?.channel ?? "?"} — 피해 0`, "dodge");
+        sfx("outOfBand");
+        break;
+      case "windup":
+        if (Math.hypot(e.monster.x - motor.x, e.monster.z - motor.z) < 8) sfx("windup"); // 가까운 공격 예고만
         break;
       case "ko":
+        sfx("ko");
         if (run) {
           // 던전 KO = Connection Timeout: CR2032 10% 손실 → 체크포인트(층 시작)로 롤백하거나 마을로 (PRD §5, Stage 8)
           const lost = applyTimeoutPenalty(progress);
@@ -427,6 +466,7 @@ let portalCooldown = 0;
 
 const DUNGEON_SKY = new THREE.Color(0x07040f), VILLAGE_SKY = scene.background.clone();
 function setAmbience(underground) {
+  audio.setBgm(underground ? "dungeon" : "village");
   scene.background.copy(underground ? DUNGEON_SKY : VILLAGE_SKY);
   scene.fog.color.copy(underground ? DUNGEON_SKY : VILLAGE_SKY);
   scene.fog.near = underground ? 14 : 90;
@@ -464,6 +504,7 @@ function enterNextFloor() {
   persist();
   hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
   dungeonUi.closeDungeonPanel();
+  sfx("portal");
   startFloor(floor);
 }
 
@@ -517,6 +558,7 @@ function checkDungeonProximity(dt) {
 
 function onCombatCleared() {
   run.phase = "link";
+  sfx("perfect");
   fx.showToast("✅ 간섭 몬스터 소탕! 북쪽 📡 링크 콘솔에서 채널맵을 정비해 연결을 안정시키세요", 5);
 }
 
@@ -528,16 +570,19 @@ function rollbackToCheckpoint() {
   persist();
   revivePlayer(battle);
   placeAtCheckpoint();
+  sfx("portal");
   fx.showToast(`🔁 ${run.floor}층 체크포인트로 재연결 (롤백 ${run.rollbacks}회째) — 채널맵을 다시 정비하세요`, 3);
 }
 
 chmap.initChmap({
   hasAfh: () => hasAfhSkill(progress),
-  onToggle: (ch) => { if (run?.link && !toggleLinkChannel(run.link, ch)) fx.showToast("채널맵은 최소 2채널을 써야 합니다", 2); },
+  onToggle: (ch) => {
+    if (run?.link && !toggleLinkChannel(run.link, ch)) { sfx("denied"); fx.showToast("채널맵은 최소 2채널을 써야 합니다", 2); } else sfx("channelToggle");
+  },
   onAfh: () => {
     if (!run?.link || !hasAfhSkill(progress)) return;
     if (!run.battle.monsters.some((m) => m.state !== "dead" && m.revealed)) { fx.showToast("아직 드러난 간섭 대역이 없습니다 — 몬스터를 맞혀 스캔하세요", 2.5); return; }
-    if (applyAfh(run.link, run.battle)) fx.showToast(`📶 AFH: 채널맵 갱신 요청 — 이벤트 #${run.link.pending.instant}부터 적용`, 2.5);
+    if (applyAfh(run.link, run.battle)) { sfx("afh"); fx.showToast(`📶 AFH: 채널맵 갱신 요청 — 이벤트 #${run.link.pending.instant}부터 적용`, 2.5); }
   },
   onReset: () => { if (run?.link) requestMap(run.link, allChannelsMap()); }
 });
@@ -555,12 +600,13 @@ dungeonUi.initDungeonPanel({
     if (mode === "console") consoleCooldown = 3;
     if (mode === "portal") portalCooldown = 3;
   },
-  onToggle: (ch) => { if (run && toggleChannel(run.puzzle, ch)) dungeonUi.updateConsole(run); },
+  onToggle: (ch) => { if (run && toggleChannel(run.puzzle, ch)) { sfx("channelToggle"); dungeonUi.updateConsole(run); } else sfx("denied"); },
   onReset: () => { if (run) { resetMap(run.puzzle); dungeonUi.updateConsole(run); } },
   onObserve: (on) => { if (run) { run.observing = on; dungeonUi.setObserving(on); dungeonUi.updateConsole(run); } },
   onTest: () => {
     if (!run || run.puzzle.solved) return;
     const result = runLinkTest(run.puzzle);
+    sfx(result.ok ? "perfect" : "wrong");
     if (result.ok) {
       run.phase = "open";
       run.observing = false;
@@ -585,6 +631,7 @@ function onJobDone() {
   questEvent(progress.quests, { type: "job", grade: job.result.grade });
   persist();
   hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  sfx(paid > 0 ? "coin" : "wrong");
   jobPanel.showResult(job.result, paid, job.history);
 }
 
@@ -599,7 +646,7 @@ jobPanel.initJobPanel({
     jobPanel.showRunning();
     jobPanel.updateJob(job);
   },
-  onConfirm: () => { if (job) { confirmMeasurement(job); jobPanel.updateJob(job); } },
+  onConfirm: () => { if (job) { confirmMeasurement(job); sfx("measure"); jobPanel.updateJob(job); } },
   onClose: () => {
     job = null; // 측정 도중 닫으면 보수 없이 중단
     setInputEnabled(true);
@@ -628,12 +675,14 @@ rfLab.initRfLab({
     const before = effectiveStats(progress);
     const r = upgradeGear(progress, piece, labRng);
     if (r.ok) { persist(); refreshStats(["cr2032", ...(r.success ? [GEAR[piece].stat] : [])]); }
+    sfx(!r.ok ? "denied" : r.success ? "upgradeOk" : "upgradeFail");
     rfLab.showUpgradeResult(piece, r, before, effectiveStats(progress));
   },
   onAllocate: (stat) => {
     const before = effectiveStats(progress);
     const ok = allocatePoint(progress, stat);
     if (ok) { persist(); refreshStats([stat, "xp"]); }
+    sfx(ok ? "upgradeOk" : "denied");
     rfLab.showAllocResult(stat, ok, before, effectiveStats(progress));
     return ok;
   },
@@ -691,7 +740,9 @@ btnReset.addEventListener("click", () => {
 // ---------- 시뮬레이션 한 스텝 ----------
 function simulate(dt) {
   if (job && job.phase !== "done") {
+    const heard = job.beacon?.samples.length ?? 0;
     stepJob(job, dt, jobRng);
+    if ((job.beacon?.samples.length ?? 0) > heard) sfx("beacon"); // 광고 패킷 하나 수신 = 짧은 핑
     if (job.phase === "done") onJobDone();
     else jobPanel.updateJob(job);
   }
@@ -723,11 +774,13 @@ function simulate(dt) {
   const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), speed);
   // 걸은 거리 (Q0) — 1 m 단위로 모아서 반영
   questWalk += moved;
+  if (motor.grounded && dash.t <= 0) { stepDist += moved; if (stepDist > 1.7) { stepDist = 0; sfx("step"); } } // 발소리
   if (questWalk >= 1) { const m = Math.floor(questWalk); questWalk -= m; questProgress({ type: "walk", amount: m }); }
   // 클릭 이동 중 양 축이 모두 막히면 목표 도달 불가로 취소
   if (moveTarget && inputLen <= 0.05 && intent.speedScale > 0 && moved < 0.0001) clearMoveTarget();
   if (landed) {
     knightView.onLanded(motor.x, motor.y, motor.z);
+    sfx("land");
     hud.setBadge(regionLabel());
   }
 
@@ -835,6 +888,8 @@ window.__PK = {
   prison: { open: prisonUi.openPrison, isOpen: prisonUi.isPrisonOpen, answer: prisonUi.currentAnswer },
   crypt: { open: cryptUi.openCrypt, isOpen: cryptUi.isCryptOpen, state: cryptUi.cryptState },
   dash: () => ({ ...dash }),
+  zoom: () => orbit.distance,
+  audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
   chargeCfg: () => chargeCfg(progress),
   dungeon: {
     openEntry: openDungeonEntry,
