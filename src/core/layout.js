@@ -15,6 +15,10 @@ const CHAPTER = (file) => chapterUrl(file);
  */
 
 /** @type {Landmark[]} */
+/** 등대·지하묘지 위치 (Stage 11.4: 두 자리를 맞바꾸고 등대를 더 바깥으로 — 등대 둘레가 비콘 찾기 측정 구역) */
+export const TOWER_POS = Object.freeze({ x: 11.5, z: 13.5 });
+export const CRYPT_POS = Object.freeze({ x: 8.0, z: 8.0 });
+
 export const LANDMARKS = [
   {
     id: "hall",
@@ -59,16 +63,16 @@ export const LANDMARKS = [
   },
   {
     id: "tower",
-    pos: { x: 8.0, y: S, z: 8.0 },
+    pos: { x: TOWER_POS.x, y: S, z: TOWER_POS.z },
     info: {
       sign: "📡 전파의 등대 · 알바",  // 건물 위 이름 표지판 (render/world.js)
       title: "📡 전파의 등대 (안테나 타워)",
       sub: "[비콘 채널 37 송출탑]",
-      desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 등대지기에게서 측정기를 받아, 마을에 숨겨진 비콘을 RSSI로 찾아내는 60초 알바를 할 수 있습니다.",
+      desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 등대지기에게서 측정기를 받아, 등대 둘레 측정 구역(바닥의 노란 원) 안에 숨겨진 비콘을 RSSI로 찾아내는 60초 알바를 할 수 있습니다.",
       lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
       link: CHAPTER("advertising.html"),
       action: { id: "job", label: "📡 비콘 찾기 알바 (60초)" },
-      walkPos: { x: 6.4, y: S, z: 6.4 }
+      walkPos: { x: TOWER_POS.x - 1.7, y: S, z: TOWER_POS.z - 1.7 }
     }
   },
   {
@@ -130,7 +134,7 @@ LANDMARKS.push({
 });
 LANDMARKS.push({
   id: "crypt",
-  pos: { x: 10.0, y: S, z: 12.0 },
+  pos: { x: CRYPT_POS.x, y: S, z: CRYPT_POS.z },
   info: {
     sign: "🪫 지하묘지",
     title: "🪫 전력 잃은 지하묘지",
@@ -139,7 +143,7 @@ LANDMARKS.push({
     lore: "평균 전류 ≈ 수면 전류 + 이벤트 전하 ÷ 간격, 수명 ≈ 용량 ÷ 평균 전류. 간격이 길수록 창 넓히기((ppm÷10⁶)×시간 + 16 µs)가 커집니다.",
     link: CHAPTER("power.html"),
     action: { id: "crypt", label: "🔋 배터리 계약" },
-    walkPos: { x: 10.0, y: S, z: 9.8 }
+    walkPos: { x: CRYPT_POS.x, y: S, z: CRYPT_POS.z - 2.2 }
   }
 });
 
@@ -149,6 +153,9 @@ export const landmark = (id) => LANDMARKS.find((l) => l.id === id);
 export const SPAWN_POS = Object.freeze({ x: 0, y: S, z: 3.0 });
 
 /** [x, z, scale] */
+/** 비콘 찾기 알바의 측정 구역 = 등대 둘레 (반경은 balance.js RSSI_JOB.AREA_R). 등대는 지원(Stage 10 지하묘지 자리)보다 더 바깥 */
+export const JOB_AREA = Object.freeze({ x: TOWER_POS.x, z: TOWER_POS.z });
+
 export const TREE_POSITIONS = [
   [-13, -7, 1.1], [-12, 5, 0.9], [12, -7, 1.0], [13, 4, 1.1],
   [-5, -12, 1.0], [5, -11, 0.95], [-4, 12, 1.1], [4, 12, 1.0],
@@ -167,9 +174,9 @@ export const OBSTACLE_BOXES = [
   { id: "hall",        minX: -2.0,  maxX: 2.0,   minZ: -10.2, maxZ: -7.0, top: S + 3.4 },
   { id: "library",     minX: -10.6, maxX: -7.4,  minZ: -2.4,  maxZ: 0.4,  top: S + 3.2 },
   { id: "forge",       minX: 7.4,   maxX: 10.6,  minZ: -2.4,  maxZ: 0.4,  top: S + 2.8 },
-  { id: "tower",       minX: 7.1,   maxX: 8.9,   minZ: 7.1,   maxZ: 8.9,  top: S + 8.0 },
+  { id: "tower",       minX: TOWER_POS.x - 0.9, maxX: TOWER_POS.x + 0.9, minZ: TOWER_POS.z - 0.9, maxZ: TOWER_POS.z + 0.9, top: S + 8.0 },
   { id: "prison",      minX: 8.5,   maxX: 11.5,  minZ: -13.3, maxZ: -10.7, top: S + 3.0 },
-  { id: "crypt",       minX: 9.0,   maxX: 11.0,  minZ: 11.2,  maxZ: 12.8,  top: S + 1.9 },
+  { id: "crypt",       minX: CRYPT_POS.x - 1.0, maxX: CRYPT_POS.x + 1.0, minZ: CRYPT_POS.z - 0.8, maxZ: CRYPT_POS.z + 0.8, top: S + 1.9 },
   // 던전 관문 — 던전 구현(Stage 7) 전까지는 통과 불가
   { id: "dungeonGate", minX: -10.6, maxX: -7.4,  minZ: -13.5, maxZ: -12.5, top: WORLD.DUNGEON_PIT_Y + 3.3 }
 ];

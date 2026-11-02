@@ -1,6 +1,6 @@
 {
   "generatedBy": "node scripts/simulate.mjs",
-  "balanceHash": "045d848d2ba22065",
+  "balanceHash": "facf7a9d70adadb3",
   "seed": 1,
   "bots": 1000,
   "strategy": "all",
@@ -29,7 +29,7 @@
         "jobs": 3,
         "trainMin": 1,
         "dungeonMode": "kite",
-        "rssiN": 10,
+        "rssiN": 6,
         "retryAfterFail": false,
         "alloc": [
           "hp",
@@ -44,7 +44,7 @@
         "jobs": 6,
         "trainMin": 2,
         "dungeonMode": "stand",
-        "rssiN": 10,
+        "rssiN": 6,
         "retryAfterFail": false,
         "alloc": [
           "hp",
@@ -57,108 +57,108 @@
   "rssi": {
     "bots": 1000,
     "grades": [
-      "S≥280",
-      "A≥160",
-      "B≥0",
+      "S≥520",
+      "A≥380",
+      "B≥240",
       "C(참가)"
     ],
     "strategies": [
       {
         "name": "성급 (N=1)",
-        "meanScore": 24,
-        "p10": -220,
-        "p90": 280,
-        "meanRounds": 5.4,
-        "meanCR2032": 3.8,
+        "meanScore": 390,
+        "p10": 100,
+        "p90": 680,
+        "meanRounds": 8.6,
+        "meanCR2032": 5.23,
         "gradePct": {
-          "S": 11,
-          "A": 14,
-          "B": 31,
-          "C": 45
+          "S": 32,
+          "A": 23,
+          "B": 20,
+          "C": 25
         }
       },
       {
         "name": "조급 (N=3)",
-        "meanScore": 133,
-        "p10": -100,
-        "p90": 380,
-        "meanRounds": 4.9,
-        "meanCR2032": 4.99,
+        "meanScore": 464,
+        "p10": 200,
+        "p90": 680,
+        "meanRounds": 7.6,
+        "meanCR2032": 6.02,
         "gradePct": {
-          "S": 24,
-          "A": 24,
-          "B": 29,
-          "C": 23
+          "S": 43,
+          "A": 28,
+          "B": 18,
+          "C": 12
         }
       },
       {
         "name": "적당 (N=6)",
-        "meanScore": 187,
-        "p10": -20,
-        "p90": 400,
-        "meanRounds": 4.3,
-        "meanCR2032": 5.66,
+        "meanScore": 461,
+        "p10": 260,
+        "p90": 640,
+        "meanRounds": 6.4,
+        "meanCR2032": 6.18,
         "gradePct": {
-          "S": 34,
-          "A": 26,
-          "B": 30,
-          "C": 11
+          "S": 42,
+          "A": 32,
+          "B": 18,
+          "C": 8
         }
       },
       {
         "name": "평균 (N=10)",
-        "meanScore": 222,
-        "p10": 40,
-        "p90": 400,
-        "meanRounds": 3.7,
-        "meanCR2032": 6.16,
+        "meanScore": 414,
+        "p10": 240,
+        "p90": 540,
+        "meanRounds": 5.2,
+        "meanCR2032": 5.56,
         "gradePct": {
-          "S": 45,
-          "A": 25,
-          "B": 24,
+          "S": 16,
+          "A": 54,
+          "B": 23,
           "C": 7
         }
       },
       {
         "name": "신중 (N=15)",
-        "meanScore": 208,
-        "p10": 40,
-        "p90": 300,
-        "meanRounds": 3,
-        "meanCR2032": 6.09,
+        "meanScore": 355,
+        "p10": 200,
+        "p90": 500,
+        "meanRounds": 4.2,
+        "meanCR2032": 4.83,
         "gradePct": {
-          "S": 38,
-          "A": 35,
-          "B": 22,
-          "C": 5
+          "S": 1,
+          "A": 51,
+          "B": 37,
+          "C": 11
         }
       },
       {
         "name": "느긋 (N=25)",
-        "meanScore": 176,
-        "p10": 80,
-        "p90": 300,
-        "meanRounds": 2.2,
-        "meanCR2032": 5.53,
+        "meanScore": 258,
+        "p10": 140,
+        "p90": 340,
+        "meanRounds": 3,
+        "meanCR2032": 3.63,
         "gradePct": {
-          "S": 13,
-          "A": 52,
-          "B": 33,
-          "C": 2
+          "S": 0,
+          "A": 6,
+          "B": 70,
+          "C": 24
         }
       },
       {
         "name": "과신중 (N=40)",
-        "meanScore": 134,
-        "p10": 40,
+        "meanScore": 175,
+        "p10": 100,
         "p90": 200,
-        "meanRounds": 1.5,
-        "meanCR2032": 4.72,
+        "meanRounds": 2.1,
+        "meanCR2032": 2.17,
         "gradePct": {
           "S": 0,
-          "A": 41,
-          "B": 54,
-          "C": 5
+          "A": 0,
+          "B": 8,
+          "C": 92
         }
       }
     ]
@@ -343,46 +343,46 @@
         "strategy": "aggressive",
         "name": "공격형",
         "quiz": true,
-        "income": 70.5,
+        "income": 74.2,
         "incomeBySource": {
-          "job": 32.8,
+          "job": 36.6,
           "training": 0.5,
-          "dungeon": 37.2
+          "dungeon": 37.1
         },
         "spend": {
-          "upgrade": 24.8,
-          "fee": 46.8,
-          "penalty": 0.3
+          "upgrade": 27.8,
+          "fee": 47.4,
+          "penalty": 0.5
         },
-        "available": 23.4,
-        "surplusVsTarget": -67.4,
-        "upgradesSucceeded": 3.3,
-        "level": 4.3,
-        "dungeonAttempts": 15.6,
-        "dungeonClearPct": 45.4,
+        "available": 26.3,
+        "surplusVsTarget": -63.3,
+        "upgradesSucceeded": 3.7,
+        "level": 4.4,
+        "dungeonAttempts": 15.8,
+        "dungeonClearPct": 41.8,
         "reachedClearPct": 100,
-        "floorsCleared": 7.1,
-        "firstClearMin": 11.4,
-        "kosBeforeFirstClear": 2.3,
-        "rollbacksPerClear": 3.3,
+        "floorsCleared": 6.6,
+        "firstClearMin": 12.2,
+        "kosBeforeFirstClear": 3.4,
+        "rollbacksPerClear": 3.5,
         "endBalance": 3.6,
         "quests": {
           "per": {
             "Q0": {
               "donePct": 100,
-              "meanMin": 6.5
+              "meanMin": 6.4
             },
             "Q1": {
-              "donePct": 99.4,
-              "meanMin": 22
+              "donePct": 99.5,
+              "meanMin": 21.7
             },
             "Q2": {
-              "donePct": 99.4,
-              "meanMin": 35.7
+              "donePct": 99.5,
+              "meanMin": 35.8
             },
             "Q3": {
-              "donePct": 25.7,
-              "meanMin": 56.8
+              "donePct": 29.9,
+              "meanMin": 56
             },
             "Q4": {
               "donePct": 0,
@@ -405,37 +405,37 @@
               "meanMin": null
             }
           },
-          "meanQuestMin": 12.6,
-          "meanDone": 3.2
+          "meanQuestMin": 12.7,
+          "meanDone": 3.3
         }
       },
       {
         "strategy": "aggressive",
         "name": "공격형",
         "quiz": false,
-        "income": 107.8,
+        "income": 117.1,
         "incomeBySource": {
-          "job": 74.8,
-          "training": 1.9,
-          "dungeon": 31.1
+          "job": 83,
+          "training": 1.5,
+          "dungeon": 32.6
         },
         "spend": {
-          "upgrade": 41.7,
-          "fee": 62.6,
-          "penalty": 0.3
+          "upgrade": 50.5,
+          "fee": 62.5,
+          "penalty": 0.5
         },
-        "available": 44.9,
-        "surplusVsTarget": -37.5,
-        "upgradesSucceeded": 5.1,
-        "level": 4.4,
-        "dungeonAttempts": 20.9,
-        "dungeonClearPct": 24.2,
+        "available": 54.2,
+        "surplusVsTarget": -24.6,
+        "upgradesSucceeded": 6,
+        "level": 4.5,
+        "dungeonAttempts": 20.8,
+        "dungeonClearPct": 26.4,
         "reachedClearPct": 100,
-        "floorsCleared": 5,
-        "firstClearMin": 8.8,
-        "kosBeforeFirstClear": 2.8,
-        "rollbacksPerClear": 6.7,
-        "endBalance": 3.3,
+        "floorsCleared": 5.5,
+        "firstClearMin": 8.3,
+        "kosBeforeFirstClear": 2,
+        "rollbacksPerClear": 6,
+        "endBalance": 3.7,
         "quests": {
           "per": {
             "Q0": {
@@ -483,34 +483,34 @@
         "strategy": "balanced",
         "name": "균형형 (중간 전략)",
         "quiz": true,
-        "income": 104.2,
+        "income": 104.9,
         "incomeBySource": {
-          "job": 75.9,
-          "training": 6,
-          "dungeon": 22.4
+          "job": 77.9,
+          "training": 5.8,
+          "dungeon": 21.1
         },
         "spend": {
-          "upgrade": 76.5,
-          "fee": 25.8,
+          "upgrade": 76.9,
+          "fee": 26,
           "penalty": 0.2
         },
-        "available": 78.2,
-        "surplusVsTarget": 8.8,
-        "upgradesSucceeded": 8.2,
+        "available": 78.7,
+        "surplusVsTarget": 9.6,
+        "upgradesSucceeded": 8.3,
         "level": 4.9,
-        "dungeonAttempts": 8.6,
-        "dungeonClearPct": 68.2,
+        "dungeonAttempts": 8.7,
+        "dungeonClearPct": 65.3,
         "reachedClearPct": 100,
-        "floorsCleared": 5.9,
+        "floorsCleared": 5.7,
         "firstClearMin": 13.9,
         "kosBeforeFirstClear": 0.2,
-        "rollbacksPerClear": 0.5,
-        "endBalance": 6.6,
+        "rollbacksPerClear": 0.6,
+        "endBalance": 6.8,
         "quests": {
           "per": {
             "Q0": {
               "donePct": 100,
-              "meanMin": 6.4
+              "meanMin": 6.5
             },
             "Q1": {
               "donePct": 100,
@@ -521,7 +521,7 @@
               "meanMin": 35.5
             },
             "Q3": {
-              "donePct": 99.5,
+              "donePct": 100,
               "meanMin": 50.5
             },
             "Q4": {
@@ -553,29 +553,29 @@
         "strategy": "balanced",
         "name": "균형형 (중간 전략)",
         "quiz": false,
-        "income": 123,
+        "income": 123.1,
         "incomeBySource": {
-          "job": 85.1,
-          "training": 18.3,
-          "dungeon": 19.6
+          "job": 87.3,
+          "training": 18,
+          "dungeon": 17.9
         },
         "spend": {
           "upgrade": 81.3,
-          "fee": 34.7,
-          "penalty": 0
+          "fee": 34.5,
+          "penalty": 0.1
         },
-        "available": 88.2,
-        "surplusVsTarget": 22.8,
+        "available": 88.6,
+        "surplusVsTarget": 23.3,
         "upgradesSucceeded": 8.6,
-        "level": 6.5,
-        "dungeonAttempts": 11.6,
-        "dungeonClearPct": 41.8,
+        "level": 6.6,
+        "dungeonAttempts": 11.5,
+        "dungeonClearPct": 40.9,
         "reachedClearPct": 100,
-        "floorsCleared": 4.8,
-        "firstClearMin": 8.3,
-        "kosBeforeFirstClear": 0.2,
+        "floorsCleared": 4.7,
+        "firstClearMin": 8.4,
+        "kosBeforeFirstClear": 0.3,
         "rollbacksPerClear": 1.2,
-        "endBalance": 6.9,
+        "endBalance": 7.3,
         "quests": {
           "per": {
             "Q0": {
@@ -623,27 +623,27 @@
         "strategy": "collector",
         "name": "수집형",
         "quiz": true,
-        "income": 101.6,
+        "income": 103.8,
         "incomeBySource": {
-          "job": 76.8,
-          "training": 10.1,
-          "dungeon": 14.7
+          "job": 79,
+          "training": 9.4,
+          "dungeon": 15.4
         },
         "spend": {
-          "upgrade": 77.6,
+          "upgrade": 79.7,
           "fee": 21.9,
-          "penalty": 0.1
+          "penalty": 0.2
         },
-        "available": 79.5,
-        "surplusVsTarget": 10.7,
-        "upgradesSucceeded": 8.3,
+        "available": 81.7,
+        "surplusVsTarget": 13.8,
+        "upgradesSucceeded": 8.4,
         "level": 5.1,
         "dungeonAttempts": 7.3,
-        "dungeonClearPct": 52.3,
+        "dungeonClearPct": 52.1,
         "reachedClearPct": 100,
         "floorsCleared": 3.8,
-        "firstClearMin": 18.7,
-        "kosBeforeFirstClear": 0.4,
+        "firstClearMin": 18.9,
+        "kosBeforeFirstClear": 0.5,
         "rollbacksPerClear": 0,
         "endBalance": 7,
         "quests": {
@@ -654,11 +654,11 @@
             },
             "Q1": {
               "donePct": 100,
-              "meanMin": 20.5
+              "meanMin": 20.4
             },
             "Q2": {
               "donePct": 100,
-              "meanMin": 35.6
+              "meanMin": 35.7
             },
             "Q3": {
               "donePct": 99.9,
@@ -693,29 +693,29 @@
         "strategy": "collector",
         "name": "수집형",
         "quiz": false,
-        "income": 122.6,
+        "income": 123.9,
         "incomeBySource": {
-          "job": 85.4,
-          "training": 24.1,
-          "dungeon": 13.2
+          "job": 88,
+          "training": 22.9,
+          "dungeon": 13.1
         },
         "spend": {
-          "upgrade": 84.1,
-          "fee": 31.4,
+          "upgrade": 85.3,
+          "fee": 31.6,
           "penalty": 0
         },
-        "available": 91.2,
-        "surplusVsTarget": 26.9,
+        "available": 92.3,
+        "surplusVsTarget": 28.5,
         "upgradesSucceeded": 8.8,
         "level": 7,
         "dungeonAttempts": 10.5,
-        "dungeonClearPct": 30.7,
+        "dungeonClearPct": 30.6,
         "reachedClearPct": 100,
         "floorsCleared": 3.2,
-        "firstClearMin": 13.1,
-        "kosBeforeFirstClear": 0.8,
+        "firstClearMin": 13.3,
+        "kosBeforeFirstClear": 0.9,
         "rollbacksPerClear": 0,
-        "endBalance": 7.1,
+        "endBalance": 7,
         "quests": {
           "per": {
             "Q0": {
@@ -760,21 +760,21 @@
         }
       }
     ],
-    "cacheSize": 684
+    "cacheSize": 696
   },
   "criteria": [
     {
       "id": "clearRate",
       "label": "던전 층 클리어율 (중간 전략, 도전 중인 가장 깊은 층 기준 1시간 전체 시도)",
       "target": "40~70%",
-      "value": "68.2%",
+      "value": "65.3%",
       "pass": true
     },
     {
       "id": "questTime",
       "label": "퀘스트 하나 완료에 걸리는 시간 평균 (중간 전략, 직전 퀘스트 완료부터 · 1시간 안에 끝낸 Q0~Q3)",
       "target": "10~20분",
-      "value": "12.6분 (1시간에 4개 · Q0 100%@6.4분 · Q1 100%@20.4분 · Q2 100%@35.5분 · Q3 99.5%@50.5분 · Q4 0% · Q5 0% · Q6 0% · Q7 0% · Q8 0%)",
+      "value": "12.6분 (1시간에 4개 · Q0 100%@6.5분 · Q1 100%@20.4분 · Q2 100%@35.5분 · Q3 100%@50.5분 · Q4 0% · Q5 0% · Q6 0% · Q7 0% · Q8 0%)",
       "pass": true,
       "note": "Stage 9: 대리 지표(첫 던전 클리어 시간)를 실제 퀘스트 완료 시간(core/quests.js 판정)으로 교체"
     },
@@ -782,7 +782,7 @@
       "id": "surplus",
       "label": "CR2032 수지 ((수급 − 입장료 − 페널티) / 목표 강화 비용 − 1, 중간 전략)",
       "target": "+5~+15%",
-      "value": "+8.8%",
+      "value": "+9.6%",
       "pass": true
     },
     {
@@ -796,7 +796,7 @@
       "id": "rollbacks",
       "label": "층(퀘스트) 하나 깨는 동안 체크포인트 롤백 횟수 평균 (중간 전략, Stage 8 DoD)",
       "target": "≤ 3회",
-      "value": "0.5회",
+      "value": "0.6회",
       "pass": true
     },
     {
@@ -817,10 +817,10 @@
       "id": "quizWorthIt",
       "label": "공부한 시간까지 따져도 퀴즈가 이득 (중간 전략 1시간 도달 층: 퀴즈 O / 퀴즈 X)",
       "target": "≥ 1.2배",
-      "value": "도달 층 5.9 / 4.8 = 1.23배 (참고: 첫 클리어 13.9분 / 8.3분)",
+      "value": "도달 층 5.7 / 4.7 = 1.21배 (참고: 첫 클리어 13.9분 / 8.4분)",
       "pass": true,
       "note": "Stage 8에서 합격 판정에 포함 (사용자 결정: 도달 층 기준) — 공부 시간의 기회비용까지 따진 학습 인센티브"
     }
   ],
-  "elapsedSec": 113.6
+  "elapsedSec": 120.4
 }

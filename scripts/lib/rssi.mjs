@@ -5,14 +5,15 @@
 //   ② 잰 자리가 1~2곳뿐이면 STEP m 옆으로 (두 번째는 직각으로) 옮겨 다시 잰다
 //   ③ 3곳 이상이면 최근 자리들의 거리로 삼변측량(최소제곱)해 그 점으로 걸어가 다시 잰다
 //   ④ MAX_PROBES번 재도 못 찾으면 추정 위치에서 그냥 신고한다
-// 지도는 마을처럼 반경 VILLAGE_R m 원판이고 장애물은 없다고 본다 (실제 게임은 건물을 돌아가야 해서 조금 더 느리다).
+// 비콘은 게임과 같은 반경 AREA_R m 측정 구역 안에 숨는다 (Stage 11.4). 봇은 구역 가장자리에서 시작하고(등대에서 걸어온 셈),
+// 구역 밖으로는 나가지 않는다. 구역은 장애물 없는 잔디밭이라 게임과 거의 같다.
 import { createJob, stepJob, markBeacon, distanceFromRssi, averageRssi } from "../../src/core/rssiJob.js";
-import { PLAYER_BASE } from "../../src/core/balance.js";
+import { PLAYER_BASE, RSSI_JOB } from "../../src/core/balance.js";
 
 export const DT = 1 / 60;
 export const REACTION = 0.35;   // 사람 반응 지연 (초)
 const SPEED = PLAYER_BASE.hop;  // 걷는 속도 (m/s)
-const VILLAGE_R = 15;
+const AREA = { x: 0, z: 0, r: RSSI_JOB.AREA_R };
 const MARK_R = 1.2;             // 이 거리 안이라고 재면 신고
 const STEP = 3;                 // 처음 두 번 옮겨 재는 거리 (m)
 const MAX_PROBES = 7;
@@ -28,10 +29,9 @@ export const RSSI_STRATEGIES = [
   { name: "과신중 (N=40)", targetN: 40 }
 ];
 
-const inVillage = (x, z) => Math.hypot(x, z) <= VILLAGE_R;
-function clampToVillage(p) {
-  const r = Math.hypot(p.x, p.z);
-  return r <= VILLAGE_R - 0.5 ? p : { x: (p.x / r) * (VILLAGE_R - 0.5), z: (p.z / r) * (VILLAGE_R - 0.5) };
+function clampToArea(p) {
+  const r = Math.hypot(p.x, p.z), lim = AREA.r;
+  return r <= lim ? p : { x: (p.x / r) * lim, z: (p.z / r) * lim };
 }
 
 /** 최소제곱 삼변측량 — Σ(|p − pᵢ| − rᵢ)² 최소점 (가우스–뉴턴, 거리가 가까운 측정에 가중치) */
@@ -57,8 +57,8 @@ export function trilaterate(probes) {
 }
 
 export function rssiSession(targetN, rng) {
-  const pos = { x: 0, z: 0 };
-  const job = createJob(rng, { start: pos, isSpotOk: inVillage });
+  const pos = { x: 0, z: AREA.r };   // 구역 가장자리에서 시작
+  const job = createJob(rng, { start: pos, area: AREA });
   let probes = [], target = null, readyAt = null, markAt = null, markOnArrive = false, round = -1, dir = 0;
   while (job.phase !== "done") {
     if (job.phase === "search" && round !== job.history.length) {   // 새 비콘
@@ -87,13 +87,13 @@ export function rssiSession(targetN, rng) {
     probes.push({ x: pos.x, z: pos.z, r });
     if (r <= MARK_R) { markAt = job.phaseTime; continue; }
     if (probes.length >= MAX_PROBES) {
-      target = clampToVillage(trilaterate(probes.slice(-4)));
+      target = clampToArea(trilaterate(probes.slice(-4)));
       markOnArrive = true;   // 도착하면 신고
       continue;
     }
-    if (probes.length === 1) target = clampToVillage({ x: pos.x + STEP * Math.cos(dir), z: pos.z + STEP * Math.sin(dir) });
-    else if (probes.length === 2) target = clampToVillage({ x: pos.x + STEP * Math.cos(dir + Math.PI / 2), z: pos.z + STEP * Math.sin(dir + Math.PI / 2) });
-    else target = clampToVillage(trilaterate(probes.slice(-4)));
+    if (probes.length === 1) target = clampToArea({ x: pos.x + STEP * Math.cos(dir), z: pos.z + STEP * Math.sin(dir) });
+    else if (probes.length === 2) target = clampToArea({ x: pos.x + STEP * Math.cos(dir + Math.PI / 2), z: pos.z + STEP * Math.sin(dir + Math.PI / 2) });
+    else target = clampToArea(trilaterate(probes.slice(-4)));
     if (Math.hypot(target.x - pos.x, target.z - pos.z) < 0.4) target = null;   // 제자리 → 다시 잰다
   }
   return job.result;

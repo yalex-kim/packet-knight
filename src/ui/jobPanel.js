@@ -67,13 +67,13 @@ function showIntro() {
   const c = RSSI_JOB;
   render(
     header("📡 비콘 찾기", "알바 · 60초"),
-    el("p", { class: "npc", textContent: "비콘 찾기 기사 모집! 마을 어딘가에 비콘을 숨겨 두었네. 측정기를 들고 걸어 다니며 RSSI로 찾아 주게. 다만 패킷마다 신호가 크게 출렁이니, 멈춰 서서 여러 개를 평균 내야 거리를 믿을 수 있지. 너무 오래 서 있으면 60초 안에 몇 개 못 찾는다네." }),
+    el("p", { class: "npc", textContent: `비콘 찾기 기사 모집! 등대 둘레 노란 원(반경 ${c.AREA_R} m) 안 어딘가에 비콘을 숨겨 두었네. 측정기를 들고 걸어 다니며 RSSI로 찾아 주게. 다만 패킷마다 신호가 크게 출렁이니, 멈춰 서서 여러 개를 평균 내야 거리를 믿을 수 있지. 너무 오래 서 있으면 60초 안에 몇 개 못 찾는다네.` }),
     el("h3", { textContent: "찾는 법" }),
     el("div", { class: "formula", textContent: `추정 거리 d ≈ 10^((P₁ₘ − RSSI평균) / (10·n))     P₁ₘ = ${c.P1M} dBm, n = ${c.PATH_LOSS_N} (집 환경)` }),
     el("ul", {},
       el("li", { textContent: `비콘은 ${c.ADV_INTERVAL * 1000} ms마다 광고 패킷을 보낸다. 패킷 하나의 RSSI는 페이딩으로 크게(σ ≈ ${c.FADING_SIGMA} dB) 흔들린다 — 걸으면서 보는 숫자는 믿기 어렵다.` }),
       el("li", { textContent: "🧍 멈춰 서면 그 자리의 평균과 추정 거리가 나온다. 움직이면 평균은 새로 시작된다." }),
-      el("li", { textContent: "두세 자리에서 잰 거리를 겹쳐 보면 비콘 위치가 좁혀진다(삼변측량). 가까워질수록 RSSI가 커진다." }),
+      el("li", { textContent: `🗺️ 측정기 미니맵: 한 자리에서 패킷 ${c.PROBE_MIN}개 이상 모으면 그 자리를 중심으로 "추정 거리 원"이 그려진다. 두세 자리의 원이 겹치는 곳이 비콘이다(삼변측량).` }),
       el("li", { textContent: "여기다 싶으면 📍 여기다! (B 키·Enter·버튼). 내 자리와 실제 비콘 사이 거리로 판정한다." }),
       el("li", { textContent: `판정: ${c.TIERS.map((t) => `${t.label} ≤${t.maxErr} m ${tierPts(t.points)}`).join(" · ")} · ${c.MISS.label} ${tierPts(c.MISS.points)}` }),
       el("li", { textContent: `보수(CR2032): ${c.GRADES.map((g) => `${g.grade} ${Number.isFinite(g.minScore) ? `${g.minScore}점+` : "참가"} → ${g.reward}개`).join(" · ")}` })
@@ -95,15 +95,16 @@ export function showRunning() {
   const score = el("span", { class: "job-stat" });
   const round = el("span", { class: "job-stat" });
   const canvas = el("canvas", { class: "rssi-canvas", width: 360, height: 90, "aria-label": "RSSI 그래프" });
+  const map = el("canvas", { class: "hunt-map", width: 120, height: 120, "aria-label": "측정 구역 미니맵 — 내 위치와 추정 거리 원" });
   const readout = el("div", { class: "job-readout" });
   const estimate = el("div", { class: "job-estimate", role: "status" });
   const mark = button("📍 여기다! (B)", () => hooks.onMark(), "lib-btn primary job-confirm");
   const quit = button("✖", () => abort(), "lib-btn job-quit");
   quit.setAttribute("aria-label", "알바 그만두기 (보수 없음)");
-  view = { timer, score, round, canvas, ctx: canvas.getContext("2d"), readout, estimate, confirm: mark };
+  view = { timer, score, round, canvas, ctx: canvas.getContext("2d"), map, mctx: map.getContext("2d"), readout, estimate, confirm: mark };
   hunt.replaceChildren(
     el("div", { class: "job-bar" }, timer, round, score, quit),
-    canvas, readout, estimate,
+    el("div", { class: "hunt-row" }, el("div", { class: "hunt-graph" }, canvas, readout, estimate), map),
     el("div", { class: "lib-actions" }, mark)
   );
 }
@@ -144,6 +145,37 @@ function drawCanvas(job) {
   }
 }
 
+/** 미니맵: 측정 구역(노란 원)·등대·내 위치·지난 측정 자리의 추정 거리 원 (공개 때는 실제 비콘) */
+function drawMap(job) {
+  const { mctx: ctx, map } = view;
+  const W = map.width, H = map.height, a = job.area;
+  const scale = (W / 2 - 6) / (a.r + 1);
+  const px = (x) => W / 2 + (x - a.x) * scale, pz = (z) => H / 2 + (z - a.z) * scale;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#06101e"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(255, 215, 107, 0.08)"; ctx.strokeStyle = "#ffd76b"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(px(a.x), pz(a.z), a.r * scale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#8b96a5"; ctx.fillRect(px(a.x) - 3, pz(a.z) - 3, 6, 6);      // 등대
+  const circle = (p, color, dash) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.setLineDash(dash ? [4, 3] : []);
+    ctx.beginPath(); ctx.arc(px(p.x), pz(p.z), Math.max(2, p.r * scale), 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(px(p.x), pz(p.z), 2, 0, Math.PI * 2); ctx.fill();
+  };
+  job.probes.forEach((p, i) => circle(p, `rgba(125, 216, 255, ${0.35 + 0.15 * i})`, false));
+  if (job.probe) circle(job.probe, "#ffffff", true);
+  if (job.phase === "reveal") {
+    ctx.fillStyle = "#7dffb5";
+    ctx.beginPath(); ctx.arc(px(job.beacon.x), pz(job.beacon.z), 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // 나 (구역 밖이면 테두리에 붙여 속을 비운 점)
+  const me = job.lastPos, d = Math.hypot(me.x - a.x, me.z - a.z), lim = a.r + 0.8;
+  const mx = d > lim ? a.x + ((me.x - a.x) / d) * lim : me.x, mz = d > lim ? a.z + ((me.z - a.z) / d) * lim : me.z;
+  ctx.fillStyle = "#39d0ff"; ctx.strokeStyle = "#39d0ff"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(px(mx), pz(mz), 4, 0, Math.PI * 2);
+  if (d > lim) ctx.stroke(); else ctx.fill();
+}
+
 /** 매 스텝 갱신 */
 export function updateJob(job) {
   if (!view || hunt.hidden) return;
@@ -155,8 +187,10 @@ export function updateJob(job) {
   const n = b.samples.length;
   const avg = averageRssi(job);
   const last = job.live.at(-1);
+  const outside = Math.hypot(job.lastPos.x - job.area.x, job.lastPos.z - job.area.z) > job.area.r + 0.5;
   if (job.phase === "search") {
-    view.readout.textContent = !last ? "광고 패킷 수신 대기 중…"
+    view.readout.textContent = outside ? "🟡 등대 둘레 노란 원 안으로 가세요 — 비콘은 그 안에 있다"
+      : !last ? "광고 패킷 수신 대기 중…"
       : n < 3 ? `🚶 방금 ${last.rssi.toFixed(0)} dBm — 멈춰 서면 평균을 냅니다`
       : `🧍 이 자리 N=${n} · 평균 ${avg.toFixed(1)} dBm`;
     view.estimate.className = "job-estimate";
@@ -169,6 +203,7 @@ export function updateJob(job) {
     view.confirm.disabled = true;
   }
   drawCanvas(job);
+  drawMap(job);
 }
 
 // ---------- 화면 3: 결과 ----------

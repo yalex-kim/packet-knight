@@ -12,10 +12,10 @@
 import * as THREE from "three";
 import { WORLD, PHYSICS } from "./core/config.js";
 import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
-import { SPAWN_POS, landmark } from "./core/layout.js";
+import { SPAWN_POS, landmark, JOB_AREA } from "./core/layout.js";
 import * as prisonUi from "./ui/prison.js";
 import * as cryptUi from "./ui/crypt.js";
-import { QUEST_SKILLS } from "./core/balance.js";
+import { QUEST_SKILLS, RSSI_JOB } from "./core/balance.js";
 import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
@@ -632,9 +632,9 @@ const jobRng = createRng(TEST_MODE ? 7 : Date.now());
 /** @type {import("./core/rssiJob.js").Job | null} */
 let job = null;
 
-/** 비콘을 숨길 수 있는 자리: 마을 안, 걸어서 닿는 평지, 장애물에서 조금 떨어진 곳 (훈련장·던전 입구 제외) */
+/** 비콘을 숨길 수 있는 자리: (측정 구역 안에서) 걸어서 닿는 평지, 장애물에서 조금 떨어진 곳 (훈련장·던전 입구 제외) */
 function isBeaconSpot(x, z) {
-  if (Math.hypot(x, z) > WORLD.VILLAGE_RADIUS - 1.5 || isDungeonCell(x, z)) return false;
+  if (Math.hypot(x, z) > WORLD.PLAY_RADIUS - 1 || isDungeonCell(x, z)) return false;
   if (Math.hypot(x - TRAINING_GROUND.x, z - TRAINING_GROUND.z) < 5) return false;
   const y = groundHeightAt(x, z);
   if (!Number.isFinite(y) || y > SPAWN_POS.y + 0.6) return false;
@@ -642,9 +642,15 @@ function isBeaconSpot(x, z) {
 }
 let huntRevealShown = false;
 
-function endHunt() {
+/** 공개 기둥만 숨긴다 (다음 비콘으로 넘어갈 때) */
+function hideReveal() {
   huntBeacon.visible = false;
   huntRevealShown = false;
+}
+/** 알바가 끝나면 측정 구역 원도 숨긴다 */
+function endHunt() {
+  hideReveal();
+  huntArea.visible = false;
 }
 
 function onJobDone() {
@@ -664,13 +670,14 @@ jobPanel.initJobPanel({
   onStart: () => {
     if (!startJobCharge(progress, now())) return; // 배터리 없음 (버튼도 비활성)
     persist();
-    job = createJob(jobRng, { start: { x: motor.x, z: motor.z }, isSpotOk: isBeaconSpot });
+    job = createJob(jobRng, { start: { x: motor.x, z: motor.z }, area: JOB_AREA, isSpotOk: isBeaconSpot });
+    huntArea.visible = true;
     jobPanel.showRunning();
     jobPanel.updateJob(job);
     // 모달은 닫히고 기사는 걸어 다니며 찾는다
     setInputEnabled(true);
     inputLocked = false;
-    hud.setBadge("📡 비콘 찾는 중 — 멈춰 서서 평균을 내 보자");
+    hud.setBadge("📡 등대 둘레 노란 원 안에서 비콘을 찾자");
   },
   onMark: () => {
     if (!job || job.phase !== "search") return;
@@ -702,6 +709,19 @@ const huntBeacon = new THREE.Group();
   huntBeacon.add(pillar, ring, box);
   huntBeacon.visible = false;
   scene.add(huntBeacon);
+}
+// 측정 구역 — 등대 둘레의 노란 원 (알바 중에만 보인다)
+const huntArea = new THREE.Group();
+{
+  const y = groundHeightAt(JOB_AREA.x, JOB_AREA.z) + 0.04;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(RSSI_JOB.AREA_R - 0.12, RSSI_JOB.AREA_R, 64),
+    new THREE.MeshBasicMaterial({ color: 0xffd76b, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }));
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(RSSI_JOB.AREA_R - 0.12, 64),
+    new THREE.MeshBasicMaterial({ color: 0xffd76b, side: THREE.DoubleSide, transparent: true, opacity: 0.08, depthWrite: false }));
+  for (const m of [ring, fill]) { m.rotation.x = -Math.PI / 2; m.position.set(JOB_AREA.x, y, JOB_AREA.z); huntArea.add(m); }
+  fill.position.y -= 0.01;
+  huntArea.visible = false;
+  scene.add(huntArea);
 }
 const TIER_COLOR = { precise: 0x7dffb5, good: 0xb5f07d, near: 0xffb36b, miss: 0xff7a70 };
 function showHuntBeacon() {
@@ -803,7 +823,7 @@ function simulate(dt) {
     const got = stepJob(job, dt, jobRng, motor);
     if (got.length) sfx("beacon"); // 광고 패킷 하나 수신 = 짧은 핑
     if (job.phase === "reveal" && !huntRevealShown) { showHuntBeacon(); huntRevealShown = true; }
-    if (job.phase === "search" && huntRevealShown) endHunt();
+    if (job.phase === "search" && huntRevealShown) hideReveal();
     if (job.phase === "done") onJobDone();
     else jobPanel.updateJob(job);
   }
@@ -978,6 +998,7 @@ window.__PK = {
     state: () => job && {
       phase: job.phase, timeLeft: job.timeLeft, score: job.score, rounds: job.history.length,
       samples: job.beacon.samples.length, beacon: { x: job.beacon.x, z: job.beacon.z }, err: job.beacon.err, result: job.result,
+      area: job.area, probes: job.probes.length + (job.probe ? 1 : 0), areaShown: huntArea.visible,
       revealShown: huntBeacon.visible
     },
     isHunting: jobPanel.isMeasuring,

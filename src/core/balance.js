@@ -65,8 +65,10 @@ export const RSSI_JOB = Object.freeze({
   ADV_INTERVAL: 0.1,       // 광고 간격 100 ms
   ADV_DELAY_MAX: 0.01,     // advDelay 0~10 ms
   MIN_D: 0.5,              // 비콘 바로 위에서의 최소 거리 (m) — log10(0) 방지
-  // 비콘 찾기 (Stage 11.2): 기사 위치에서 SPAWN_MIN~SPAWN_MAX m 떨어진, 걸어갈 수 있는 자리에 숨긴다
-  SPAWN_MIN: 5, SPAWN_MAX: 13, SPAWN_TRIES: 60,
+  // 비콘 찾기: 정해진 측정 구역(반경 AREA_R m 원, 위치는 layout.js JOB_AREA) 안에 숨긴다 (Stage 11.4 — 마을 전체는 너무 어려웠다)
+  AREA_R: 5, SPAWN_MIN: 2, SPAWN_TRIES: 80,   // SPAWN_MIN: 기사에게서 최소 거리 (m)
+  PROBE_MIN: 5,            // 한 자리에서 패킷 이만큼 모이면 미니맵에 "추정 거리 원"을 그린다
+  PROBES_KEEP: 4,          // 미니맵에 남기는 지난 측정 자리 수
   STILL_RADIUS: 0.3,       // 이만큼 움직이면 "다른 자리" — 평균을 새로 모은다 (m)
   LIVE_WINDOW: 5,          // 측정기 그래프 가로 폭 (초)
   REVEAL_TIME: 2.0,        // 정답 공개 + 다음 비콘 설치 시간 (초)
@@ -79,15 +81,15 @@ export const RSSI_JOB = Object.freeze({
   TIERS: Object.freeze([
     { id: "precise", label: "정밀", maxErr: 1.0, points: 100 },
     { id: "good",    label: "양호", maxErr: 2.0, points: 40 },
-    { id: "near",    label: "근처", maxErr: 3.5, points: -20 }
+    { id: "near",    label: "근처", maxErr: 3.5, points: -40 }
   ]),
   MISS: Object.freeze({ id: "miss", label: "빗나감", maxErr: Infinity, points: -100 }),
   // 세션 점수 → 등급 → CR2032 보수 (보수 8/6/4/2는 PRD §8.4). minScore는 시뮬레이션으로 보정.
   // 비콘을 1개 이상 신고하면 최소 C(참가 보수)
   GRADES: Object.freeze([
-    { grade: "S", minScore: 280, reward: 8 },   // Stage 11.2 비콘 찾기 기준 (60초에 비콘 약 4개, §8.5)
-    { grade: "A", minScore: 160, reward: 6 },
-    { grade: "B", minScore: 0,   reward: 4 },
+    { grade: "S", minScore: 520, reward: 8 },   // Stage 11.4 측정 구역(등대 둘레) 기준 — 60초에 비콘 약 6개 (§8.5)
+    { grade: "A", minScore: 380, reward: 6 },
+    { grade: "B", minScore: 240, reward: 4 },
     { grade: "C", minScore: -Infinity, reward: 2 }
   ])
 });

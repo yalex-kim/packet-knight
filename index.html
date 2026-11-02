@@ -231,6 +231,9 @@
   }
   #hunt .job-bar { font-size: 12px; margin-bottom: 6px; align-items: center; }
   #hunt .rssi-canvas { aspect-ratio: 360 / 90; }
+  #hunt .hunt-row { display: flex; gap: 8px; align-items: flex-start; }
+  #hunt .hunt-graph { flex: 1; min-width: 0; }
+  #hunt .hunt-map { width: 112px; height: 112px; flex: none; border-radius: 8px; border: 1px solid #1f3a5f; }
   #hunt .job-readout { font-size: 12px; margin-top: 5px; }
   #hunt .job-estimate { font-size: 15px; margin-top: 3px; min-height: 22px; }
   #hunt .lib-actions { margin-top: 6px; display: flex; justify-content: flex-end; }
@@ -456,7 +459,8 @@
     #badge { top: 44px; right: 8px; max-width: calc(44vw - 20px); font-size: 11px; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* 비콘 찾기 측정기: 스탯 요약 아래, 조이스틱·버튼 위 */
     #hunt { top: 74px; width: calc(100vw - 16px); padding: 6px 8px; }
-    #hunt .rssi-canvas { aspect-ratio: 360 / 60; }
+    #hunt .rssi-canvas { aspect-ratio: 360 / 70; }
+    #hunt .hunt-map { width: 104px; height: 104px; }
     /* 던전 바는 스탯 요약 아래 왼쪽 */
     /* 던전 (Stage 11.3): 상태 바 한 줄 + 채널맵 납작하게(셀 한 줄 + 설명·버튼 한 줄) → 위쪽 약 160px 안에.
        토스트는 기사(화면 가운데)를 가리지 않게 트래커 위로 */
@@ -481,14 +485,14 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 11.3: 모바일 던전 · 퀘스트 팝오버 · 줌 아웃</span><br />
+  <b>PACKET KNIGHT</b><span class="stage-label"> — Stage 11.4: 알바 측정 구역 · 미니맵</span><br />
   <div class="control-desc" id="hud-controls">
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
     🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />
     🔄 시점: <b>화면 드래그</b> 회전 · <b>핀치 / 휠</b> 줌<br />
     📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
-    📡 알바: <b>전파의 등대</b> 클릭 → 비콘 찾기 (RSSI, B 키로 신고 · CR2032 획득)<br />
+    📡 알바: <b>전파의 등대</b>(남동쪽 바깥) 클릭 → 등대 둘레 노란 원 안에서 비콘 찾기 (B 키로 신고 · CR2032)<br />
     ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
     🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />

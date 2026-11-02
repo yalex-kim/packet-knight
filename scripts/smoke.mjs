@@ -87,8 +87,9 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   const sim = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "scripts/simulate.mjs"), "--game=rssi", "--bots=300", "--json"], { encoding: "utf8" }));
   const by = Object.fromEntries(sim.strategies.map((x) => [x.name.split(" ")[0], x]));
   const best = sim.strategies.reduce((a, b) => (b.meanScore > a.meanScore ? b : a));
+  // Stage 11.4 측정 구역 도입 후 최적이 N≈3~6으로 내려왔다 (구역이 작아 거리 오차가 m 단위로 작다) — 그래도 N=1·40은 손해 (PRD §8.5)
   check("봇 시뮬: 적당히 평균 내는 전략이 성급·과신중보다 낫다 (학습 목표)",
-    by["평균"].meanScore > by["성급"].meanScore && by["평균"].meanScore > by["과신중"].meanScore && /N=(6|10|15)/.test(best.name),
+    by["평균"].meanScore > by["성급"].meanScore && by["평균"].meanScore > by["과신중"].meanScore && /N=(3|6|10|15)/.test(best.name) && best.meanScore > by["성급"].meanScore,
     `최적 ${best.name} ${best.meanScore}점 · 성급 ${by["성급"].meanScore} · 과신중 ${by["과신중"].meanScore}`);
   check("봇 시뮬: 합리적 전략의 보수가 PRD 범위(분당 4~8개)에 든다", by["평균"].meanCR2032 >= 4 && by["평균"].meanCR2032 <= 8, `${by["평균"].meanCR2032}개/60초`);
 
@@ -729,9 +730,9 @@ await page.waitForFunction(() => window.__PK);
 const jobState = () => page.evaluate(() => window.__PK.job.state());
 await reset();
 {
-  await teleport(5.0, 13.0); // 등대가 카메라 정면에 오도록
+  await teleport(11.5, 19.0); // 등대(11.5, 13.5)가 카메라 정면에 오도록 (Stage 11.4 등대를 남동쪽 바깥으로)
   await tick(500);
-  const p = await page.evaluate(() => window.__PK.projectToScreen(8.0, 5.0, 8.0)); // 등대 탑신
+  const p = await page.evaluate(() => window.__PK.projectToScreen(11.5, 5.0, 13.5)); // 등대 탑신
   await page.mouse.click(p.x, p.y);
   await tick(20);
   const label = await page.locator("#modal-action").textContent();
@@ -744,7 +745,7 @@ await reset();
   await tick(1200);
   const s1 = await jobState();
   check("멈춰 서 있으면 광고 패킷(약 100 ms 간격)이 그 자리의 RSSI 샘플로 쌓인다", s1.phase === "search" && s1.samples >= 9 && s1.samples <= 13, `1.2초 → ${s1.samples}개`);
-  const spawnD = Math.hypot(s1.beacon.x - 5.0, s1.beacon.z - 13.0);
+  const inArea = (b, a) => Math.hypot(b.x - a.x, b.z - a.z) <= a.r;
 
   const a = await state();
   await hold("KeyS", 400);
@@ -764,9 +765,14 @@ await reset();
     s3.phase === "reveal" && s3.rounds === 1 && Math.abs(s3.err - 0.4) < 0.05 && shown.includes("정밀") && s3.revealShown, shown);
   await tick(2100);
   const s4 = await jobState();
-  check("공개 후 새 비콘은 기사에게서 5~13 m 떨어진 마을 안에 숨겨진다 (첫 비콘도)",
-    s4.phase === "search" && !(await jobState()).revealShown && spawnD >= 5 - 1e-6 && spawnD <= 13 + 1e-6 && Math.hypot(s4.beacon.x, s4.beacon.z) <= 15.0,
-    `첫 비콘 ${spawnD.toFixed(1)} m · 다음 (${s4.beacon.x.toFixed(1)}, ${s4.beacon.z.toFixed(1)})`);
+  check("비콘은 등대 둘레 측정 구역(반경 5 m) 안에 숨고, 구역 원이 바닥에 보인다 (공개 후 다음 비콘도)",
+    s4.phase === "search" && !(await jobState()).revealShown && inArea(s1.beacon, s1.area) && inArea(s4.beacon, s4.area) && s4.areaShown
+      && Math.abs(s1.area.x - 11.5) < 1e-9 && Math.abs(s1.area.z - 13.5) < 1e-9 && s1.area.r === 5,
+    `구역 (${s1.area.x}, ${s1.area.z}) r ${s1.area.r} · 첫 비콘 (${s1.beacon.x.toFixed(1)}, ${s1.beacon.z.toFixed(1)}) · 다음 (${s4.beacon.x.toFixed(1)}, ${s4.beacon.z.toFixed(1)})`);
+  // 한 자리에서 패킷 5개 이상 모으면 미니맵에 추정 거리 원이 생긴다
+  await tick(800);
+  const s5 = await jobState();
+  check("멈춰서 패킷 5개 이상 모으면 미니맵에 그 자리의 '추정 거리 원'이 생긴다 (삼변측량 보조)", s5.probes >= 1 && s5.samples >= 5, `원 ${s5.probes}개 · 샘플 ${s5.samples}`);
 
   // 남은 시간: 비콘마다 그 자리로 가서 1초 평균을 본 뒤 신고 (흐름 검증 — 실력·밸런스는 봇 시뮬레이션이 맡는다)
   const result = await page.evaluate(() => {
@@ -783,13 +789,14 @@ await reset();
       pk.tick(1 / 60);
     }
     const r = pk.job.state().result;
-    return { ...r, spotsOk: spots.every((b) => Math.hypot(b.x, b.z) <= 15.0 && Math.hypot(b.x + 9, b.z - 10) >= 5) };
+    const a = pk.job.state()?.area ?? { x: 11.5, z: 13.5, r: 5 };
+    return { ...r, spotsOk: spots.every((b) => Math.hypot(b.x - a.x, b.z - a.z) <= a.r) };
   });
   await tick(20);
   const prog = await page.evaluate(() => window.__PK.progress());
   const hudCoins = await page.locator('#stats [data-stat="cr2032"]').textContent();
   const resultShown = await page.evaluate(() => !document.getElementById("job").hidden && document.getElementById("hunt").hidden);
-  check("60초가 끝나면 결과 창이 뜨고 등급에 따라 CR2032가 지급된다 (비콘 자리는 모두 마을 안·훈련장 밖)",
+  check("60초가 끝나면 결과 창이 뜨고 등급에 따라 CR2032가 지급된다 (비콘 자리는 모두 측정 구역 안)",
     result.rounds >= 8 && result.grade === "S" && result.reward === 8 && prog.cr2032 === result.reward && hudCoins.includes(`${result.reward}`) && resultShown && result.spotsOk,
     `비콘 ${result.rounds}개 · ${result.score}점 · 등급 ${result.grade} · +${result.reward}`);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));

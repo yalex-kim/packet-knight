@@ -41,7 +41,7 @@ export const WHATIF_MISS = 0.3;
 /**
  * 플레이어 전략 (PRD §8.1 공격적/방어적/수집형). 루프(15분)마다 시간 배분.
  *   jobs: 루프 시작 알바 횟수(측정기 배터리 한도 안) · trainMin: 훈련장 분 · 나머지 시간 = 던전
- *   dungeonMode: 던전 전투 방식 · rssiN: 알바에서 평균 내는 패킷 수
+ *   dungeonMode: 던전 전투 방식 · rssiN: 알바에서 평균 내는 패킷 수 (Stage 11.4 측정 구역 도입 후 최적이 약 6개 → 균형·수집형 10 → 6)
  *   retryAfterFail: 실패한 층에 장비를 올리지 않고 곧바로 재도전하는가 (공격형만 그렇다)
  *   alloc: 레벨업 스탯 포인트를 이 순서로 돌아가며 분배 (Stage 7.5 RF 랩)
  *   rollbacks: 던전에서 쓰러졌을 때 체크포인트(층 시작)에서 입장료 없이 다시 하는 최대 횟수 (Stage 8)
@@ -49,8 +49,8 @@ export const WHATIF_MISS = 0.3;
  */
 export const PLAYER_STRATEGIES = [
   { id: "aggressive", name: "공격형", jobs: 1, trainMin: 0, dungeonMode: "rush",  rssiN: 6,  retryAfterFail: true,  alloc: ["tx"],             rollbacks: 3 },
-  { id: "balanced",   name: "균형형 (중간 전략)", jobs: 3, trainMin: 1, dungeonMode: "kite",  rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec", "tx"], rollbacks: 1 },
-  { id: "collector",  name: "수집형", jobs: 6, trainMin: 2, dungeonMode: "stand", rssiN: 10, retryAfterFail: false, alloc: ["hp", "sec"],       rollbacks: 0 }
+  { id: "balanced",   name: "균형형 (중간 전략)", jobs: 3, trainMin: 1, dungeonMode: "kite",  rssiN: 6,  retryAfterFail: false, alloc: ["hp", "sec", "tx"], rollbacks: 1 },
+  { id: "collector",  name: "수집형", jobs: 6, trainMin: 2, dungeonMode: "stand", rssiN: 6,  retryAfterFail: false, alloc: ["hp", "sec"],       rollbacks: 0 }
 ];
 
 // ---------- 결과 풀 ----------

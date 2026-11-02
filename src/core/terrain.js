@@ -62,7 +62,8 @@ export function surfaceTypeAt(x, z) {
   const isSouthAve = Math.abs(x) <= 1 && z >= 0 && z <= 8;
   const isEastWestAve = (z >= -2 && z <= 0) && (x >= -10 && x <= 10);
   const isDungeonRoad = (z <= -4 && z >= -8) && Math.abs(x - (DUNGEON_X * ((-4 - z) / 4.0))) <= 1.2;
-  const isBeaconRoad = (z >= 4 && z <= 9) && Math.abs(x - (8.0 * ((z - 4) / 4.0))) <= 1.2;
+  // 등대 길: 남쪽 대로 → 등대 앞 (Stage 11.4 등대를 남동쪽 바깥으로 옮김 — 지하묘지 옆을 비켜 간다)
+  const isBeaconRoad = (z >= 4 && z <= 12.2) && Math.abs(x - (1 + 9 * ((z - 4) / 8.2))) <= 1.2;
   if (isNorthAve || isSouthAve || isEastWestAve || isDungeonRoad || isBeaconRoad) return "path";
   return "grass";
 }
