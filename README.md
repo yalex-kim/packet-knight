@@ -53,7 +53,7 @@ docker compose run --rm packetknight-deploy
 ```
 
 - 서빙하는 것은 `index.html`과 `src/`뿐이다(PRD·scripts·package.json은 404).
-- ES 모듈 주소에 버전이 붙지 않으므로 모든 파일을 `Cache-Control: no-cache`(ETag 재검증)로 내린다.
+- 배포할 때 `tools/stamp_assets.py <sha>`가 `index.html`의 진입 모듈을 `./v/<sha>/src/main.js`로 바꾼다. 상대 import라 하위 모듈도 모두 `/v/<sha>/src/…`로 받으므로, 배포마다 주소가 바뀌어 브라우저가 옛 모듈과 새 모듈을 섞지 않는다(Cloudflare가 `.js`에 4시간 캐시를 덧씌우기 때문 — 2026-11-02 모바일 빈 화면 사고). 저장소의 `index.html`은 그대로라 로컬 실행·스모크와 무관하다.
 - 배포 전에 `npm run smoke`가 통과해야 한다(CI 게이트 없음).
 
 ## 🤖 봇 시뮬레이션
