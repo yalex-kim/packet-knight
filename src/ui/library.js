@@ -11,10 +11,6 @@ const CHAPTER_URL = (file, section) => chapterUrl(file, section);
 
 const overlay = document.getElementById("library");
 const panel = document.getElementById("library-panel");
-const reader = document.getElementById("reader");
-const readerFrame = document.getElementById("reader-frame");
-const readerTitle = document.getElementById("reader-title");
-const readerNewTab = document.getElementById("reader-newtab");
 
 /**
  * @typedef {{
@@ -109,7 +105,7 @@ function showLesson(id) {
     el("ol", {}, c.keypoints.map((k) => el("li", { textContent: k }))),
     el("div", { class: "lib-actions" },
       button("← 목록", showHome),
-      button("📖 원문 전체 읽기", () => openReader(c)),
+      chapterLink(c, null, "📖 원문 전체 읽기 ↗"),
       button(`✏️ 퀴즈 시작 (${QUIZ.QUESTIONS_PER_QUIZ}문제)`, () => startQuiz(id), "lib-btn primary")
     ),
     sourceNote(c)
@@ -213,7 +209,7 @@ function finishQuiz() {
     body,
     el("div", { class: "lib-actions" },
       button("← 목록", showHome),
-      button(result.perfect ? "📖 원문 읽기" : "📖 교과서 다시 읽기", () => openReader(c)),
+      chapterLink(c, null, result.perfect ? "📖 원문 읽기 ↗" : "📖 교과서 다시 읽기 ↗"),
       !result.perfect && button("🔁 새 문제로 다시 도전", () => startQuiz(chapterId), "lib-btn primary")
     ),
     sourceNote(c)
@@ -221,20 +217,19 @@ function finishQuiz() {
   session = null;
 }
 
-// ---------- 원문 리더 ----------
-/** 교과서 원문을 게임 안 리더로 연다 — section이 있으면 그 절로 바로 (퀘스트 "원문 읽기"도 이것을 쓴다) */
-export function openReader(chapter, section = null) {
-  hooks.onChapterOpen(chapter.id);
+// ---------- 교과서 원문 (새 탭) ----------
+let lastOpenedUrl = null;
+/**
+ * 교과서 원문을 새 탭으로 여는 링크 버튼 — section이 있으면 그 절로 바로 (퀘스트 "원문 읽기"도 이것을 쓴다).
+ * <a target="_blank">라서 팝업 차단에 걸리지 않고, 가운데 클릭·길게 누르기도 브라우저 기본 동작을 따른다.
+ */
+export function chapterLink(chapter, section, label, cls = "lib-btn") {
   const url = CHAPTER_URL(chapter.file, section);
-  readerTitle.textContent = `📖 ${chapter.title}`;
-  readerNewTab.href = url;
-  readerFrame.src = url;
-  reader.hidden = false;
-  document.getElementById("reader-close").focus({ preventScroll: true });
-}
-function closeReader() {
-  reader.hidden = true;
-  readerFrame.removeAttribute("src");
+  return el("a", {
+    class: cls, href: url, target: "_blank", rel: "noopener", textContent: label,
+    title: "교과서 원문을 새 탭으로 엽니다",
+    on: { click: () => { lastOpenedUrl = url; hooks.onChapterOpen(chapter.id); } }
+  });
 }
 
 // ---------- 열기 / 닫기 ----------
@@ -245,15 +240,14 @@ export function openLibrary() {
   showHome();
 }
 export function closeLibrary() {
-  closeReader();
   overlay.hidden = true;
   session = null;
   hooks.onOpenChange(false);
   lastFocus?.focus?.({ preventScroll: true });
 }
 export const isLibraryOpen = () => !overlay.hidden;
-export const isReaderOpen = () => !reader.hidden;
-export const readerUrl = () => readerFrame.getAttribute("src");
+/** 테스트 훅: 마지막으로 연 원문 주소 */
+export const lastChapterUrl = () => lastOpenedUrl;
 
 /** 테스트 훅: 진행 중 퀴즈의 정답 인덱스 */
 export const currentAnswerKey = () => session?.questions.map((q) => q.answer) ?? null;
@@ -262,14 +256,9 @@ export const currentAnswerKey = () => session?.questions.map((q) => q.answer) ??
 export function initLibrary(h) {
   hooks = h;
   rng = createRng(h.seed);
-  document.getElementById("reader-close").addEventListener("click", closeReader);
-  readerNewTab.addEventListener("click", closeReader);
-  // 배경(오버레이 바깥) 클릭으로 닫기, Esc로 한 단계씩 닫기
+  // 배경(오버레이 바깥) 클릭이나 Esc로 닫기
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closeLibrary(); });
-  reader.addEventListener("click", (e) => { if (e.target === reader) closeReader(); });
   window.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    if (!reader.hidden) closeReader();
-    else if (!overlay.hidden) closeLibrary();
+    if (e.key === "Escape" && !overlay.hidden) closeLibrary();
   });
 }

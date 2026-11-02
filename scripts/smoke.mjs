@@ -722,7 +722,7 @@ await page.waitForFunction(() => window.__PK);
   check("손상된 세이브로도 게임이 시작되고 원본은 백업된다", st.load === "corrupt" && s3.hp === 100 && backup === "{not json");
 }
 
-// ---------- Stage 5: 알바 (60초 RSSI 측정 → CR2032 지급·저장) ----------
+// ---------- Stage 5 → 11.2: 알바 (60초 비콘 찾기 → CR2032 지급·저장) ----------
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForFunction(() => window.__PK);
@@ -735,50 +735,74 @@ await reset();
   await page.mouse.click(p.x, p.y);
   await tick(20);
   const label = await page.locator("#modal-action").textContent();
-  check("등대 모달에 '알바 시작' 버튼이 있다", (await state()).modal?.includes("등대") && label.includes("알바"), label);
+  check("등대 모달에 '비콘 찾기 알바' 버튼이 있다", (await state()).modal?.includes("등대") && label.includes("알바"), label);
   await page.click("#modal-action");
-  await page.locator("#job-panel .lib-btn.primary").click(); // 60초 측정 시작
+  await page.locator("#job-panel .lib-btn.primary").click(); // 60초 비콘 찾기 시작
+  const huntUi = await page.evaluate(() => ({ modal: !document.getElementById("job").hidden, hunt: !document.getElementById("hunt").hidden }));
+  check("시작하면 모달이 닫히고 걸어 다니며 보는 측정기 창이 뜬다", !huntUi.modal && huntUi.hunt, JSON.stringify(huntUi));
 
   await tick(1200);
   const s1 = await jobState();
-  check("측정 중 광고 패킷(약 100 ms 간격)이 RSSI 샘플로 쌓인다", s1.phase === "measure" && s1.samples >= 9 && s1.samples <= 13, `1.2초 → ${s1.samples}개`);
+  check("멈춰 서 있으면 광고 패킷(약 100 ms 간격)이 그 자리의 RSSI 샘플로 쌓인다", s1.phase === "search" && s1.samples >= 9 && s1.samples <= 13, `1.2초 → ${s1.samples}개`);
+  const spawnD = Math.hypot(s1.beacon.x - 5.0, s1.beacon.z - 13.0);
 
   const a = await state();
-  await hold("KeyW", 300);
+  await hold("KeyS", 400);
   const b = await state();
-  check("알바 중에는 기사가 움직이지 않는다", Math.hypot(b.x - a.x, b.z - a.z) < 0.01);
-
-  await page.keyboard.press("Space");
   const s2 = await jobState();
-  const shown = await page.locator(".job-estimate").textContent();
-  check("스페이스바로 측정을 확정하면 실제 거리와 판정이 공개된다", s2.phase === "reveal" && s2.rounds === 1 && /실제 .* m · 추정/.test(shown), shown);
+  check("알바 중에도 걸을 수 있고, 움직이면 그 자리의 평균은 새로 시작된다",
+    Math.hypot(b.x - a.x, b.z - a.z) > 0.5 && s2.samples <= 4, `${Math.hypot(b.x - a.x, b.z - a.z).toFixed(1)} m 이동 · 샘플 ${s1.samples} → ${s2.samples}`);
 
-  // 남은 시간은 봇처럼 플레이: 패킷 10개가 모이면 확정
+  // 비콘 바로 옆(0.4 m)으로 가서 B 키로 신고
+  await page.evaluate(({ x, z }) => window.__PK.teleport(x + 0.4, z), s2.beacon);
+  await tick(100);
+  await page.keyboard.press("KeyB");
+  await tick(20);
+  const s3 = await jobState();
+  const shown = await page.locator("#hunt .job-estimate").textContent();
+  check("B 키로 '여기다!'를 누르면 실제 비콘까지 거리로 판정하고, 비콘 위치를 3D로 공개한다",
+    s3.phase === "reveal" && s3.rounds === 1 && Math.abs(s3.err - 0.4) < 0.05 && shown.includes("정밀") && s3.revealShown, shown);
+  await tick(2100);
+  const s4 = await jobState();
+  check("공개 후 새 비콘은 기사에게서 5~13 m 떨어진 마을 안에 숨겨진다 (첫 비콘도)",
+    s4.phase === "search" && !(await jobState()).revealShown && spawnD >= 5 - 1e-6 && spawnD <= 13 + 1e-6 && Math.hypot(s4.beacon.x, s4.beacon.z) <= 15.0,
+    `첫 비콘 ${spawnD.toFixed(1)} m · 다음 (${s4.beacon.x.toFixed(1)}, ${s4.beacon.z.toFixed(1)})`);
+
+  // 남은 시간: 비콘마다 그 자리로 가서 1초 평균을 본 뒤 신고 (흐름 검증 — 실력·밸런스는 봇 시뮬레이션이 맡는다)
   const result = await page.evaluate(() => {
     const pk = window.__PK;
+    const spots = [];
+    let waited = 0;
     while (pk.job.state().phase !== "done") {
-      pk.tick(1 / 60);
       const st = pk.job.state();
-      if (st.phase === "measure" && st.samples >= 10) window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " " }));
+      if (st.phase === "search") {
+        if (waited === 0) { pk.teleport(st.beacon.x, st.beacon.z); spots.push(st.beacon); }
+        waited += 1 / 60;
+        if (waited > 1) { pk.job.mark(); waited = 0; }
+      }
+      pk.tick(1 / 60);
     }
-    return pk.job.state().result;
+    const r = pk.job.state().result;
+    return { ...r, spotsOk: spots.every((b) => Math.hypot(b.x, b.z) <= 15.0 && Math.hypot(b.x + 9, b.z - 10) >= 5) };
   });
+  await tick(20);
   const prog = await page.evaluate(() => window.__PK.progress());
   const hudCoins = await page.locator('#stats [data-stat="cr2032"]').textContent();
-  check("60초가 끝나면 등급에 따라 CR2032가 지급된다",
-    result.rounds >= 10 && result.reward >= 2 && prog.cr2032 === result.reward && hudCoins.includes(`${result.reward}`),
+  const resultShown = await page.evaluate(() => !document.getElementById("job").hidden && document.getElementById("hunt").hidden);
+  check("60초가 끝나면 결과 창이 뜨고 등급에 따라 CR2032가 지급된다 (비콘 자리는 모두 마을 안·훈련장 밖)",
+    result.rounds >= 8 && result.grade === "S" && result.reward === 8 && prog.cr2032 === result.reward && hudCoins.includes(`${result.reward}`) && resultShown && result.spotsOk,
     `비콘 ${result.rounds}개 · ${result.score}점 · 등급 ${result.grade} · +${result.reward}`);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
   check("CR2032 잔액이 localStorage에 저장된다", saved.v >= 2 && saved.cr2032 === result.reward && saved.job.runs === 1);
 
-  // 두 번째 판은 도중에 나가면 보수 없음
+  // 두 번째 판은 도중에 그만두면 보수 없음
   await page.locator("#job-panel .lib-btn.primary").click(); // 한 번 더
   await tick(3000);
   await page.keyboard.press("Escape");
   await tick(100);
   const after = await page.evaluate(() => window.__PK.progress());
-  check("측정 도중 나가면 보수 없이 중단되고 다시 조작할 수 있다",
-    after.cr2032 === result.reward && after.job.runs === 1 && !(await page.evaluate(() => window.__PK.job.isOpen())));
+  check("찾는 도중 Esc로 그만두면 보수 없이 끝나고 측정기 창이 닫힌다",
+    after.cr2032 === result.reward && after.job.runs === 1 && !(await page.evaluate(() => window.__PK.job.isOpen())) && (await jobState()) === null);
 
   await page.reload();
   await page.waitForFunction(() => window.__PK);
@@ -1147,6 +1171,35 @@ await reset();
   await page.keyboard.press("Escape");
 }
 
+// ---------- Stage 11.1: 건물 표지판 · 퀘스트 "📍 길 안내" ----------
+await page.evaluate(() => {           // 안테나 강화 단계를 미완료로 — 그래야 그 단계에 길 안내 버튼이 뜬다
+  const p = window.__PK.progress();
+  p.gear.antenna = 0;
+  localStorage.setItem("packetKnight.save", JSON.stringify(p));
+});
+await page.reload();
+await page.waitForFunction(() => window.__PK);
+{
+  const signs = await page.evaluate(() => window.__PK.signs());
+  check("건물 위 이름 표지판이 뜨고, 대장간 표지판이 RF 랩을 함께 알린다",
+    signs.includes("🔨 패킷 대장간 · RF 랩") && signs.includes("📚 도서관") && signs.includes("📡 전파의 등대 · 알바") && signs.length >= 7, signs.join(" | "));
+  await reset();
+  await page.evaluate(() => window.__PK.quests.open("Q1"));
+  const goes = await page.locator("#quests-panel .q-go").evaluateAll((bs) => bs.map((b) => b.dataset.place));
+  await page.locator('#quests-panel .q-go[data-place="forge"]').click();
+  const s0 = await state();
+  const closed = await page.evaluate(() => !window.__PK.quests.isOpen());
+  for (let i = 0; i < 40 && !(await state()).badge.includes("앞 도착"); i++) await tick(300);
+  const s1 = await state();
+  const trackerText = await page.locator("#quest-tracker").textContent();
+  check("HUD 퀘스트 트래커에는 길 안내 버튼도, 새어 나온 'false' 글자도 없다",
+    (await page.locator("#quest-tracker .q-go").count()) === 0 && !trackerText.includes("false"), trackerText.slice(-40));
+  check("퀘스트 로그의 '📍 길 안내'가 그 단계의 건물(RF 랩 → 패킷 대장간)로 데려간다",
+    goes.includes("forge") && goes.includes("tower") && closed && s0.modal.includes("패킷 대장간") && s1.badge.includes("패킷 대장간") && Math.hypot(s1.x - 6.6, s1.z + 1.0) < 1.2,
+    `${goes.join(",")} · ${s0.modal} · ${s1.badge} @ (${s1.x.toFixed(1)}, ${s1.z.toFixed(1)})`);
+  await page.keyboard.press("Escape");
+}
+
 // ---------- Stage 9: 퀘스트 트래커 · 로그 · 예측해 보기 · 배지 ----------
 await page.evaluate(() => localStorage.clear());
 await page.reload();
@@ -1156,6 +1209,9 @@ await page.waitForFunction(() => window.__PK);
   const tracker = () => page.locator("#quest-tracker").textContent();
   const t0 = await tracker();
   check("새 게임은 Q0 퀘스트 트래커가 보인다", t0.includes("Q0") && t0.includes("○"), t0.slice(0, 40));
+  const tBox = await page.locator("#quest-tracker").boundingBox();
+  check("퀘스트 트래커는 한 줄로 접혀 있다 (다음 단계 하나만, 화면을 덜 가린다)",
+    tBox.height < 40 && t0.includes("0/4") && (t0.match(/○/g) ?? []).length === 1, `${Math.round(tBox.height)}px · ${t0}`);
 
   await reset();
   await hold("KeyS", 1000); await reset(); await hold("KeyS", 1000);
@@ -1170,13 +1226,21 @@ await page.waitForFunction(() => window.__PK);
   const lockedText = await page.locator("#quests-panel .q-whatif").textContent();
   check("Q 키로 퀘스트 로그가 열리고, 강좌 전에는 예측해 보기가 잠겨 있다",
     await page.evaluate(() => window.__PK.quests.isOpen()) && lockedText.includes("모두 마치면"));
-  await page.locator("#quests-panel .q-read").click();
-  const url = await page.evaluate(() => window.__PK.library.readerUrl());
+  // 실제 탭은 열지 않는다 — 우리 click 핸들러(열람 기록)는 돌고, 기본 동작(새 탭)만 막는다
+  const read = await page.evaluate(() => {
+    const a = document.querySelector("#quests-panel .q-read");
+    const before = window.__PK.progress().metrics.chapterOpens.intro ?? 0;
+    a.addEventListener("click", (e) => e.preventDefault(), { once: true });
+    a.click();
+    return { tag: a.tagName, href: a.getAttribute("href"), target: a.target, rel: a.rel, url: window.__PK.library.lastChapterUrl(),
+      opened: (window.__PK.progress().metrics.chapterOpens.intro ?? 0) - before, overlay: document.querySelector("#reader") !== null,
+      logOpen: window.__PK.quests.isOpen() };
+  });
   const w0 = Q9.whatifFor(Q9.QUESTS[0]);
-  check("'원문 읽기'가 게임 안 리더로 교과서 새 주소의 그 절을 연다", url === `https://connbook.yalex-k.com/bluetooth/chapters/intro.html#${w0.section}`, url);
-  await page.keyboard.press("Escape");
-  const stillOpen = await page.evaluate(() => window.__PK.quests.isOpen() && !window.__PK.library.isReaderOpen());
-  check("Esc는 리더만 먼저 닫고 퀘스트 로그는 남는다", stillOpen);
+  const want = `https://connbook.yalex-k.com/bluetooth/chapters/intro.html#${w0.section}`;
+  check("'원문 읽기'는 교과서 그 절을 새 탭 링크로 열고(게임 안 리더 없음) 열람을 기록한다",
+    read.tag === "A" && read.href === want && read.target === "_blank" && read.rel.includes("noopener") && read.url === want && read.opened === 1 && !read.overlay && read.logOpen,
+    JSON.stringify(read));
   await page.keyboard.press("Escape");
 
   await page.evaluate(() => window.__PK.library.open());
@@ -1215,7 +1279,7 @@ await page.waitForFunction(() => window.__PK);
   await page.waitForFunction(() => window.__PK);
   const re = await qState();
   const t1 = await tracker();
-  check("퀘스트 진행·칭호가 저장되고 새로고침 후 유지된다 (트래커는 Q1)", closed && Boolean(re.done.Q0) && re.active === "Q1" && t1.includes("Q1") && t1.includes("패킷 나이트"), t1.slice(0, 50));
+  check("퀘스트 진행·칭호가 저장되고 새로고침 후 유지된다 (트래커는 Q1)", closed && Boolean(re.done.Q0) && re.active === "Q1" && t1.includes("Q1") && re.title === "패킷 나이트", `${t1.slice(0, 50)} · 칭호 ${re.title}`);
 
   // 모바일 폭: 트래커·퀘스트 버튼이 조이스틱·점프/발사 버튼과 겹치지 않는다
   await page.setViewportSize({ width: 390, height: 780 });
@@ -1434,7 +1498,7 @@ await page.waitForFunction(() => window.__PK);
     await page.evaluate(() => window.__PK.job.open());
     await page.locator("#job-panel .lib-btn.primary").click();
     await tick(1500);
-    await page.keyboard.press("Space");
+    await page.keyboard.press("KeyB");
     await tick(100);
     await page.keyboard.press("Escape");
   }), ["beacon", "measure"]);

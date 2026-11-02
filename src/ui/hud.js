@@ -12,6 +12,11 @@ const modalLore = document.getElementById("modal-lore");
 const modalLink = document.getElementById("modal-link");
 const modalAction = document.getElementById("modal-action");
 const statsPanel = document.getElementById("stats");
+// 모바일: 스탯은 한 줄 요약(.st-sum)으로 접혀 있고, 누르면 펼친다 (데스크톱은 요약을 숨기고 늘 펼침)
+statsPanel.addEventListener("click", () => {
+  const open = statsPanel.classList.toggle("open");
+  statsPanel.querySelector(".st-sum")?.setAttribute("aria-expanded", String(open));
+});
 
 
 document.getElementById("modal-close").addEventListener("click", hideModal);
@@ -84,5 +89,11 @@ export function renderStats(stats, { skillSlots, cr2032, xp, statPoints }, chang
   level.className = `slots level${changed.includes("xp") ? " up" : ""}`;
   level.dataset.stat = "level";
   level.textContent = `⭐ Lv ${lv.level} · XP ${lv.intoLevel}/${lv.toNext}${statPoints ? ` · 포인트 ${statPoints}` : ""}`;
-  statsPanel.replaceChildren(...cells, slots, coins, level);
+  const sum = document.createElement("button");
+  sum.type = "button";
+  sum.className = `st-sum${changed.length ? " up" : ""}`;
+  sum.setAttribute("aria-expanded", String(statsPanel.classList.contains("open")));
+  sum.setAttribute("aria-label", "스탯 펼치기/접기");
+  sum.textContent = `${STAT_META.tx.icon} ${stats.tx} · ${STAT_META.rx.icon} ${stats.rx}${STAT_META.rx.unit} · 🪙 ${cr2032} · ⭐ Lv ${lv.level}${statPoints ? ` · ✨${statPoints}` : ""}`;
+  statsPanel.replaceChildren(sum, ...cells, slots, coins, level);
 }

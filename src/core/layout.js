@@ -10,7 +10,7 @@ const CHAPTER = (file) => chapterUrl(file);
 
 /**
  * @typedef {{ x: number, y: number, z: number }} Vec3
- * @typedef {{ title: string, sub: string, desc: string, lore: string, link: string, walkPos: Vec3, action?: { id: string, label: string } }} LandmarkInfo
+ * @typedef {{ sign?: string, title: string, sub: string, desc: string, lore: string, link: string, walkPos: Vec3, action?: { id: string, label: string } }} LandmarkInfo
  * @typedef {{ id: string, pos: Vec3, info: LandmarkInfo }} Landmark
  */
 
@@ -20,6 +20,7 @@ export const LANDMARKS = [
     id: "hall",
     pos: { x: 0, y: S, z: -8.5 },
     info: {
+      sign: "🏛️ GATT 중앙 회관",  // 건물 위 이름 표지판 (render/world.js)
       title: "🏛️ GATT 중앙 회관",
       sub: "[데이터 프로필 허브]",
       desc: "스펙트럼 대륙의 모든 서비스(Service)와 특성(Characteristic)이 등록되는 행정 중앙 회관입니다. 시민 NPC들에게 데이터를 읽기(Read), 쓰기(Write), 알림(Notify) 받는 퀘스트를 수주합니다.",
@@ -32,6 +33,7 @@ export const LANDMARKS = [
     id: "library",
     pos: { x: -9.0, y: S, z: -1.0 },
     info: {
+      sign: "📚 도서관",  // 건물 위 이름 표지판 (render/world.js)
       title: "📚 RF 이론 도서관",
       sub: "[connectivityBook 연동 연구소]",
       desc: "2.4GHz 무선통신의 모든 원리가 기록된 지식의 성소입니다. 챕터 퀴즈를 풀면 스탯(TX 파워, 수신 감도)이 오르고 새로운 스킬 슬롯이 해금됩니다.",
@@ -45,12 +47,13 @@ export const LANDMARKS = [
     id: "forge",
     pos: { x: 9.0, y: S, z: -1.0 },
     info: {
+      sign: "🔨 패킷 대장간 · RF 랩",  // 건물 위 이름 표지판 (render/world.js)
       title: "🔨 패킷 대장간",
-      sub: "[장비 강화 & 배터리 상점]",
-      desc: "안테나 사거리를 늘리고, 크리스털 정밀도를 맞추며, 던전 탐험에 필수적인 코인 배터리 CR2032를 장착하고 교체하는 하드웨어 정비소입니다.",
+      sub: "[RF 랩 · 장비 강화 & 레벨업 스탯 분배]",
+      desc: "대장간 안의 RF 랩에서 CR2032를 재료로 안테나·크리스털 같은 RF 부품을 강화하고, 레벨업으로 받은 스탯 포인트를 분배합니다. 분수대 동쪽, 구리 지붕에 굴뚝이 있는 건물입니다.",
       lore: "저전력 BLE 기기의 수명과 성능을 좌우하는 CR2032 전원 설계 및 RF 매칭 회로를 은유합니다.",
       link: CHAPTER("power.html"),
-      action: { id: "rflab", label: "🔧 RF 랩 입장" },
+      action: { id: "rflab", label: "🔧 RF 랩 입장 (장비 강화·스탯 분배)" },
       walkPos: { x: 6.6, y: S, z: -1.0 }
     }
   },
@@ -58,12 +61,13 @@ export const LANDMARKS = [
     id: "tower",
     pos: { x: 8.0, y: S, z: 8.0 },
     info: {
+      sign: "📡 전파의 등대 · 알바",  // 건물 위 이름 표지판 (render/world.js)
       title: "📡 전파의 등대 (안테나 타워)",
       sub: "[비콘 채널 37 송출탑]",
-      desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 신호를 수신해 RSSI 거리를 측정하는 알바 미니게임을 진행할 수 있습니다.",
+      desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 등대지기에게서 측정기를 받아, 마을에 숨겨진 비콘을 RSSI로 찾아내는 60초 알바를 할 수 있습니다.",
       lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
       link: CHAPTER("advertising.html"),
-      action: { id: "job", label: "📡 알바 시작 (60초)" },
+      action: { id: "job", label: "📡 비콘 찾기 알바 (60초)" },
       walkPos: { x: 6.4, y: S, z: 6.4 }
     }
   },
@@ -83,6 +87,7 @@ export const LANDMARKS = [
     id: "dungeonGate",
     pos: { x: WORLD.DUNGEON_X, y: WORLD.DUNGEON_PIT_Y, z: WORLD.DUNGEON_Z },
     info: {
+      sign: "⚔️ 호핑 던전",  // 건물 위 이름 표지판 (render/world.js)
       title: "⚔️ 37채널 호핑 던전 지하 입구",
       sub: "[지하 던전 포털 · Lv.1 권장]",
       desc: "스펙트럼 대륙 지하 37개 데이터 채널로 이어지는 관문입니다. 패킷 기사는 연결 이벤트마다 바뀌는 호핑 패턴을 밟아가며 Wi-Fi 간섭 몬스터를 격퇴해야 합니다.",
@@ -113,6 +118,7 @@ LANDMARKS.push({
   id: "prison",
   pos: { x: 10.0, y: S, z: -12.0 },
   info: {
+      sign: "🔒 보안의 감옥",  // 건물 위 이름 표지판 (render/world.js)
     title: "🔒 보안의 감옥",
     sub: "[페어링 시험장 · Q7]",
     desc: "몰래 엿듣는 도청자와 쪽지를 바꿔치기하는 중간자가 갇힌 감옥입니다. 간수의 페어링 시험을 통과하세요: 두 기기의 입출력 능력으로 페어링 방식을 판정하고, 숫자 비교 화면이 다르면 '아니요'로 중간자를 잡아내야 합니다.",
@@ -126,6 +132,7 @@ LANDMARKS.push({
   id: "crypt",
   pos: { x: 10.0, y: S, z: 12.0 },
   info: {
+    sign: "🪫 지하묘지",
     title: "🪫 전력 잃은 지하묘지",
     sub: "[CR2032 배터리 계약소 · Q8]",
     desc: "배터리가 다해 잠든 센서들의 무덤입니다. 묘지기의 계약을 받아 센서 세 개의 연결 간격·페리페럴 지연·수면 시계를 골라, 요구 반응 시간 안에서 CR2032 하나로 약속한 햇수를 버티게 하세요.",

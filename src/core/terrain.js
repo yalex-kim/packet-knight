@@ -12,14 +12,13 @@ export function isDungeonCell(x, z) {
 
 /** 연속 높이 설계 함수 (생성 전용 — 물리는 groundHeightAt을 쓴다) */
 export function rawHeight(x, z) {
-  const { SURFACE_Y, DUNGEON_PIT_Y, VILLAGE_RADIUS } = WORLD;
+  const { SURFACE_Y, DUNGEON_PIT_Y } = WORLD;
   if (isDungeonCell(x, z)) {
     const t = clamp((-8.0 - z) / 5.5, 0, 1);
     return SURFACE_Y - t * (SURFACE_Y - DUNGEON_PIT_Y);
   }
-  const r = Math.hypot(x, z);
-  if (r <= VILLAGE_RADIUS) return SURFACE_Y;
-  return SURFACE_Y - Math.min(2.5, (r - VILLAGE_RADIUS) * 0.35);
+  // 섬 전체가 마을과 같은 높이의 평지다 (Stage 11.2: 바깥 고리가 반 블록씩 내려가던 계단 해안을 없앴다 — 사용자 요청)
+  return SURFACE_Y;
 }
 
 const cellKey = (i, j) => i * 1000 + j;

@@ -3,7 +3,7 @@
 
 import { sfx } from "./audio.js";
 import { CHAPTERS } from "../core/chapters.data.js";
-import { QUESTS, UPCOMING_QUESTS, questById, whatifFor, stepDone, readyForWhatif, badges } from "../core/quests.js";
+import { QUESTS, UPCOMING_QUESTS, questById, whatifFor, stepDone, readyForWhatif, badges, stepPlace } from "../core/quests.js";
 
 const overlay = document.getElementById("quests");
 const panel = document.getElementById("quests-panel");
@@ -11,7 +11,7 @@ const tracker = document.getElementById("quest-tracker");
 
 /**
  * @type {{ getProgress: () => any, onAnswer: (questId: string, originalIndex: number) => { correct: boolean, completed: any },
- *   openReader: (chapter: any, section: string|null) => void, isReaderOpen: () => boolean, onOpenChange: (open: boolean) => void, seed?: number }}
+ *   chapterLink: (chapter: any, section: string|null, label: string, cls?: string) => HTMLAnchorElement, guideTo: (landmarkId: string) => void, onOpenChange: (open: boolean) => void, seed?: number }}
  */
 let hooks;
 let lastFocus = null;
@@ -43,11 +43,17 @@ function shuffled(n) {
   return a;
 }
 
+/** 퀘스트 로그의 단계 한 줄 — 아직 안 한 단계에는 "📍 길 안내" */
 function stepLine(qs, p, quest, step) {
   const done = step.kind === "whatif" ? Boolean(qs.done[quest.id]) : stepDone(qs, p, quest, step);
   const n = qs.progress[quest.id]?.[step.id] ?? 0;
   const count = step.kind === "event" && (step.need ?? 1) > 1 && !done ? ` (${Math.floor(n)}/${step.need})` : "";
-  return el("li", { class: done ? "done" : "" }, `${done ? "✓" : "○"} ${step.text}${count}`);
+  const place = done ? null : stepPlace(step);
+  return el("li", { class: done ? "done" : "" }, `${done ? "✓" : "○"} ${step.text}${count}`,
+    place ? el("button", {
+      type: "button", class: "q-go", "data-place": place, textContent: "📍 길 안내",
+      title: "이 단계를 하는 곳으로 걸어갑니다", on: { click: () => { closeQuestLog(); hooks.guideTo(place); } }
+    }) : null);
 }
 
 // ---------- HUD 트래커 ----------
@@ -55,17 +61,26 @@ export function refreshTracker() {
   const p = hooks.getProgress();
   const qs = p.quests;
   const quest = questById(qs.active);
-  const title = qs.title ? el("span", { class: "qt-title", textContent: `🏅 ${qs.title}` }) : null;
+  // 한 줄로 접는다 (모바일에서 화면을 가리지 않게) — 단계 전체는 눌러서 여는 퀘스트 로그에 있다
   if (!quest) {
-    tracker.replaceChildren(el("div", { class: "qt-head" }, `📜 퀘스트 Q0~${QUESTS.at(-1).code} 완료 `, title), el("div", { class: "muted", textContent: `다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 다음 업데이트에서 열린다` }));
+    tracker.replaceChildren(el("span", { class: "qt-head", textContent: `📜 Q0~${QUESTS.at(-1).code} 완료` }),
+      el("span", { class: "qt-next", textContent: ` · 다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 업데이트에서` }));
+    tracker.title = "";
+    tracker.classList.remove("ready");
     return;
   }
   const ready = readyForWhatif(qs, p, quest);
+  const steps = quest.steps.filter((s) => s.kind !== "whatif");
+  const done = steps.filter((s) => stepDone(qs, p, quest, s)).length;
+  const next = steps.find((s) => !stepDone(qs, p, quest, s));
+  const n = next ? qs.progress[quest.id]?.[next.id] ?? 0 : 0;
+  const count = next && next.kind === "event" && (next.need ?? 1) > 1 ? ` (${Math.floor(n)}/${next.need})` : "";
+  const nextText = ready ? "🔮 예측해 보기 열림 — 눌러서 답하기" : `○ ${next?.text ?? ""}${count}`;
   tracker.replaceChildren(
-    el("div", { class: "qt-head" }, `📜 ${quest.code} ${quest.title} `, title),
-    el("ul", {}, quest.steps.map((s) => stepLine(qs, p, quest, s))),
-    ready && el("div", { class: "qt-ready", textContent: "🔮 예측해 보기가 열렸다 — 눌러서 답하기 (Q)" })
+    el("span", { class: "qt-head" }, `📜 ${quest.code} `, el("span", { class: "qt-name", textContent: `${quest.title} ` }), `${done}/${steps.length}`),
+    el("span", { class: "qt-next", textContent: ` › ${nextText}` })
   );
+  tracker.title = `${quest.code} ${quest.title} — ${nextText} (눌러서 퀘스트 로그 열기)`;
   tracker.classList.toggle("ready", ready);
 }
 
@@ -126,7 +141,7 @@ function render() {
       el("div", { class: "q-reward", textContent: `🎁 보상: ${quest.reward.label}` }),
       whatifBlock,
       el("div", { class: "lib-actions" },
-        button("📖 원문 읽기 (예측해 보기 절)", () => hooks.openReader(ch, w.section), "lib-btn q-read"))
+        hooks.chapterLink(ch, w.section, "📖 원문 읽기 (예측해 보기 절) ↗", "lib-btn q-read"))
     ),
     el("h3", { textContent: "📖 완독 배지" }),
     el("div", { class: "q-badges" }, CHAPTERS.map((c) => el("span", {
@@ -177,9 +192,9 @@ export function initQuestLog(h) {
   tracker.addEventListener("click", () => openQuestLog());
   document.getElementById("btn-quests").addEventListener("click", () => openQuestLog());
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closeQuestLog(); });
-  // 캡처 단계: 원문 리더가 위에 떠 있으면 리더만 닫히게 둔다
+  // 캡처 단계: 다른 팝업의 Esc 처리보다 먼저 퀘스트 로그를 닫는다
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !overlay.hidden && !hooks.isReaderOpen()) closeQuestLog();
+    if (e.key === "Escape" && !overlay.hidden) closeQuestLog();
   }, { capture: true });
   refreshTracker();
 }

@@ -47,7 +47,7 @@ forEachCell((i, j, top) => {
     return;
   }
   // 하부 층: 이웃 칸보다 낮아지는 절벽 면이 비지 않도록 충분히 깊게 쌓는다
-  const depth = type === "sand" ? 2 : 4;
+  const depth = 4;   // 섬 가장자리 절벽이 바다 아래까지 꽉 차 보이게 (해안도 평지 — Stage 11.2)
   for (let d = 1; d <= depth; d++) {
     const y = top - d;
     if (y <= WORLD.BEDROCK_Y) break;
@@ -73,8 +73,41 @@ sea.position.y = WORLD.SEA_LEVEL - 0.2;
 root.add(sea);
 
 // ---------- 랜드마크 ----------
+/** 건물 위 이름 표지판 — 멀리서도 어느 건물이 무엇인지 보이게 (캔버스 텍스처 스프라이트) */
+export const signs = [];
+function makeSign(text, topY) {
+  const font = "bold 44px system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  ctx.font = font;
+  const pad = 22, h = 72;
+  c.width = Math.ceil(ctx.measureText(text).width) + pad * 2;
+  c.height = h;
+  ctx.font = font;                                   // 크기를 바꾸면 컨텍스트가 초기화된다
+  ctx.fillStyle = "rgba(15, 18, 30, 0.78)";
+  ctx.beginPath(); ctx.roundRect(0, 0, c.width, h, 18); ctx.fill();
+  ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle";
+  ctx.fillText(text, pad, h / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  const worldH = 0.55;
+  sprite.scale.set(worldH * c.width / h, worldH, 1);
+  sprite.position.y = topY + 0.55;
+  sprite.renderOrder = 10;
+  sprite.userData.signText = text;
+  sprite.raycast = () => {};                         // 보기 전용 — 뒤에 있는 건물·몬스터 클릭을 가로채지 않는다
+  return sprite;
+}
+
 function placeLandmark(group, id) {
   const { pos, info } = landmark(id);
+  if (info.sign) {
+    const top = new THREE.Box3().setFromObject(group).max.y;  // 위치를 옮기기 전 = 그룹 기준 높이
+    const sign = makeSign(info.sign, Number.isFinite(top) ? top : 2);
+    group.add(sign);
+    signs.push(sign);
+  }
   group.position.set(pos.x, pos.y, pos.z);
   group.userData.interactive = info;
   interactiveObjects.push(group);
