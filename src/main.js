@@ -22,6 +22,7 @@ import * as world from "./render/world.js";
 import * as knightView from "./render/knight.js";
 import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera, setAttract, startLanding } from "./render/camera.js";
 import * as splash from "./ui/splash.js";
+import { lifeRoot, stepLife, lifeState } from "./render/villagers.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
@@ -102,6 +103,7 @@ scene.add(new THREE.HemisphereLight(0xd6ecff, 0x7a8f5a, 0.85));
 world.enableShadows(world.root);
 world.sea.visible = false;   // 떠 있는 섬 — 바다 대신 하늘 (클릭 이동 레이캐스트도 보이는 것만 맞는다)
 scene.add(world.root);
+scene.add(lifeRoot);   // 주민·광고 패킷 (Stage 11.9)
 scene.add(battleView.battleRoot);
 world.enableShadows(battleView.battleRoot);   // 훈련장 봇
 scene.add(dungeonView.dungeonRoot);
@@ -509,6 +511,7 @@ function setAmbience(underground) {
   scene.fog.near = underground ? 14 : 70;
   scene.fog.far = underground ? 40 : 190;
   world.root.visible = !underground;
+  lifeRoot.visible = !underground;
 }
 
 /** 체크포인트 = 층 시작 순간: 같은 layout으로 전투·링크·위치를 다시 만든다 (PRD §5 Connection Timeout 롤백) */
@@ -981,6 +984,7 @@ function animate() {
   const t = clock.elapsedTime;
   renderFrame(t, dt);
   world.animateWorld(t);
+  if (!run) stepLife(dt, t, motor);
   knightView.animateEffects(t, dt);
   renderer.render(scene, camera);
 }
@@ -1050,6 +1054,7 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   quality: () => perf.level,
+  life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
   chargeCfg: () => chargeCfg(progress),
   dungeon: {

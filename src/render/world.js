@@ -81,7 +81,7 @@ root.add(sea);
 // ---------- 랜드마크 ----------
 /** 건물 위 이름 표지판 — 멀리서도 어느 건물이 무엇인지 보이게 (캔버스 텍스처 스프라이트) */
 export const signs = [];
-function makeSign(text, topY) {
+export function makeSign(text, topY) {
   const font = "bold 44px system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
   const c = document.createElement("canvas");
   const ctx = c.getContext("2d");

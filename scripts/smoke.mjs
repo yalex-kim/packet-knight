@@ -1561,6 +1561,19 @@ await page.waitForFunction(() => window.__PK);
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
+// ---------- Stage 11.9: 마을의 생기 — 주민 NPC·광고 패킷 ----------
+{
+  const life = await page.evaluate(() => {
+    const a = window.__PK.life();
+    for (let i = 0; i < 180; i++) window.__PK.life();      // 3초
+    const b = window.__PK.life();
+    const moved = a.positions.filter((p, i) => Math.hypot(p[0] - b.positions[i][0], p[1] - b.positions[i][1]) > 0.3).length;
+    return { n: a.villagers, moved, packets: Math.max(a.packets, b.packets) };
+  });
+  check("마을 주민 6명이 길을 오가고, 등대가 광고 패킷(채널 37·38·39)을 날린다", life.n === 6 && life.moved >= 3 && life.packets >= 1,
+    `주민 ${life.n}명 중 ${life.moved}명 이동 · 날아가는 패킷 ${life.packets}개`);
+}
+
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
 {
   const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });
