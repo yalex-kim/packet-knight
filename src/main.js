@@ -886,6 +886,7 @@ function simulate(dt) {
     speed *= QUEST_SKILLS.DASH.speedMul;
   }
   dashBtn.classList.toggle("cooling", dash.cooldown > 0);
+  dashBtn.style.setProperty("--cd", (dash.cooldown / QUEST_SKILLS.DASH.cooldown).toFixed(3));
 
   const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), speed);
   // 걸은 거리 (Q0) — 1 m 단위로 모아서 반영

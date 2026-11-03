@@ -406,7 +406,7 @@
 
   /* Stage 10: 돌진 버튼 · 페어링 시험 · 배터리 계약 */
   #btn-dash {
-    position: fixed; right: 16px; bottom: 216px; z-index: 20;
+    position: fixed; right: 18px; bottom: 228px; z-index: 20;
     width: 64px; height: 64px; border-radius: 50%; font-size: 12px; font-family: inherit; cursor: pointer;
     background: radial-gradient(circle at 35% 35%, #ffe08a, #c98a10); color: #2a1a00; border: 2px solid #ffd76b;
   }
@@ -515,11 +515,11 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#hud, #badge, #stats, #hp, #btn-sound, #quest-tracker, #btn-quests, #btn-reset, #joystick-zone, #btn-jump, #btn-fire) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#hud, #badge, #stats, #hp, #btn-sound, #quest-tracker, #btn-quests, #btn-reset, #joystick-zone, #btn-jump, #btn-fire) { transition: opacity .6s ease; }
+  body.prestart :is(#hud, #badge, #stats, #hp, #btn-sound, #quest-tracker, #btn-quests, #btn-reset, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#hud, #badge, #stats, #hp, #btn-sound, #quest-tracker, #btn-quests, #btn-reset, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-sound) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
-  body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-quests, #btn-reset) { transition-delay: .35s; }
+  body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash, #btn-quests, #btn-reset) { transition-delay: .35s; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -612,6 +612,29 @@
   #btn-sound { color: var(--ink); }
   #toast { color: var(--ink); border: 1.5px solid rgba(12, 147, 184, .45); border-radius: 14px; font-weight: 500; }
   #joystick-base { background: rgba(255, 255, 255, .28); border: 1.5px solid rgba(255, 255, 255, .7); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+  /* 행동 버튼 (Stage 11.11): 흰 유리 테두리의 둥근 광택 버튼 — 큰 아이콘 + 작은 라벨, 누르면 쏙 들어간다 */
+  .act {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    width: 66px; height: 66px; padding: 0; border-radius: 50%; color: #fff; font-family: inherit; cursor: pointer;
+    border: 3px solid rgba(255, 255, 255, .92);
+    box-shadow: 0 5px 0 rgba(0, 0, 0, .18), 0 10px 22px rgba(20, 40, 70, .28), inset 0 -6px 10px rgba(0, 0, 0, .18), inset 0 6px 10px rgba(255, 255, 255, .35);
+    transition: transform .08s ease, box-shadow .08s ease; user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  .act .act-ico { font-size: 22px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25)); }
+  .act .act-lbl { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+  .act:active { transform: translateY(3px) scale(.95); box-shadow: 0 2px 0 rgba(0, 0, 0, .18), 0 4px 10px rgba(20, 40, 70, .25), inset 0 -3px 8px rgba(0, 0, 0, .2), inset 0 4px 8px rgba(255, 255, 255, .3); }
+  #btn-fire.act { width: 76px; height: 76px; background: radial-gradient(circle at 35% 28%, #b8f6ff 0%, #34c3e6 45%, #0f86ad 100%); }
+  #btn-fire.act .act-ico { font-size: 26px; }
+  #btn-jump.act { background: radial-gradient(circle at 35% 28%, #ffb3a8 0%, #ff6b5e 45%, #c9372d 100%); }
+  #btn-dash.act { color: #3a2400; background: radial-gradient(circle at 35% 28%, #fff1b8 0%, #ffcd47 45%, #e09a12 100%); }
+  #btn-dash.act .act-lbl { text-shadow: 0 1px 0 rgba(255, 255, 255, .6); }
+  /* 돌진 쿨타임: 버튼 둘레에 차오르는 링 (--cd 1 → 0) */
+  #btn-dash.act { position: fixed; }
+  #btn-dash.act::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(rgba(255, 255, 255, .95) calc((1 - var(--cd, 0)) * 360deg), rgba(20, 40, 70, .25) 0);
+    -webkit-mask: radial-gradient(circle, transparent 61%, #000 63%); mask: radial-gradient(circle, transparent 61%, #000 63%); opacity: 0; transition: opacity .15s; }
+  #btn-dash.act.cooling::after { opacity: 1; }
+  #btn-dash.act.cooling { opacity: .7; }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }
@@ -711,10 +734,10 @@
 </div>
 
 <!-- 모바일 점프 버튼 & 리셋 버튼 -->
-<button id="btn-jump" aria-label="점프">🦘 점프</button>
+<button id="btn-jump" class="act" aria-label="점프"><span class="act-ico">🦘</span><span class="act-lbl">점프</span></button>
 <button id="btn-reset">📍 시작 위치로</button>
-<button id="btn-fire" aria-label="ADV 패킷 발사">📡 발사</button>
-<button id="btn-dash" aria-label="Connect Request 돌진" hidden>⚡ 돌진</button>
+<button id="btn-fire" class="act" aria-label="ADV 패킷 발사"><span class="act-ico">📡</span><span class="act-lbl">발사</span></button>
+<button id="btn-dash" class="act" aria-label="Connect Request 돌진" hidden><span class="act-ico">⚡</span><span class="act-lbl">돌진</span></button>
 
 <!-- 전투 HUD -->
 <div id="hp" aria-label="연결 안정성 HP"><div id="hp-fill"></div><div id="hp-text"></div></div>
