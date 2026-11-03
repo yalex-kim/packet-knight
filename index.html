@@ -502,8 +502,8 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.prestart :is(#corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-sound) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
   body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
@@ -771,6 +771,12 @@
     .dc-note, .dc-actions { margin-left: 16px; margin-right: 16px; }
     .dc-online { display: none; }
   }
+  /* 왼쪽 위 엠블럼 (Stage 11.21) — 모바일에서도 늘 보이게. 데스크톱은 조작법 상자 머리에 있다 */
+  #corner-emblem { display: none; }
+  @media (max-width: 640px) {
+    #corner-emblem { display: block; position: fixed; left: 6px; top: 4px; z-index: 11; width: 36px; height: auto; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
+    #hp { left: 48px; width: calc(100vw - 134px); }
+  }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }
@@ -860,6 +866,7 @@
 <button id="btn-sound" type="button" aria-label="소리 켜기/끄기 (M)" aria-pressed="true">🔊</button>
 <button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">?</button>
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
+<img id="corner-emblem" src="./src/assets/emblem-v1.webp" alt="Packet Knight" width="491" height="512" />
 <div id="stats" aria-label="기사 스탯"></div>
 <div id="xpbar" role="progressbar" aria-label="레벨과 경험치"><div class="xp-fill"></div><span class="xp-text"></span></div>
 <div id="quest-tracker" role="button" tabindex="0" aria-label="진행 중인 퀘스트 (눌러서 펼치기)" aria-expanded="false" aria-controls="quest-pop"></div>

@@ -521,13 +521,21 @@ let dungeonSeedBase = TEST_MODE ? 1234 : Date.now() >>> 0;
 let consoleCooldown = 0; // 콘솔 앞을 떠났다 돌아와야 다시 자동으로 열린다
 let portalCooldown = 0;
 
-const DUNGEON_SKY = new THREE.Color(0x07040f);
+// 던전 보조광: 기사 위에서 비추는 따뜻한 빛 + 보랏빛 반구광 (Stage 11.21)
+const dungeonFill = new THREE.Group();
+dungeonFill.add(new THREE.HemisphereLight(0xc9b8ff, 0x3a4660, 1.1));
+const dungeonLamp = new THREE.PointLight(0xfff0d8, 26, 18, 1.4);
+dungeonFill.add(dungeonLamp);
+dungeonFill.visible = false;
+scene.add(dungeonFill);
+const DUNGEON_SKY = new THREE.Color(0x1c1530);   // Stage 11.21: 0x07040f → 조금 밝게 (몬스터가 보이게)
 function setAmbience(underground) {
   audio.setBgm(underground ? "dungeon" : "village");
   scene.background = underground ? DUNGEON_SKY : VILLAGE_SKY_TEX;
   scene.fog.color.copy(underground ? DUNGEON_SKY : VILLAGE_FOG);
-  scene.fog.near = underground ? 14 : 70;
-  scene.fog.far = underground ? 40 : 190;
+  scene.fog.near = underground ? 24 : 70;
+  scene.fog.far = underground ? 70 : 190;
+  dungeonFill.visible = underground;
   world.root.visible = !underground;
   lifeRoot.visible = !underground;
 }
@@ -1055,6 +1063,7 @@ function animate() {
   renderFrame(t, dt);
   world.animateWorld(t);
   if (!run) stepLife(dt, t, motor);
+  else dungeonLamp.position.set(motor.x, motor.y + 5, motor.z);
   knightView.animateEffects(t, dt);
   renderer.render(scene, camera);
 }

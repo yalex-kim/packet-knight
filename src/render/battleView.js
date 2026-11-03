@@ -57,8 +57,8 @@ function joint(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x,
 
 /** Wi-Fi 간섭 몬스터: 화난 눈·LED 이빨·꿈틀대는 안테나 3개·게 다리 4개의 공유기 괴물 + 간섭 전파 고리 + 광역 공격 예고 원 */
 function makeRouter(g) {
-  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x2f3542, emissive: 0x000000 });
-  const trimMat = new THREE.MeshLambertMaterial({ color: 0x1b1f27 });
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x5a6378, emissive: 0x000000 });   // Stage 11.21: 어두운 던전에서도 보이게 밝게
+  const trimMat = new THREE.MeshLambertMaterial({ color: 0x343a48 });
   const ledMat = new THREE.MeshBasicMaterial({ color: 0xff9a3c });
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffb340 });
   const rig = new THREE.Group();

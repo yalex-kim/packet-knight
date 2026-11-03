@@ -6,24 +6,25 @@ import { DATA_CHANNELS } from "../core/hopping.js";
 import { monsterBand } from "../core/link.js";
 
 const { cx, cz, radius, floorY } = DUNGEON_ROOM;
+// Stage 11.21: 바닥·벽·고리를 밝게 — 몬스터가 바닥에 묻히지 않게
 export const dungeonRoot = new THREE.Group();
 dungeonRoot.visible = false;
 
 // ---------- 방 ----------
 {
-  const floor = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.6, radius + 0.6, 0.6, 48), new THREE.MeshLambertMaterial({ color: 0x1b2230 }));
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.6, radius + 0.6, 0.6, 48), new THREE.MeshLambertMaterial({ color: 0x3a4660 }));
   floor.position.set(cx, floorY - 0.3, cz);
   dungeonRoot.add(floor);
   // 바닥의 동심원 무늬 (전파 은유)
   for (const r of [3, 6, 9]) {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.05, r + 0.05, 64), new THREE.MeshBasicMaterial({ color: 0x24456b, side: THREE.DoubleSide }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.05, r + 0.05, 64), new THREE.MeshBasicMaterial({ color: 0x4f7fb8, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(cx, floorY + 0.01, cz);
     dungeonRoot.add(ring);
   }
   const wall = new THREE.Mesh(
     new THREE.CylinderGeometry(radius + 1.4, radius + 1.4, 5, 48, 1, true),
-    new THREE.MeshLambertMaterial({ color: 0x141a24, side: THREE.BackSide })
+    new THREE.MeshLambertMaterial({ color: 0x2a2440, side: THREE.BackSide })
   );
   wall.position.set(cx, floorY + 2.5, cz);
   dungeonRoot.add(wall);
