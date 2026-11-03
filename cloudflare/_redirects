@@ -1,0 +1,2 @@
+# 지난 배포의 sha 로 온 모듈 요청은 지금 src/ 로 (이번 sha 는 _site/v/<sha>/src/ 에 파일로 있다)
+/v/:sha/src/*  /src/:splat  200

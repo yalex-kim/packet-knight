@@ -13,5 +13,5 @@ cp tools/stamp_assets.py _site/tools/
 python3 -I _site/tools/stamp_assets.py "$SHA"     # _site/index.html 을 고친다
 rm -r _site/tools
 cp -R _site/src "_site/v/$SHA/src"
-cp cloudflare/_headers _site/
+cp cloudflare/_headers cloudflare/_redirects cloudflare/404.html _site/
 echo "built _site @ $SHA ($(find _site -type f | wc -l) files)"
