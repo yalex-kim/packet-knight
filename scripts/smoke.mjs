@@ -178,7 +178,8 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   try { rep = JSON.parse(readFileSync(REPORT, "utf8")); } catch { /* 없음 */ }
   check("밸런스 보고서가 현재 balance.js로 생성되어 있다 (수치를 바꾸면 시뮬레이션 재실행)",
     rep?.balanceHash === hash, rep ? `보고서 ${rep.balanceHash} vs 현재 ${hash}` : "scripts/report/balance-report.json 없음 — node scripts/simulate.mjs 실행");
-  check("Stage 6.5 DoD: 봇 1000명 전략 전체 시뮬레이션이 1분 안에 끝났다", rep?.bots >= 1000 && rep?.strategy === "all" && rep?.elapsedSec < 60, `${rep?.bots}명, ${rep?.elapsedSec}초`);
+  // 기준 1분 → 3분 (2026-11-03 사용자 결정): NAS(Synology)에서는 변경 전 코드도 약 100초 걸린다 (PRD §8.5)
+  check("Stage 6.5 DoD: 봇 1000명 전략 전체 시뮬레이션이 3분 안에 끝났다", rep?.bots >= 1000 && rep?.strategy === "all" && rep?.elapsedSec < 180, `${rep?.bots}명, ${rep?.elapsedSec}초`);
   const failed = (rep?.criteria ?? []).filter((x) => !x.pass && x.gating !== false).map((x) => x.id);
   check("PRD §8.3 기준선을 통과한다 (보고서 기준)", rep?.criteria?.length >= 6 && failed.length === 0, failed.join(", ") || `${rep?.criteria?.length}개 항목`);
 }

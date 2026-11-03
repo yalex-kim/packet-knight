@@ -713,7 +713,8 @@
   #talk { bottom: 30px; }
   #info-modal { bottom: 76px; }
   @media (max-width: 640px) {
-    #hp { bottom: auto; }
+    /* 모바일에서 위쪽에 붙는 것들은 위 "올리기" 규칙을 되돌린다 — 안 그러면 위·아래에 동시에 붙어 세로로 늘어난다 */
+    #hp, #talk, #info-modal, #chmap { bottom: auto; }
     #quest-tracker { bottom: 166px; }
   }
   /* 퀘스트 팝오버: 밝은 카드 */
