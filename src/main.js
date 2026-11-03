@@ -24,7 +24,7 @@ import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelativ
 import * as splash from "./ui/splash.js";
 import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
-import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager } from "./render/villagers.js";
+import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
@@ -545,6 +545,17 @@ function startFloor(floor) {
   fx.showToast(`⚔️ ${floor}층 — Wi-Fi 간섭 몬스터 ${b.monsters.length}마리! 바닥의 빨간 원(광역 예고) 밖으로 피하세요`, 4);
   if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
 }
+/** 기사(반경 KNIGHT_RADIUS)가 주민 원과 겹치면 겹친 만큼 바깥으로 — 밀려난 자리가 막혀 있으면 그대로 둔다 */
+function pushOutOfVillagers() {
+  for (const c of villagerCircles()) {
+    const dx = motor.x - c.x, dz = motor.z - c.z, d = Math.hypot(dx, dz), min = c.r + PHYSICS.KNIGHT_RADIUS;
+    if (d >= min) continue;
+    const ux = d > 1e-6 ? dx / d : 1, uz = d > 1e-6 ? dz / d : 0;
+    const nx = c.x + ux * min, nz = c.z + uz * min;
+    if (!isBlocked(nx, nz, motor.y)) { motor.x = nx; motor.z = nz; }
+  }
+}
+
 function talkTo(v) {
   hud.hideModal();
   clearMoveTarget();
@@ -936,6 +947,7 @@ function simulate(dt) {
   dashBtn.style.setProperty("--cd", (dash.cooldown / QUEST_SKILLS.DASH.cooldown).toFixed(3));
 
   const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), speed);
+  if (!run) pushOutOfVillagers();   // 주민과 부딪히면 밀려난다 (Stage 11.17)
   // 걸은 거리 (Q0) — 1 m 단위로 모아서 반영
   questWalk += moved;
   if (motor.grounded && dash.t <= 0) { stepDist += moved; if (stepDist > 1.7) { stepDist = 0; sfx("step"); } } // 발소리
@@ -1109,6 +1121,7 @@ window.__PK = {
   talk: { open: (id) => talkTo(VILLAGERS.find((v) => v.id === id)), close: closeTalk, state: talkState, more: talkMore },
   fireCd: () => getComputedStyle(fireBtn).getPropertyValue("--cd"),
   life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
+  villagerCircles,
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
   chargeCfg: () => chargeCfg(progress),
   dungeon: {

@@ -1666,6 +1666,18 @@ await page.waitForFunction(() => window.__PK);
     `"${talk.a.text?.slice(0, 24)}…" → "${talk.b.text?.slice(0, 24)}…"`);
 }
 
+// ---------- Stage 11.17: 주민과 기사 충돌 ----------
+{
+  await reset();
+  const c = await page.evaluate(() => window.__PK.villagerCircles()[0]);
+  await teleport(c.x - 1.6, c.z);                     // 주민 서쪽 1.6 m
+  await page.evaluate(() => { window.__PK.motor.rotY = Math.PI / 2; });
+  await hold("KeyD", 900);                             // 동쪽(주민 쪽)으로 걷기
+  const k = await state();
+  const d = Math.hypot(k.x - c.x, k.z - c.z);
+  check("기사가 주민에게 걸어 들어가면 겹치지 않고 밀려난다 (반경 합 0.72 m)", d >= 0.72 - 0.02, `거리 ${d.toFixed(2)} m`);
+}
+
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
 {
   const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });

@@ -177,5 +177,8 @@ export function stepLife(dt, time, knight) {
   stepPackets(dt);
   stepSpeech(dt, knight);
 }
+/** 주민 충돌 원 (Stage 11.17) — 기사는 이 원 밖으로 밀려난다 */
+export const VILLAGER_RADIUS = 0.3;
+export const villagerCircles = () => villagers.map((n) => ({ x: n.root.position.x, z: n.root.position.z, r: VILLAGER_RADIUS }));
 /** 테스트 훅: 주민 수·움직였는지 */
 export const lifeState = () => ({ villagers: villagers.length, positions: villagers.map((n) => [n.root.position.x, n.root.position.z]), packets: packets.filter((p) => p.m.visible).length });

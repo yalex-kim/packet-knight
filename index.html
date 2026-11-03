@@ -724,7 +724,8 @@
   #quest-pop .q-steps li { color: var(--ink); }
   #quest-pop .q-steps li.done { color: var(--green); }
   #quest-pop .q-reward { color: var(--violet); }
-  #quest-pop .close { color: var(--ink-2); }
+  #quest-pop .close { appearance: none; border: 0; background: none; color: var(--ink-2); font-size: 20px; line-height: 1; width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer; font-family: inherit; }
+  #quest-pop .close:hover, #quest-pop .close:focus-visible { background: rgba(20, 40, 70, .08); color: var(--ink); }   /* 대사창 닫기와 같은 모양 */
   #quest-pop .lib-btn { background: #fff; color: var(--ink); border: 1px solid var(--line); }
   #quest-pop .lib-btn.primary { background: linear-gradient(100deg, #8b6bff, #b49bff); color: #fff; border: 0; }
   #quest-pop .q-go { color: #8a5a00; background: #fff4d6; border-color: #f0c35a; }
