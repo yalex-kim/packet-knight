@@ -12,7 +12,7 @@
 import * as THREE from "three";
 import { WORLD, PHYSICS } from "./core/config.js";
 import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
-import { SPAWN_POS, landmark, JOB_AREA, LANDMARKS } from "./core/layout.js";
+import { SPAWN_POS, landmark, JOB_AREA, LANDMARKS, VILLAGERS } from "./core/layout.js";
 import * as prisonUi from "./ui/prison.js";
 import * as cryptUi from "./ui/crypt.js";
 import { QUEST_SKILLS, RSSI_JOB, COMBAT } from "./core/balance.js";
@@ -24,7 +24,8 @@ import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelativ
 import * as splash from "./ui/splash.js";
 import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
-import { lifeRoot, stepLife, lifeState } from "./render/villagers.js";
+import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager } from "./render/villagers.js";
+import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
@@ -275,7 +276,7 @@ function handleTap(clientX, clientY) {
   // 건물·지형을 한 번에 검사해 화면에서 가장 앞에 있는 대상을 고른다
   const targets = run
     ? [...battleView.monsterTargets, ...dungeonView.dungeonTargets]
-    : [...battleView.monsterTargets, ...world.interactiveObjects, world.terrain, world.sea];
+    : [...battleView.monsterTargets, ...villagerTargets, ...world.interactiveObjects, world.terrain, world.sea];
   const hits = raycaster.intersectObjects(targets, true).filter((h) => h.object.visible);
   if (hits.length === 0) {
     if (run) tapDungeonFloor();
@@ -296,6 +297,10 @@ function handleTap(clientX, clientY) {
   }
   if (run) { tapDungeonFloor(); return; }
 
+  // 주민을 누르면 대사창 (Stage 11.14)
+  for (let o = hits[0].object; o; o = o.parent) {
+    if (o.userData.villager) { talkTo(o.userData.villager); return; }
+  }
   const info = findInteractive(hits[0].object);
   if (info) { goToLandmark(info); return; }
 
@@ -539,6 +544,17 @@ function startFloor(floor) {
   fx.showToast(`⚔️ ${floor}층 — Wi-Fi 간섭 몬스터 ${b.monsters.length}마리! 바닥의 빨간 원(광역 예고) 밖으로 피하세요`, 4);
   if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
 }
+function talkTo(v) {
+  hud.hideModal();
+  clearMoveTarget();
+  openTalk(v);
+}
+initTalk({
+  onOpen: (v) => { holdVillager(v.id, motor); setInputEnabled(false); inputLocked = true; sfx("open"); },
+  onClose: () => { holdVillager(null); setInputEnabled(true); inputLocked = false; },
+  onChapterOpen: (id) => { recordChapterOpen(progress, id); persist(); }
+});
+
 function showTutorial() {
   if (isTutorialOpen()) return;
   questLog.closeQuestLog();
@@ -1088,6 +1104,7 @@ window.__PK = {
   quality: () => perf.level,
   hopGuide: { open: showHopGuide, isOpen: isHopGuideOpen, example: hopGuideExample },
   tutorial: { open: showTutorial, state: tutorialState, next: tutorialNext },
+  talk: { open: (id) => talkTo(VILLAGERS.find((v) => v.id === id)), close: closeTalk, state: talkState, more: talkMore },
   fireCd: () => getComputedStyle(fireBtn).getPropertyValue("--cd"),
   life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },

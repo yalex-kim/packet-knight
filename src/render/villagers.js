@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { VILLAGERS, TOWER_POS } from "../core/layout.js";
 import { groundHeightAt } from "../core/terrain.js";
 import { makeSign } from "./world.js";
+import { pickLine } from "../core/villagerLines.js";
 
 export const lifeRoot = new THREE.Group();
 
@@ -40,12 +41,7 @@ function makeVillager(v) {
   label.scale.multiplyScalar(0.62);
   label.position.y = 1.32;
   root.add(label);
-  const speech = makeSign(`💬 ${v.line}`, 1.5);   // 가까이 오면 가끔 한마디
-  speech.scale.multiplyScalar(0.6);
-  speech.position.y = 1.72;
-  speech.visible = false;
-  root.add(speech);
-  return { root, legL, legR, armL, armR, head, torso, speech };
+  return { root, legL, legR, armL, armR, head, torso, speech: null, lastLine: null };
 }
 
 const villagers = VILLAGERS.map((v, i) => {
@@ -62,7 +58,8 @@ function stepVillagers(dt, time) {
   for (const n of villagers) {
     const [a, b] = n.v.route;
     let moving = false;
-    if (n.pause > 0) n.pause -= dt;
+    if (n.held) { n.pause = Math.max(n.pause, 0.5); }
+    else if (n.pause > 0) n.pause -= dt;
     else {
       n.t += (n.dir * WALK_SPEED * dt) / n.len;
       if (n.t >= 1 || n.t <= 0) {                       // 끝에 닿으면 잠깐 쉬었다가 돌아선다
@@ -76,7 +73,7 @@ function stepVillagers(dt, time) {
     n.root.position.set(x, groundHeightAt(x, z), z);
     const face = Math.atan2((b[0] - a[0]) * n.dir, (b[1] - a[1]) * n.dir);
     const turn = ((face - n.root.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;   // 가까운 쪽으로 −π~π
-    n.root.rotation.y += Math.max(-dt * 6, Math.min(dt * 6, turn));
+    if (!n.held) n.root.rotation.y += Math.max(-dt * 6, Math.min(dt * 6, turn));
     const sw = moving ? Math.sin(time * 9 + n.phase) : 0;
     n.legL.rotation.x = sw * 0.6; n.legR.rotation.x = -sw * 0.6;
     n.armL.rotation.x = -sw * 0.5; n.armR.rotation.x = sw * 0.5;
@@ -136,7 +133,17 @@ function stepPackets(dt) {
   }
 }
 
-// 말풍선: 기사 8 m 안의 주민 하나가 6~10초마다 3초 동안
+/** 말풍선 스프라이트를 이 대사로 새로 만든다 (긴 대사는 두 줄로 접지 않고 한 줄 — 머리 위라 짧게 보인다) */
+function say(n, line) {
+  if (n.speech) { n.root.remove(n.speech); n.speech.material.map.dispose(); n.speech.material.dispose(); }
+  const text = line.text.length > 34 ? `💬 ${line.text.slice(0, 33)}…` : `💬 ${line.text}`;
+  n.speech = makeSign(text, 1.5);
+  n.speech.scale.multiplyScalar(0.55);
+  n.speech.position.y = 1.72;
+  n.root.add(n.speech);
+  n.lastLine = line.text;
+}
+// 말풍선: 기사 8 m 안의 주민 하나가 6~10초마다 4초 동안 (대사는 villagerLines.js에서 무작위)
 let speechTimer = 3, speaking = null, speechLeft = 0;
 function stepSpeech(dt, knight) {
   if (speaking) {
@@ -150,8 +157,18 @@ function stepSpeech(dt, knight) {
   const near = villagers.filter((n) => Math.hypot(n.root.position.x - knight.x, n.root.position.z - knight.z) < 8);
   if (!near.length) return;
   speaking = near[Math.floor(Math.random() * near.length)];
-  speaking.speech.visible = true;
-  speechLeft = 3;
+  say(speaking, pickLine(speaking.v.topics, Math.random, speaking.lastLine));
+  speechLeft = 4;
+}
+
+/** 클릭 대상 — 주민 루트 그룹들 (userData.villager = VILLAGERS 항목) */
+export const villagerTargets = villagers.map((n) => { n.root.userData.villager = n.v; return n.root; });
+/** 클릭한 주민: 걸음을 멈추고 기사를 바라본다 (대사창이 닫힐 때까지) */
+export function holdVillager(id, knight) {
+  for (const n of villagers) {
+    n.held = n.v.id === id;
+    if (n.held && knight) n.root.rotation.y = Math.atan2(knight.x - n.root.position.x, knight.z - n.root.position.z);
+  }
 }
 
 /** @param {{ x: number, z: number }} [knight] 기사 위치 (말풍선 거리 판정) */

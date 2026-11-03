@@ -154,16 +154,16 @@ export const SPAWN_POS = Object.freeze({ x: 0, y: S, z: 3.0 });
 
 /** [x, z, scale] */
 /**
- * 마을 주민 (Stage 11.9) — 장식용 NPC. 두 점 사이를 오가며 가끔 멈춘다 (충돌 없음, 경로는 장애물을 피해 골랐다).
- * look: 셔츠·머리카락 색, line: 가끔 말풍선으로 하는 말 (BLE 한 줄 지식)
+ * 마을 주민 (Stage 11.9 · 11.14) — 장식용 NPC. 두 점 사이를 오가며 가끔 멈춘다 (충돌 없음, 경로는 장애물을 피해 골랐다).
+ * 대사는 core/villagerLines.js에서 관심 장(topics) 위주로 무작위. face: 대사창 초상화 (Gemini로 생성, src/assets/faces)
  */
 export const VILLAGERS = Object.freeze([
-  { id: "merchant",  name: "GATT 상인", route: [[-3.2, -5.6], [3.2, -5.6]],   shirt: 0x4f7bd9, hair: 0x3b2a1e, line: "읽기·쓰기·알림 — 특성마다 되는 일이 달라!" },
-  { id: "librarian", name: "사서",      route: [[-6.75, -4.2], [-6.75, 2.6]], shirt: 0x7a5cc9, hair: 0xd9d2c5, line: "교과서 그 장을 읽으면 퀴즈가 쉬워요." },
-  { id: "smith",     name: "대장장이",  route: [[6.75, -4.0], [6.75, 2.4]],   shirt: 0x9c5a2e, hair: 0x2a1d14, line: "안테나 이득 3 dB면 거리가 꽤 늘지." },
-  { id: "keeper",    name: "등대지기",  route: [[8.8, 10.4], [14.6, 10.8]],   shirt: 0x2f8f7a, hair: 0x8a8a8a, line: "37·38·39 — 광고는 세 채널로 외친다네." },
-  { id: "walkerA",   name: "주민",      route: [[-1.2, 4.5], [-1.2, 15.0]],   shirt: 0xe0a33a, hair: 0x5a3a22, line: "이어폰이 또 끊겼어… Wi-Fi 탓인가?" },
-  { id: "walkerB",   name: "주민",      route: [[-13.0, -3.6], [-6.6, -3.6]], shirt: 0xd9567a, hair: 0x1f1a17, line: "분실물 태그 배터리가 2년째 멀쩡해!" }
+  { id: "merchant",  name: "GATT 상인",     role: "회관 앞 데이터 상인",   route: [[-3.2, -5.6], [3.2, -5.6]],   shirt: 0x4f7bd9, hair: 0x3b2a1e, face: "merchant",  topics: ["gatt", "connection"] },
+  { id: "librarian", name: "사서",          role: "RF 이론 도서관 사서",   route: [[-6.75, -4.2], [-6.75, 2.6]], shirt: 0x7a5cc9, hair: 0xd9d2c5, face: "librarian", topics: ["intro", "design", "radio"] },
+  { id: "smith",     name: "대장장이",      role: "패킷 대장간 RF 장인",   route: [[6.75, -4.0], [6.75, 2.4]],   shirt: 0x9c5a2e, hair: 0x2a1d14, face: "smith",     topics: ["radio", "phy", "power"] },
+  { id: "keeper",    name: "등대지기",      role: "전파의 등대 지킴이",    route: [[8.8, 10.4], [14.6, 10.8]],   shirt: 0x2f8f7a, hair: 0x8a8a8a, face: "keeper",    topics: ["advertising", "location", "mesh"] },
+  { id: "walkerA",   name: "펌웨어 개발자", role: "BT 스택 10년 차",       route: [[-1.2, 4.5], [-1.2, 15.0]],   shirt: 0xe0a33a, hair: 0x5a3a22, face: "fwdev",     topics: ["connection", "hopping", "power", "gatt"] },
+  { id: "walkerB",   name: "QA 엔지니어",   role: "호환성 테스트 담당",    route: [[-13.0, -3.6], [-6.6, -3.6]], shirt: 0xd9567a, hair: 0x1f1a17, face: "qa",        topics: ["security", "coexistence", "audio", "hopping"] }
 ]);
 
 /** 비콘 찾기 알바의 측정 구역 = 등대 둘레 (반경은 balance.js RSSI_JOB.AREA_R). 등대는 지원(Stage 10 지하묘지 자리)보다 더 바깥 */

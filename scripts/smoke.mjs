@@ -1616,6 +1616,34 @@ await page.waitForFunction(() => window.__PK);
     `${t.b.steps.length}단계 · 둘째 ${t.sel} · 스포트라이트 ${t.onTarget} · 말풍선 ${t.tipIn}`);
 }
 
+// ---------- Stage 11.14: 주민 대사창 (초상화 + 교과서 근거 대사) ----------
+{
+  const L = await import(pathToFileURL(path.join(ROOT, "src/core/villagerLines.js")).href);
+  const C = await import(pathToFileURL(path.join(ROOT, "src/core/chapters.data.js")).href);
+  const ids = new Set(C.CHAPTERS.map((c) => c.id));
+  const bad = L.VILLAGER_LINES.filter((l) => !ids.has(l.chapter) || l.text.length < 10);
+  const dup = L.VILLAGER_LINES.length - new Set(L.VILLAGER_LINES.map((l) => l.text)).size;
+  check("주민 대사 파일: 대사마다 교과서 장 근거가 있고(14장 중), 중복 없이 40줄 이상", L.VILLAGER_LINES.length >= 40 && bad.length === 0 && dup === 0,
+    `${L.VILLAGER_LINES.length}줄 · 장 ${new Set(L.VILLAGER_LINES.map((l) => l.chapter)).size}개 · 문제 ${bad.length} · 중복 ${dup}`);
+  await reset();
+  const talk = await page.evaluate(async () => {
+    const T = window.__PK.talk;
+    T.open("smith");
+    const a = T.state();
+    T.more();
+    const b = T.state();
+    const img = document.querySelector("#talk .talk-face");
+    await new Promise((ok) => (img.complete ? ok() : img.addEventListener("load", ok, { once: true })));
+    const loaded = img.naturalWidth > 0;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return { a, b, loaded, closed: !T.state().open };
+  });
+  check("주민을 누르면 초상화·이름·대사·교과서 링크가 있는 대사창이 뜨고, '다른 이야기'로 바뀌며 Esc로 닫힌다",
+    talk.a.open && talk.a.name === "대장장이" && /face-smith-v1\.webp/.test(talk.a.face) && talk.loaded && /connbook\.yalex-k\.com\/bluetooth\/chapters\//.test(talk.a.book)
+      && talk.b.text && talk.b.text !== talk.a.text && talk.closed,
+    `"${talk.a.text?.slice(0, 24)}…" → "${talk.b.text?.slice(0, 24)}…"`);
+}
+
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
 {
   const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });
