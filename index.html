@@ -717,6 +717,60 @@
     #hp, #talk, #info-modal, #chmap { bottom: auto; }
     #quest-tracker { bottom: 166px; }
   }
+  /* 개발자 카드 (Stage 11.19) — home.yalex-k.com 히어로 디자인 */
+  #devcard .panel.dc { max-width: 760px; padding: 0 0 18px; background: radial-gradient(120% 70% at 20% 10%, #123a5c 0%, #0a2038 45%, #06121f 100%); border: 1px solid rgba(57, 208, 255, .35); color: #cfe0f0;
+    background-image: radial-gradient(rgba(125, 216, 255, .12) 1px, transparent 1.5px), radial-gradient(120% 70% at 20% 10%, #123a5c 0%, #0a2038 45%, #06121f 100%); background-size: 26px 26px, auto; font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; }
+  .dc .dc-mono { font-family: ui-monospace, "JetBrains Mono", "D2Coding", Consolas, monospace; }
+  .dc-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: rgba(6, 18, 31, .82); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(57, 208, 255, .15); }
+  .dc-mini { width: 40px; height: 40px; border-radius: 50%; }
+  .dc-brand { display: block; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.1; }
+  .dc-brand i { font-style: normal; color: #39d0ff; }
+  .dc-top .dc-mono { font-size: 12px; color: #6f8aa6; }
+  .dc-online { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, monospace; font-size: 13px; color: #cfe8ff; border: 1px solid rgba(57, 208, 255, .35); border-radius: 999px; padding: 4px 12px; }
+  .dc-online i { width: 8px; height: 8px; border-radius: 50%; background: #3ccf6e; box-shadow: 0 0 8px #3ccf6e; }
+  #devcard .dc-close { min-width: 0; min-height: 0; outline: none; appearance: none; border: 0; background: none; color: #8fb0cc; font-size: 24px; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; }
+  #devcard .dc-close:hover, #devcard .dc-close:focus-visible { background: rgba(125, 216, 255, .12); color: #fff; }
+  .dc-hero { display: flex; gap: 28px; align-items: center; padding: 24px 22px 8px; }
+  .dc-ring { position: relative; flex: none; width: 200px; height: 200px; margin: 30px; border-radius: 50%; box-shadow: 0 0 0 6px rgba(57, 208, 255, .25), 0 0 0 14px rgba(57, 208, 255, .08), 0 0 34px rgba(57, 208, 255, .55); }
+  .dc-ring::before { content: ""; position: absolute; inset: -30px; border-radius: 50%; border: 1.5px dashed rgba(125, 216, 255, .35); }
+  .dc-ring img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+  .dc-ring i { position: absolute; border-radius: 50%; }
+  .dc-ring .d1 { width: 10px; height: 10px; left: 30px; top: -18px; background: #3ccf6e; box-shadow: 0 0 10px #3ccf6e; }
+  .dc-ring .d2 { width: 14px; height: 14px; left: -26px; top: 110px; background: #39d0ff; box-shadow: 0 0 12px #39d0ff; }
+  .dc-ring .d3 { width: 9px; height: 9px; right: -16px; bottom: 26px; background: #7de3ff; box-shadow: 0 0 10px #7de3ff; }
+  .dc-prompt { color: #7fb6dd; font-size: 14px; margin: 14px 22px 8px; }
+  .dc-copy .dc-prompt { margin: 0 0 8px; }
+  #devcard .dc-title { margin: 0; font-size: clamp(32px, 7vw, 46px); line-height: 1.12; font-weight: 900; color: #f2f8ff; letter-spacing: -.02em; }
+  #devcard .dc-title span { color: #4fd8f5; text-shadow: 0 0 18px rgba(57, 208, 255, .75); }
+  .dc-lede { margin: 12px 0 0; font-size: 15px; line-height: 1.7; color: #9db4cc; }
+  .dc-lede b { color: #fff; }
+  .dc-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 22px; }
+  .dc-item { background: rgba(8, 26, 44, .75); border: 1px solid rgba(57, 208, 255, .16); border-radius: 14px; padding: 12px 14px; }
+  .dc-item.here { border-color: rgba(57, 208, 255, .6); box-shadow: 0 0 16px rgba(57, 208, 255, .2); }
+  .dc-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dc-item-head .dc-mono { font-size: 11px; color: #6f8aa6; }
+  .dc-item-head b { color: #fff; font-size: 15px; }
+  .dc-kind { font-size: 11px; color: #7fb6dd; }
+  .dc-tag { margin-left: auto; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; background: rgba(143, 160, 180, .2); color: #a9b8c8; }
+  .dc-tag.live { background: rgba(60, 207, 110, .18); color: #7dffb5; }
+  .dc-item p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: #9db4cc; }
+  .dc-vibe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 22px; }
+  .dc-vibe div { background: rgba(8, 26, 44, .6); border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(57, 208, 255, .12); }
+  .dc-vibe .dc-mono { font-size: 10.5px; color: #39d0ff; }
+  .dc-vibe b { display: block; color: #fff; font-size: 14px; margin-top: 2px; }
+  .dc-vibe p { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: #9db4cc; }
+  .dc-note { margin: 14px 22px 0; font-size: 13px; color: #cfe0f0; background: rgba(57, 208, 255, .08); border-left: 3px solid #39d0ff; border-radius: 6px; padding: 8px 12px; }
+  .dc-actions { margin: 14px 22px 0; display: flex; justify-content: flex-end; }
+  .dc-home { text-decoration: none; font-weight: 800; color: #04121f; background: linear-gradient(100deg, #39d0ff, #7de3ff 55%, #ffd76b); border-radius: 999px; padding: 10px 18px; font-size: 14px; }
+  @media (max-width: 640px) {
+    .dc-hero { flex-direction: column; text-align: left; align-items: flex-start; gap: 18px; padding: 22px 18px 6px; }
+    .dc-ring { width: 150px; height: 150px; align-self: center; margin: 14px 0; }
+    .dc-list, .dc-vibe { grid-template-columns: 1fr; margin: 0 16px; }
+    .dc-vibe { grid-template-columns: 1fr 1fr; }
+    .dc-prompt { margin-left: 16px; }
+    .dc-note, .dc-actions { margin-left: 16px; margin-right: 16px; }
+    .dc-online { display: none; }
+  }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }

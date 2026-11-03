@@ -26,6 +26,7 @@ import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./u
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
 import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
+import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
@@ -200,6 +201,15 @@ function regionLabel() {
 
 /** 랜드마크 안내 모달을 띄우고 그 앞으로 걸어간다 — 건물 클릭과 퀘스트 "📍 길 안내"가 같이 쓴다 */
 function goToLandmark(info) {
+  if (info === landmark("billboard").info) {   // 광고판: 히어로 디자인 개발자 카드 (Stage 11.19)
+    hud.hideModal();
+    clearMoveTarget();
+    setInputEnabled(false);
+    inputLocked = true;
+    sfx("open");
+    openDevCard(() => { setInputEnabled(true); inputLocked = false; });
+    return;
+  }
   hud.showModal(modalInfo(info));
   world.highlightSign(LANDMARKS.find((l) => l.info === info)?.id ?? null);
   sfx("open");
@@ -1114,6 +1124,7 @@ window.__PK = {
   crypt: { open: cryptUi.openCrypt, isOpen: cryptUi.isCryptOpen, state: cryptUi.cryptState },
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
+  devCard: { open: () => goToLandmark(landmark("billboard").info), isOpen: isDevCardOpen },
   setView: (yaw, distance) => { orbit.yaw = yaw; if (distance) setOrbitDistance(distance); },   // 스크린샷·테스트용 카메라 방향
   quality: () => perf.level,
   resetToStart,

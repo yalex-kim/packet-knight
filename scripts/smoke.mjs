@@ -1686,6 +1686,16 @@ await page.waitForFunction(() => window.__PK);
   const posts = L.OBSTACLE_CIRCLES.filter((c) => c.id === "billboardPost");
   const blocked = posts.every((c) => Col.isBlocked(c.x, c.z, 2.0));
   const front = bb.info.walkPos, frontFree = !Col.isBlocked(front.x, front.z, 2.0);
+  await reset();
+  const dc = await page.evaluate(() => {
+    window.__PK.devCard.open();
+    const el = document.getElementById("devcard");
+    const r = { open: window.__PK.devCard.isOpen(), items: el.querySelectorAll(".dc-item").length, home: el.querySelector(".dc-home")?.getAttribute("href"), title: el.querySelector(".dc-title")?.textContent };
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return { ...r, closed: !window.__PK.devCard.isOpen() };
+  });
+  check("광고판을 누르면 home 히어로 디자인의 개발자 카드(아티팩트 4개·홈 링크)가 뜨고 Esc로 닫힌다",
+    dc.open && dc.items === 4 && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));
   check("개발자 광고판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",
     bb.info.link === "https://home.yalex-k.com/" && /home/.test(bb.info.linkLabel) && posts.length === 2 && blocked && frontFree,
     `기둥 ${posts.length}개 · 정면 (${front.x.toFixed(1)}, ${front.z.toFixed(1)})`);

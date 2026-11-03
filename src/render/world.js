@@ -132,126 +132,201 @@ const glassMat  = new THREE.MeshBasicMaterial({ color: 0xffea88 });
 const cyanEmblem= new THREE.MeshBasicMaterial({ color: 0x39d0ff });
 const metalMat  = new THREE.MeshLambertMaterial({ color: 0xb5c1cd });
 
-// ----- 3.1 🏛️ GATT 중앙 회관 (Central Service Hall) -----
+// ----- 건물 공용 도구 (Stage 11.19: 상자 2~3개 → 디테일 있는 복셀 건물) -----
+const stoneLight = new THREE.MeshLambertMaterial({ color: 0xc9c3b6 });
+const stoneDark  = new THREE.MeshLambertMaterial({ color: 0x8d877c });
+const beamMat    = new THREE.MeshLambertMaterial({ color: 0x5b3a22 });
+const trimWhite  = new THREE.MeshLambertMaterial({ color: 0xf6f3ea });
+const redRoofDk  = new THREE.MeshLambertMaterial({ color: 0x8f2c24 });
+const blueRoofDk = new THREE.MeshLambertMaterial({ color: 0x1a3f6b });
+const copperDk   = new THREE.MeshLambertMaterial({ color: 0x8f4419 });
+const leafMat    = new THREE.MeshLambertMaterial({ color: 0x5aa847 });
+const flowerMats = [0xff7a8a, 0xffd76b, 0xb49bff].map((c) => new THREE.MeshLambertMaterial({ color: c }));
+const goldMat    = new THREE.MeshLambertMaterial({ color: 0xf2c14e });
+const forgeStone = new THREE.MeshLambertMaterial({ color: 0x6f665c });
+/** 상자 하나 (cx, cy, cz = 부모 기준 중심) */
+function bx(g, w, h, d, mat, cx, cy, cz) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(cx, cy, cz);
+  g.add(m);
+  return m;
+}
+/** 계단식 박공 지붕 — 용마루는 x축, 앞뒤(z)로 층층이 좁아진다. 맨 아래 층은 처마(짙은 색) */
+function gableRoof(g, w, d, y, steps, mat, eaveMat) {
+  const stepH = 0.2;
+  for (let i = 0; i < steps; i++) {
+    const k = 1 - i / steps;
+    bx(g, w + 0.3, stepH, (d + 0.5) * k, i === 0 ? eaveMat : mat, 0, y + stepH / 2 + i * stepH, 0);
+  }
+  bx(g, w + 0.36, 0.12, 0.22, eaveMat, 0, y + steps * stepH + 0.06, 0);   // 용마루
+  return y + steps * stepH + 0.12;
+}
+/** 앞면(+z) 창문: 나무 테두리 + 유리 + 창턱 (+ 덧창) */
+function windowFront(g, x, y, z, w, h, shutters = false) {
+  bx(g, w + 0.14, h + 0.14, 0.06, beamMat, x, y, z + 0.02);
+  bx(g, w, h, 0.07, glassMat, x, y, z + 0.035);
+  bx(g, 0.05, h, 0.08, beamMat, x, y, z + 0.04);                 // 가운데 창살
+  bx(g, w + 0.24, 0.07, 0.16, trimWhite, x, y - h / 2 - 0.08, z + 0.07);   // 창턱
+  if (shutters) for (const sx of [-1, 1]) bx(g, w * 0.42, h + 0.1, 0.05, blueRoofDk, x + sx * (w / 2 + w * 0.26), y, z + 0.03);
+}
+/** 화분 (꽃 세 송이) */
+function planter(g, x, y, z, w = 0.7) {
+  bx(g, w, 0.18, 0.22, beamMat, x, y, z);
+  bx(g, w - 0.08, 0.08, 0.16, leafMat, x, y + 0.12, z);
+  [-0.22, 0, 0.22].forEach((dx, i) => bx(g, 0.1, 0.1, 0.1, flowerMats[i], x + dx * (w / 0.7), y + 0.2, z));
+}
+
+// ----- 3.1 🏛️ GATT 중앙 회관 — 돌 기단·현관 기둥·목조 뼈대·계단식 빨간 지붕·GATT 문양 (정면 +z) -----
 const hall = new THREE.Group();
 {
-  const b1 = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.2, 3.0), plasterMat);
-  b1.position.y = 1.1;
-  hall.add(b1);
-
-  [[-1.8, -1.4], [1.8, -1.4], [-1.8, 1.4], [1.8, 1.4]].forEach(([px, pz]) => {
-    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.3, 0.35), woodMat);
-    pillar.position.set(px, 1.15, pz);
-    hall.add(pillar);
-  });
-
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.5, 0.08), woodMat);
-  door.position.set(0, 0.75, 1.52);
-  hall.add(door);
-
-  [-1.1, 1.1].forEach(wx => {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.04), glassMat);
-    win.position.set(wx, 1.25, 1.52);
-    hall.add(win);
-  });
-
-  const r1 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.45, 3.4), redRoof);
-  r1.position.y = 2.35;
-  hall.add(r1);
-
-  const r2 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.45, 2.4), redRoof);
-  r2.position.y = 2.75;
-  hall.add(r2);
-
-  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), cyanEmblem);
-  rune.position.set(0, 3.25, 0);
-  hall.add(rune);
+  const Z0 = -0.4;                                                   // 본채 중심 (현관은 앞쪽 +z)
+  bx(hall, 3.9, 0.3, 2.6, stoneDark, 0, 0.15, Z0);                   // 기단
+  bx(hall, 3.6, 2.0, 2.3, plasterMat, 0, 1.3, Z0);                   // 벽
+  for (const x of [-1.8, 1.8]) for (const z of [Z0 - 1.15, Z0 + 1.15]) bx(hall, 0.2, 2.1, 0.2, beamMat, x, 1.35, z);   // 모서리 기둥
+  bx(hall, 3.7, 0.16, 2.4, beamMat, 0, 2.25, Z0);                    // 위 띠
+  bx(hall, 3.66, 0.1, 2.36, beamMat, 0, 1.45, Z0);                   // 가운데 띠
+  // 앞면: 문(문틀·손잡이) + 창 두 개
+  const FZ = Z0 + 1.15;
+  bx(hall, 1.06, 1.5, 0.08, beamMat, 0, 1.05, FZ + 0.02);
+  bx(hall, 0.86, 1.38, 0.08, woodMat, 0, 1.0, FZ + 0.05);
+  bx(hall, 0.08, 0.08, 0.06, goldMat, 0.28, 1.0, FZ + 0.1);
+  windowFront(hall, -1.15, 1.25, FZ, 0.55, 0.6, true);
+  windowFront(hall, 1.15, 1.25, FZ, 0.55, 0.6, true);
+  // 현관: 계단 3단 + 흰 기둥 4개 + 처마
+  for (let i = 0; i < 3; i++) bx(hall, 2.4 - i * 0.2, 0.1, 0.3, stoneLight, 0, 0.05 + i * 0.1, FZ + 0.55 - i * 0.18);
+  for (const x of [-1.05, -0.45, 0.45, 1.05]) {
+    bx(hall, 0.2, 0.1, 0.2, stoneLight, x, 0.35, FZ + 0.42);
+    bx(hall, 0.14, 1.9, 0.14, trimWhite, x, 1.35, FZ + 0.42);
+    bx(hall, 0.22, 0.1, 0.22, stoneLight, x, 2.32, FZ + 0.42);
+  }
+  bx(hall, 2.5, 0.18, 0.7, trimWhite, 0, 2.45, FZ + 0.25);           // 현관 지붕판
+  // 계단식 지붕 + 박공의 GATT 문양 (서비스 > 특성 > 디스크립터 = 넓은 막대에서 좁은 막대로)
+  const top = gableRoof(hall, 3.7, 2.4, 2.33, 5, redRoof, redRoofDk);
+  const gable = new THREE.Group(); gable.position.set(0, 0, Z0); hall.add(gable);
+  [[0.7, 2.75], [0.5, 2.9], [0.3, 3.05]].forEach(([w, y]) => bx(gable, w, 0.08, 0.04, cyanEmblem, 0, y, 1.45));
+  // 깃대 + 하늘색 깃발
+  bx(hall, 0.06, 1.1, 0.06, metalMat, 0, top + 0.55, Z0);
+  bx(hall, 0.5, 0.3, 0.03, cyanEmblem, 0.27, top + 0.92, Z0);
+  const rune = bx(hall, 0.2, 0.2, 0.2, cyanEmblem, 0, top + 1.15, Z0);
+  rune.rotation.set(0.6, 0.6, 0);
+  planter(hall, -1.55, 0.35, FZ + 0.35, 0.6);
+  planter(hall, 1.55, 0.35, FZ + 0.35, 0.6);
 }
 placeLandmark(hall, "hall");
 
 
-// ----- 3.2 📚 RF 이론 도서관 (Theory Library) -----
+// ----- 3.2 📚 RF 이론 도서관 — 아치 창·관측 돔과 접시 안테나·굴뚝·책 간판 (정면이 광장 쪽 = 동쪽) -----
 const library = new THREE.Group();
 {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.0, 2.6), plasterMat);
-  b.position.y = 1.0;
-  library.add(b);
-
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.08), woodMat);
-  door.position.set(0.8, 0.7, 1.32);
-  library.add(door);
-
-  [-0.65, 0.1].forEach(wx => {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.04), glassMat);
-    win.position.set(wx, 1.1, 1.32);
-    library.add(win);
-  });
-
-  const roof1 = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 3.1), blueRoof);
-  roof1.position.y = 2.15;
-  library.add(roof1);
-
-  const roof2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, 2.0), blueRoof);
-  roof2.position.y = 2.5;
-  library.add(roof2);
-
-  const dome = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), darkStone);
-  dome.position.set(-0.6, 2.85, 0);
+  // 모델의 앞(+z)이 동쪽(+x)을 보도록 돌린다 (walkPos가 동쪽). 바닥: 로컬 x 2.6 × z 3.0
+  bx(library, 2.7, 0.25, 3.1, stoneDark, 0, 0.125, 0);
+  bx(library, 2.5, 1.9, 2.9, plasterMat, 0, 1.2, 0);
+  for (const x of [-1.25, 1.25]) for (const z of [-1.45, 1.45]) bx(library, 0.18, 2.0, 0.18, beamMat, x, 1.25, z);
+  bx(library, 2.6, 0.14, 3.0, beamMat, 0, 2.15, 0);
+  const FZ = 1.45;
+  // 문: 아치처럼 두 겹 + 계단
+  bx(library, 0.9, 1.45, 0.08, beamMat, -0.55, 1.0, FZ + 0.02);
+  bx(library, 0.72, 1.3, 0.08, woodMat, -0.55, 0.93, FZ + 0.05);
+  bx(library, 0.5, 0.12, 0.08, woodMat, -0.55, 1.62, FZ + 0.05);
+  bx(library, 1.1, 0.12, 0.35, stoneLight, -0.55, 0.06, FZ + 0.2);
+  // 아치 창 (책장이 비치는 노란 창)
+  for (const x of [0.45]) {
+    windowFront(library, x, 1.2, FZ, 0.55, 0.7);
+    bx(library, 0.4, 0.12, 0.07, glassMat, x, 1.62, FZ + 0.035);
+    bx(library, 0.2, 0.08, 0.07, glassMat, x, 1.72, FZ + 0.035);
+  }
+  // 옆면 창 (양쪽)
+  for (const sx of [-1, 1]) {
+    const side = new THREE.Group(); side.rotation.y = sx * Math.PI / 2; side.position.set(sx * 1.25, 0, 0); library.add(side);
+    windowFront(side, -0.6, 1.2, 0, 0.5, 0.6);
+    windowFront(side, 0.6, 1.2, 0, 0.5, 0.6);
+  }
+  const top = gableRoof(library, 2.5, 2.9, 2.22, 4, blueRoof, blueRoofDk);
+  // 굴뚝
+  bx(library, 0.36, 0.9, 0.36, stoneDark, 0.8, top + 0.1, -0.7);
+  bx(library, 0.44, 0.1, 0.44, stoneLight, 0.8, top + 0.55, -0.7);
+  // 관측 돔 + 접시 안테나 (RF 이론)
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), metalMat);
+  dome.position.set(-0.6, top - 0.05, 0.3);
   library.add(dome);
-
-  const domeRod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), metalMat);
-  domeRod.position.set(-0.6, 3.3, 0);
-  library.add(domeRod);
+  bx(library, 0.06, 0.5, 0.06, metalMat, -0.6, top + 0.55, 0.3);
+  const dish = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.16, 16, 1, true), trimWhite);
+  dish.position.set(-0.6, top + 0.86, 0.36); dish.rotation.x = -0.9;
+  dish.material.side = THREE.DoubleSide;
+  library.add(dish);
+  bx(library, 0.06, 0.06, 0.06, cyanEmblem, -0.6, top + 0.9, 0.48);
+  // 책 더미 간판 (입구 옆)
+  [[0x4f7bd9, 0.0], [0xd8443c, 0.09], [0xf2c14e, 0.18], [0x3ccf9c, 0.27]].forEach(([c, y], i) =>
+    bx(library, 0.42 - i * 0.03, 0.08, 0.28, new THREE.MeshLambertMaterial({ color: c }), 0.95, 0.3 + y, FZ + 0.3));
+  planter(library, 0.45, 0.35, FZ + 0.15, 0.55);
+  library.rotation.y = Math.PI / 2;
 }
 placeLandmark(library, "library");
 
 
-// ----- 3.3 🔨 패킷 대장간 (Packet Forge & Battery Shop) -----
+// ----- 3.3 🔨 패킷 대장간 — 돌벽·나무 기둥·차양·화로·모루·통과 상자·안테나 걸이 (정면이 광장 쪽 = 서쪽) -----
 const forge = new THREE.Group();
 {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.8, 2.6), darkStone);
-  b.position.y = 0.9;
-  forge.add(b);
-
-  const r = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.4, 3.0), copperRoof);
-  r.position.y = 1.95;
-  forge.add(r);
-
-  const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.65, 2.2, 0.65), stoneMat);
-  chimney.position.set(0.9, 1.7, -0.7);
-  forge.add(chimney);
-
-  const anvil = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.35, 0.28), metalMat);
-  anvil.position.set(-1.0, 0.18, 1.7);
-  forge.add(anvil);
-
-  const fire = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xff6600 }));
-  fire.position.set(0.35, 0.2, 1.4);
-  forge.add(fire);
+  bx(forge, 2.7, 0.25, 3.1, stoneDark, 0, 0.125, 0);
+  bx(forge, 2.5, 1.7, 2.3, forgeStone, 0, 1.1, -0.35);               // 본채 (뒤쪽)
+  for (const x of [-1.25, 1.25]) bx(forge, 0.2, 1.8, 0.2, beamMat, x, 1.15, 0.8);
+  bx(forge, 2.6, 0.14, 0.2, beamMat, 0, 1.98, 0.8);
+  // 차양 (앞쪽으로 비스듬히)
+  const awning = bx(forge, 2.8, 0.1, 0.9, copperRoof, 0, 2.05, 1.15);
+  awning.rotation.x = 0.28;
+  for (const x of [-1.2, 1.2]) bx(forge, 0.12, 1.75, 0.12, beamMat, x, 0.95, 1.5);
+  const top = gableRoof(forge, 2.5, 2.3, 1.95, 4, copperRoof, copperDk);
+  // 화로 (안쪽에서 이글거림) + 굴뚝 (끝이 빛남)
+  bx(forge, 0.9, 0.7, 0.6, stoneDark, -0.55, 0.6, 0.55);
+  const ember = bx(forge, 0.6, 0.3, 0.08, new THREE.MeshBasicMaterial({ color: 0xff7a1a }), -0.55, 0.6, 0.86);
+  bx(forge, 0.5, 2.2, 0.5, stoneMat, -0.85, top - 0.4, -0.9);
+  bx(forge, 0.6, 0.1, 0.6, stoneLight, -0.85, top + 0.72, -0.9);
+  bx(forge, 0.3, 0.06, 0.3, new THREE.MeshBasicMaterial({ color: 0xffa040 }), -0.85, top + 0.78, -0.9);
+  // 모루: 받침 + 몸통 + 뿔
+  bx(forge, 0.2, 0.32, 0.2, stoneMat, 0.5, 0.41, 1.15);
+  bx(forge, 0.5, 0.14, 0.24, metalMat, 0.5, 0.64, 1.15);
+  bx(forge, 0.18, 0.1, 0.14, metalMat, 0.83, 0.64, 1.15);
+  // 통·나무 상자·안테나 걸이 (RF 부품)
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.5, 12), woodMat);
+  barrel.position.set(1.05, 0.5, 1.3); forge.add(barrel);
+  bx(forge, 0.42, 0.04, 0.44, beamMat, 1.05, 0.55, 1.3);
+  bx(forge, 0.45, 0.4, 0.45, woodMat, -1.05, 0.45, 1.35);
+  bx(forge, 0.47, 0.05, 0.47, beamMat, -1.05, 0.66, 1.35);
+  bx(forge, 1.0, 0.06, 0.06, beamMat, 0.3, 1.5, 0.5);
+  [-0.1, 0.15, 0.4, 0.65].forEach((x, i) => bx(forge, 0.03, 0.4 + (i % 2) * 0.15, 0.03, i % 2 ? goldMat : metalMat, x, 1.27, 0.53));
+  // 매달린 간판 (모루 그림)
+  bx(forge, 0.04, 0.3, 0.04, beamMat, 1.2, 1.75, 1.6);
+  bx(forge, 0.5, 0.32, 0.05, woodMat, 1.2, 1.5, 1.62);
+  bx(forge, 0.26, 0.08, 0.06, metalMat, 1.2, 1.52, 1.66);
+  forge.userData.ember = ember;
+  forge.rotation.y = -Math.PI / 2;
 }
 placeLandmark(forge, "forge");
 
 
-// ----- 3.4 📡 전파의 등대 (Beacon Tower) -----
+// ----- 3.4 📡 전파의 등대 — 돌 기단·빨강/흰 띠 탑·전망대 난간·전구 케이지 (Stage 11.19) -----
 const tower = new THREE.Group();
 {
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 1.6), stoneMat);
-  base.position.y = 0.4;
-  tower.add(base);
-
-  const segs = [[0.85, 2.2, 0.0], [0.6, 1.8, 2.2], [0.4, 1.4, 4.0]];
-  for (const [w, h, y] of segs) {
-    const seg = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), metalMat);
-    seg.position.y = y + 0.8 + h / 2;
-    tower.add(seg);
-  }
-
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 8), metalMat);
-  rod.position.y = 6.8;
-  tower.add(rod);
-
-  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), new THREE.MeshBasicMaterial({ color: 0x39d0ff }));
-  beacon.position.y = 7.7;
+  const redBand = new THREE.MeshLambertMaterial({ color: 0xd8443c });
+  bx(tower, 1.7, 0.3, 1.7, stoneDark, 0, 0.15, 0);
+  bx(tower, 1.5, 0.55, 1.5, stoneLight, 0, 0.57, 0);
+  bx(tower, 0.6, 0.9, 0.08, woodMat, 0, 0.6, 0.76);                  // 문
+  // 몸통: 위로 갈수록 좁아지는 띠 (빨강·흰색 번갈아)
+  const bands = [[1.04, 0.9], [0.97, 0.9], [0.9, 0.9], [0.83, 0.9], [0.76, 0.9], [0.69, 0.9], [0.62, 0.9]];   // 꼭대기 불빛이 7.7 m (광고 패킷 출발점, villagers.js)
+  let y = 0.85;
+  bands.forEach(([w, h], i) => { bx(tower, w, h, w, i % 2 ? redBand : trimWhite, 0, y + h / 2, 0); y += h; });
+  for (const [yy, z] of [[1.8, 0.52], [3.6, 0.46], [5.4, 0.4]]) bx(tower, 0.22, 0.3, 0.06, glassMat, 0, yy, z);   // 작은 창
+  // 전망대: 바닥판 + 난간 기둥 + 난간대
+  bx(tower, 1.3, 0.12, 1.3, metalMat, 0, y + 0.06, 0);
+  for (const [px, pz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6], [0, -0.6], [0, 0.6], [-0.6, 0], [0.6, 0]]) bx(tower, 0.05, 0.4, 0.05, beamMat, px, y + 0.32, pz);
+  for (const [w, d, px, pz] of [[1.25, 0.05, 0, -0.6], [1.25, 0.05, 0, 0.6], [0.05, 1.25, -0.6, 0], [0.05, 1.25, 0.6, 0]]) bx(tower, w, 0.05, d, beamMat, px, y + 0.5, pz);
+  // 전구 케이지 + 지붕 + 안테나
+  for (const [px, pz] of [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]]) bx(tower, 0.05, 0.8, 0.05, metalMat, px, y + 0.52, pz);
+  bx(tower, 0.9, 0.16, 0.9, redBand, 0, y + 1.0, 0);
+  bx(tower, 0.6, 0.16, 0.6, redBand, 0, y + 1.16, 0);
+  bx(tower, 0.05, 1.1, 0.05, metalMat, 0, y + 1.8, 0);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), new THREE.MeshBasicMaterial({ color: 0x39d0ff }));
+  beacon.position.y = y + 0.55;
   tower.add(beacon);
   tower.userData.beacon = beacon;
 }
@@ -285,38 +360,32 @@ placeLandmark(fountain, "fountain");
 // ----- 3.6 ⚔️ 37채널 호핑 던전 지하 입구 (Dungeon Portal Gate) -----
 const dungeonGate = new THREE.Group();
 {
-  const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.8, 0.7), darkStone);
-  p1.position.set(-1.4, 1.4, 0);
-  dungeonGate.add(p1);
-
-  const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.8, 0.7), darkStone);
-  p2.position.set(1.4, 1.4, 0);
-  dungeonGate.add(p2);
-
-  const arch = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.7, 0.8), darkStone);
-  arch.position.set(0, 2.9, 0);
-  dungeonGate.add(arch);
-
-  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.15), new THREE.MeshBasicMaterial({ color: 0xb539ff }));
-  rune.position.set(0, 3.0, 0.45);
-  dungeonGate.add(rune);
-
+  // 돌 블록을 쌓은 계단식 아치 (Stage 11.19)
+  const runeMat = new THREE.MeshBasicMaterial({ color: 0xb539ff });
+  for (const sx of [-1, 1]) {
+    bx(dungeonGate, 0.8, 0.35, 0.9, stoneDark, sx * 1.4, 0.18, 0);                    // 받침
+    for (let i = 0; i < 6; i++) bx(dungeonGate, 0.62, 0.42, 0.72, i % 2 ? darkStone : forgeStone, sx * 1.4, 0.55 + i * 0.42, 0);
+    bx(dungeonGate, 0.1, 0.7, 0.04, runeMat, sx * 1.4, 1.4, 0.38);                     // 기둥 룬
+  }
+  [[2.1, 3.0], [1.6, 3.3], [0.9, 3.55]].forEach(([w, yy], i) => bx(dungeonGate, w * 1.6 + 0.4, 0.34, 0.8, i % 2 ? forgeStone : darkStone, 0, yy, 0));
+  const rune = bx(dungeonGate, 0.34, 0.34, 0.12, runeMat, 0, 3.32, 0.44);
+  rune.rotation.z = Math.PI / 4;
   const portalPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.1, 2.5),
+    new THREE.PlaneGeometry(2.1, 2.6),
     new THREE.MeshBasicMaterial({ color: 0x7c1bd4, side: THREE.DoubleSide, transparent: true, opacity: 0.88 })
   );
-  portalPlane.position.set(0, 1.3, 0);
+  portalPlane.position.set(0, 1.45, 0);
   dungeonGate.add(portalPlane);
   dungeonGate.userData.portal = portalPlane;
-
-  [-2.1, 2.1].forEach(fx => {
-    const brazier = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.4), stoneMat);
-    brazier.position.set(fx, 0.45, 0.35);
-    dungeonGate.add(brazier);
-
-    const flame = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.3, 0.24), new THREE.MeshBasicMaterial({ color: 0xc855ff }));
-    flame.position.set(fx, 1.0, 0.35);
-    dungeonGate.add(flame);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.06, 8, 32), new THREE.MeshBasicMaterial({ color: 0xd9a6ff }));
+  ring.position.set(0, 1.5, 0.02);
+  portalPlane.add(ring);
+  ring.position.set(0, 0.05, 0.02);
+  [-2.2, 2.2].forEach((fx) => {
+    bx(dungeonGate, 0.42, 0.7, 0.42, stoneMat, fx, 0.35, 0.4);
+    bx(dungeonGate, 0.56, 0.12, 0.56, stoneDark, fx, 0.76, 0.4);
+    bx(dungeonGate, 0.26, 0.32, 0.26, new THREE.MeshBasicMaterial({ color: 0xc855ff }), fx, 1.0, 0.4);
+    bx(dungeonGate, 0.14, 0.2, 0.14, new THREE.MeshBasicMaterial({ color: 0xf0d0ff }), fx, 1.22, 0.4);
   });
 }
 placeLandmark(dungeonGate, "dungeonGate");
@@ -383,54 +452,81 @@ placeLandmark(trainingSign, "trainingSign");
 // ----- Stage 10: 🔒 보안의 감옥 (북동) -----
 const prison = new THREE.Group();
 {
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.4, 2.6), darkStone);
-  wall.position.y = 1.2;
-  prison.add(wall);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.4, 2.9), stoneMat);
-  roof.position.y = 2.6;
-  prison.add(roof);
-  // 정면 창살 (8개) + 자물쇠
+  // 성벽 요새: 돌 기단·성가퀴·쇠창살 아치 문·금색 자물쇠·모서리 탑(빨간 감시 눈)·횃불 (Stage 11.19)
   const barMat = new THREE.MeshLambertMaterial({ color: 0x8a95a3 });
-  for (let i = 0; i < 8; i++) {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.6, 0.08), barMat);
-    bar.position.set(-1.05 + i * 0.3, 1.0, 1.34);
-    prison.add(bar);
+  bx(prison, 3.0, 0.3, 2.6, stoneDark, 0, 0.15, 0);
+  bx(prison, 2.8, 2.1, 2.4, forgeStone, 0, 1.35, 0);
+  for (let i = 0; i < 4; i++) bx(prison, 2.82, 0.04, 2.42, stoneDark, 0, 0.75 + i * 0.5, 0);   // 돌 줄눈
+  for (let i = -3; i <= 3; i++) {                                                             // 성가퀴 (앞뒤)
+    bx(prison, 0.3, 0.3, 0.3, stoneLight, i * 0.4, 2.55, 1.05);
+    bx(prison, 0.3, 0.3, 0.3, stoneLight, i * 0.4, 2.55, -1.05);
   }
-  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.14), new THREE.MeshBasicMaterial({ color: 0xffb020 }));
-  lock.position.set(0, 2.0, 1.36);
+  for (const sx of [-1, 1]) for (let i = -2; i <= 2; i++) bx(prison, 0.3, 0.3, 0.3, stoneLight, sx * 1.25, 2.55, i * 0.45);
+  // 아치 문 + 쇠창살
+  bx(prison, 1.7, 1.75, 0.12, darkStone, 0, 1.1, 1.2);
+  bx(prison, 1.4, 1.5, 0.06, new THREE.MeshBasicMaterial({ color: 0x0b0d12 }), 0, 1.0, 1.24);
+  for (let i = 0; i < 6; i++) bx(prison, 0.07, 1.5, 0.07, barMat, -0.6 + i * 0.24, 1.0, 1.28);
+  bx(prison, 1.4, 0.07, 0.07, barMat, 0, 1.3, 1.28);
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.34, 0.12), new THREE.MeshBasicMaterial({ color: 0xffb020 }));
+  lock.position.set(0, 1.0, 1.36);
   prison.add(lock);
+  bx(prison, 0.2, 0.16, 0.06, goldMat, 0, 1.24, 1.36);
   prison.userData.lock = lock;
-  // 감시탑 (모서리)
-  const turret = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.4, 0.8), darkStone);
-  turret.position.set(1.3, 1.7, -1.0);
-  prison.add(turret);
-  const eye = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
-  eye.position.set(1.3, 3.6, -1.0);
-  prison.add(eye);
+  // 모서리 탑 + 계단식 지붕 + 빨간 감시 눈
+  for (const [tx, tz] of [[1.25, -1.0], [-1.25, -1.0]]) {
+    bx(prison, 0.75, 3.3, 0.75, darkStone, tx, 1.65, tz);
+    bx(prison, 0.9, 0.18, 0.9, stoneLight, tx, 3.35, tz);
+    bx(prison, 0.55, 0.3, 0.55, redRoofDk, tx, 3.6, tz);
+    bx(prison, 0.25, 0.25, 0.25, redRoofDk, tx, 3.85, tz);
+  }
+  const eye = bx(prison, 0.26, 0.26, 0.26, new THREE.MeshBasicMaterial({ color: 0xff3b30 }), 1.25, 2.9, -0.6);
+  // 횃불 두 개
+  for (const sx of [-1, 1]) {
+    bx(prison, 0.08, 0.4, 0.08, beamMat, sx * 1.0, 1.75, 1.25);
+    bx(prison, 0.14, 0.16, 0.14, new THREE.MeshBasicMaterial({ color: 0xffa040 }), sx * 1.0, 2.0, 1.25);
+  }
+  // 빨간 깃발 (보안)
+  bx(prison, 0.04, 0.9, 0.04, metalMat, -1.25, 4.2, -1.0);
+  bx(prison, 0.4, 0.26, 0.03, new THREE.MeshLambertMaterial({ color: 0xd8443c }), -1.04, 4.5, -1.0);
 }
 placeLandmark(prison, "prison");
 
 // ----- Stage 10: 🪫 전력 잃은 지하묘지 입구 (남동) -----
 const crypt = new THREE.Group();
 {
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.6, 1.6), stoneMat);
-  slab.position.y = 0.8;
-  crypt.add(slab);
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.3, 1.9), darkStone);
-  cap.position.y = 1.75;
-  crypt.add(cap);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.2, 0.06), new THREE.MeshBasicMaterial({ color: 0x0b0d12 }));
-  door.position.set(0, 0.6, -0.82); // 마을 쪽(북)을 향한다
-  crypt.add(door);
-  // 꺼져 가는 CR2032 (코인 전지 모양 원판)
-  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.1, 20), new THREE.MeshBasicMaterial({ color: 0x9aa3ad }));
+  // 작은 영묘: 계단식 기단·앞 기둥 둘·박공 지붕·어두운 문·꺼져 가는 CR2032·이끼·작은 비석 (Stage 11.19)
+  // 모델의 앞(+z)이 마을 쪽(북, −z)을 보도록 뒤집는다
+  const slate = new THREE.MeshLambertMaterial({ color: 0x4a4f5a });
+  const moss = new THREE.MeshLambertMaterial({ color: 0x5f8a4a });
+  bx(crypt, 2.0, 0.2, 1.6, stoneDark, 0, 0.1, 0);
+  bx(crypt, 1.8, 0.15, 1.5, stoneMat, 0, 0.27, 0.0);
+  bx(crypt, 1.6, 1.3, 1.2, stoneLight, 0, 1.0, -0.1);
+  for (const sx of [-1, 1]) {
+    bx(crypt, 0.2, 1.35, 0.2, trimWhite, sx * 0.62, 1.02, 0.62);
+    bx(crypt, 0.28, 0.1, 0.28, stoneMat, sx * 0.62, 0.38, 0.62);
+  }
+  bx(crypt, 1.75, 0.14, 1.5, slate, 0, 1.72, 0.05);
+  bx(crypt, 1.4, 0.14, 1.1, slate, 0, 1.86, 0.05);
+  bx(crypt, 0.9, 0.14, 0.7, slate, 0, 2.0, 0.05);
+  bx(crypt, 0.7, 1.0, 0.06, new THREE.MeshBasicMaterial({ color: 0x0b0d12 }), 0, 0.85, 0.52);
+  bx(crypt, 0.86, 0.1, 0.08, stoneDark, 0, 1.38, 0.53);
+  // 꺼져 가는 CR2032 (코인 전지 모양 원판) — 가끔 깨어나는 센서 빛
+  const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 20), new THREE.MeshBasicMaterial({ color: 0x9aa3ad }));
   coin.rotation.x = Math.PI / 2;
-  coin.position.set(0, 1.45, -0.84);
+  coin.position.set(0, 1.58, 0.56);
   crypt.add(coin);
-  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.05), new THREE.MeshBasicMaterial({ color: 0x7dffb5 }));
-  glow.position.set(0, 1.45, -0.91);
+  const glow = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.04), new THREE.MeshBasicMaterial({ color: 0x7dffb5 }));
+  glow.position.set(0, 1.58, 0.61);
   crypt.add(glow);
   crypt.userData.glow = glow;
+  // 이끼·비석
+  bx(crypt, 0.5, 0.08, 0.3, moss, -0.5, 1.8, 0.6);
+  bx(crypt, 0.3, 0.3, 0.2, moss, 0.75, 0.42, -0.6);
+  for (const [gx, gz] of [[-0.85, 0.85], [0.85, 0.85]]) {
+    bx(crypt, 0.24, 0.4, 0.08, stoneMat, gx, 0.4, gz);
+    bx(crypt, 0.12, 0.04, 0.1, stoneDark, gx, 0.48, gz + 0.01);
+  }
+  crypt.rotation.y = Math.PI;
 }
 placeLandmark(crypt, "crypt");
 
