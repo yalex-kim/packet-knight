@@ -23,6 +23,7 @@ import * as knightView from "./render/knight.js";
 import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera, setAttract, startLanding } from "./render/camera.js";
 import * as splash from "./ui/splash.js";
 import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
+import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
 import { lifeRoot, stepLife, lifeState } from "./render/villagers.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
@@ -538,6 +539,20 @@ function startFloor(floor) {
   fx.showToast(`⚔️ ${floor}층 — Wi-Fi 간섭 몬스터 ${b.monsters.length}마리! 바닥의 빨간 원(광역 예고) 밖으로 피하세요`, 4);
   if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
 }
+function showTutorial() {
+  if (isTutorialOpen()) return;
+  questLog.closeQuestLog();
+  questLog.closeQuestPop();
+  hud.hideModal();
+  setInputEnabled(false);
+  inputLocked = true;
+  clearMoveTarget();
+  startTutorial(() => { setInputEnabled(true); inputLocked = false; });
+}
+// 📘 다시 보기 버튼 (조작법 상자·퀘스트 로그)
+document.addEventListener("click", (e) => {
+  if (e.target instanceof Element && e.target.closest('[data-action="tutorial"]')) showTutorial();
+});
 function showHopGuide() {
   setInputEnabled(false);
   inputLocked = true;
@@ -1026,6 +1041,7 @@ if (!TEST_MODE) {
       document.body.classList.add("revealing");
       setTimeout(() => document.body.classList.remove("prestart"), 900);   // 거의 내려앉았을 때 HUD가 차례로
       setTimeout(() => document.body.classList.remove("revealing"), 2200);
+      if (!tutorialSeen()) setTimeout(showTutorial, 2300);   // 처음 온 사람: 설명서 → UI 투어 (Stage 11.13)
     }
   })));
 }
@@ -1071,6 +1087,7 @@ window.__PK = {
   zoom: () => orbit.distance,
   quality: () => perf.level,
   hopGuide: { open: showHopGuide, isOpen: isHopGuideOpen, example: hopGuideExample },
+  tutorial: { open: showTutorial, state: tutorialState, next: tutorialNext },
   fireCd: () => getComputedStyle(fireBtn).getPropertyValue("--cd"),
   life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },

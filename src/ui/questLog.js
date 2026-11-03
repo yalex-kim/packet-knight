@@ -145,6 +145,7 @@ function render() {
       el("div", { class: "lib-actions" },
         hooks.chapterLink(ch, w.section, "📖 원문 읽기 (예측해 보기 절) ↗", "lib-btn q-read"))
     ),
+    el("div", { class: "lib-actions" }, el("button", { type: "button", class: "lib-btn", "data-action": "tutorial", textContent: "📘 설명서·튜토리얼 다시 보기" })),
     el("h3", { textContent: "📖 완독 배지" }),
     el("div", { class: "q-badges" }, CHAPTERS.map((c) => el("span", {
       class: `q-badge${earned.has(c.id) ? " on" : ""}`, title: c.title, "data-chapter": c.id,

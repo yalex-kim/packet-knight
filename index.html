@@ -648,6 +648,40 @@
   .hg-points { margin: 6px 0 4px; padding-left: 18px; font-size: 12.5px; color: #a4c7e8; line-height: 1.7; }
   .hg-points b { color: #7dd8ff; }
   #dungeon-hud .dh-help { background: #3a2456; color: #f0e6ff; border: 1px solid #8a5cc4; border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12px; cursor: pointer; }
+  /* 설명서·UI 투어 (Stage 11.13) */
+  .tut-root { position: fixed; inset: 0; z-index: 120; font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; }
+  .tut-dim { position: absolute; inset: 0; background: rgba(4, 10, 20, .55); backdrop-filter: blur(3px); animation: overlayIn .2s ease-out; }
+  .tut-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); overflow-y: auto;
+    background: rgba(255, 255, 255, .97); color: #1d2733; border-radius: 22px; padding: 22px 22px 18px; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); animation: cardIn .3s cubic-bezier(.2, .8, .2, 1); text-align: left; }
+  .tut-icon { font-size: 40px; line-height: 1; }
+  .tut-title { margin: 8px 0 10px; font-size: 21px; font-weight: 800; letter-spacing: -.01em; }
+  .tut-p { margin: 0 0 9px; font-size: 14px; line-height: 1.65; color: #3a4757; }
+  .tut-p b { color: #0c93b8; }
+  .tut-center { text-align: center; color: #6b7a8a; font-size: 12.5px; }
+  .tut-loop { display: flex; align-items: stretch; gap: 4px; margin: 6px 0 10px; flex-wrap: wrap; justify-content: center; }
+  .tut-node { flex: 1 1 88px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border-radius: 14px; background: #f1f6fa; text-align: center; }
+  .tut-node-i { font-size: 26px; }
+  .tut-node b { font-size: 13px; }
+  .tut-node small { font-size: 11px; color: #6b7a8a; line-height: 1.4; }
+  .tut-arrow { align-self: center; color: #b0bccb; font-weight: 800; }
+  @media (max-width: 520px) { .tut-loop { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .tut-arrow { display: none; } }
+  .tut-dots { display: flex; justify-content: center; gap: 6px; margin: 8px 0 12px; }
+  .tut-dots i { width: 7px; height: 7px; border-radius: 50%; background: #d3dce6; }
+  .tut-dots i.on { width: 20px; border-radius: 4px; background: #0c93b8; }
+  .tut-actions { display: flex; align-items: center; gap: 6px; }
+  .tut-gap { flex: 1; }
+  .tut-btn { appearance: none; border: 1px solid rgba(20, 40, 70, .14); background: #fff; color: #1d2733; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .tut-btn:disabled { opacity: .35; cursor: default; }
+  .tut-btn.ghost { border-color: transparent; color: #6b7a8a; padding-left: 4px; }
+  .tut-btn.primary { border: 0; color: #fff; background: linear-gradient(100deg, #18b4dc, #3ccf9c); }
+  .tut-catch { position: absolute; inset: 0; }
+  .tut-spot { position: absolute; border: 2.5px solid #ffd76b; box-shadow: 0 0 0 9999px rgba(4, 10, 20, .62), 0 0 24px rgba(255, 215, 107, .6);
+    transition: left .35s cubic-bezier(.2, .8, .2, 1), top .35s cubic-bezier(.2, .8, .2, 1), width .35s, height .35s, border-radius .35s; pointer-events: none; }
+  .tut-tip { position: absolute; background: rgba(255, 255, 255, .98); color: #1d2733; border-radius: 16px; padding: 12px 14px 10px; box-shadow: 0 14px 36px rgba(0, 0, 0, .35); animation: cardIn .25s cubic-bezier(.2, .8, .2, 1); }
+  .tut-step { font-size: 11px; color: #8a97a6; font-weight: 700; }
+  .tut-tip-title { display: block; font-size: 15px; margin: 2px 0 4px; }
+  .tut-tip-text { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: #3a4757; }
+  .tut-replay { margin-top: 6px; appearance: none; border: 1px solid rgba(12, 147, 184, .35); background: #fff; color: #0c93b8; border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }
@@ -728,7 +762,8 @@
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
     📜 퀘스트: <b>Q 키 / 퀘스트 버튼 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지<br />
     ⚡ 돌진: <b>E 키 / 돌진 버튼</b> (Q5 보상) · 🔒 보안의 감옥(북동) · 🪫 지하묘지(남동)<br />
-    🔊 소리: <b>M 키 / 우상단 버튼</b> · 휠 줌은 맵 위에서만
+    🔊 소리: <b>M 키 / 우상단 버튼</b> · 휠 줌은 맵 위에서만<br />
+    <button type="button" class="tut-replay" data-action="tutorial">📘 설명서·튜토리얼 다시 보기</button>
   </div>
 </div>
 

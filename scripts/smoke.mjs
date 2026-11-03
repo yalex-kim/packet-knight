@@ -1592,6 +1592,30 @@ await page.waitForFunction(() => window.__PK);
   check("발사하면 버튼이 어두워지고(쿨타임 덮개), 쿨타임이 끝나면 걷힌다", cd.cooling && cd.cd > 0.5 && !cd2.cooling && cd2.cd === 0, `${JSON.stringify(cd)} → ${JSON.stringify(cd2)}`);
 }
 
+// ---------- Stage 11.13: 설명서 + UI 투어 ----------
+{
+  await reset();
+  const t = await page.evaluate(() => {
+    const T = window.__PK.tutorial;
+    T.open();
+    const a = T.state();
+    T.next(); T.next(); T.next();            // 설명서 3장 → 투어 첫 단계
+    const b = T.state();
+    T.next();                                // 두 번째 단계 (발사 버튼)
+    const c = T.state();
+    const sel = c.steps[c.step];
+    const sr = document.querySelector(".tut-spot").getBoundingClientRect(), er = document.querySelector(sel).getBoundingClientRect();
+    const tip = document.querySelector(".tut-tip").getBoundingClientRect();
+    const onTarget = Math.abs((sr.left + sr.width / 2) - (er.left + er.width / 2)) < 2 && Math.abs((sr.top + sr.height / 2) - (er.top + er.height / 2)) < 2;
+    const tipIn = tip.left >= 0 && tip.right <= innerWidth && tip.top >= 0 && tip.bottom <= innerHeight;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return { a, b, sel, onTarget, tipIn, closed: !T.state().open, seen: localStorage.getItem("packetKnight.tips.intro") };
+  });
+  check("설명서 3장 → UI 투어: 보이는 버튼을 차례로 비추고(스포트라이트가 대상 위, 말풍선은 화면 안), Esc로 끝내면 다시 뜨지 않는다",
+    t.a.mode === "manual" && t.b.mode === "tour" && t.b.steps.length >= 8 && t.sel === "#btn-fire" && t.onTarget && t.tipIn && t.closed && t.seen === "1",
+    `${t.b.steps.length}단계 · 둘째 ${t.sel} · 스포트라이트 ${t.onTarget} · 말풍선 ${t.tipIn}`);
+}
+
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
 {
   const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });
