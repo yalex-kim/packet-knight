@@ -38,12 +38,12 @@ const STEPS = [
   { sel: "#btn-fire", title: "📡 ADV 패킷 발사", text: "가장 가까운 몬스터에게 광고 패킷을 쏴요. 쏘고 나면 버튼이 어두워졌다가 시계 방향으로 밝아져요 — 쿨타임. (PC: F)" },
   { sel: "#btn-jump", title: "🦘 점프", text: "턱을 넘거나 공격을 피할 때. (PC: 스페이스)" },
   { sel: "#hp", title: "❤️ HP = 연결 안정성", text: "0이 되면 연결 타임아웃 — 던전에서 쫓겨나요. 맞지 않고 3초가 지나면 회복돼요." },
-  { sel: "#stats", title: "스탯", text: "TX(공격)·RX(회피)·HOP(속도)·SEC(방어)·PWR(배터리 효율)과 CR2032·레벨. 모바일에선 눌러서 펼쳐요." },
+  { sel: "#stats", title: "스탯", text: "TX(공격)·RX(회피)·HOP(속도)·SEC(방어)·PWR(배터리 효율)·CI(연결 간격 — 공격 쿨타임)와 CR2032·레벨. 모바일에선 눌러서 펼쳐요." },
   { sel: "#quest-tracker", title: "📜 지금 할 일", text: "진행 중인 퀘스트 한 줄. 누르면 단계와 📍 길 안내가 이 위로 펼쳐져요." },
   { sel: "#btn-quests", title: "퀘스트 로그", text: "모든 퀘스트·🔮 예측해 보기·📖 완독 배지. (PC: Q)" },
   { sel: "#badge", title: "지금 상태", text: "어디에 있는지, 무엇을 하는 중인지 알려 줘요." },
-  { sel: "#btn-reset", title: "📍 시작 위치로", text: "길을 잃으면 광장으로 돌아가요." },
   { sel: "#btn-help", title: "❔ 조작법", text: "키 조작 전체를 펼쳐 봐요. 이 설명서와 투어도 여기서 다시 볼 수 있어요. (PC: H)" },
+  { sel: "#btn-guide", title: "❔ 다시 보기", text: "이 설명서와 버튼 소개를 언제든 다시 볼 수 있어요." },
   { sel: "#btn-sound", title: "🔊 소리", text: "효과음·배경음 켜고 끄기. (PC: M)" },
   { sel: null, title: "건물을 눌러 보세요", text: "건물 위 이름표를 누르면 정보 카드가 떠요 — 도서관·대장간·등대·던전 입구로 들어가는 문이에요. 그럼 광장을 10 m 걸어 보는 것부터!" }
 ];

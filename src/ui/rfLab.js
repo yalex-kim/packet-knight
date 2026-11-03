@@ -1,7 +1,7 @@
 // RF 랩 UI — 장비 강화 (PRD §4.4) · 레벨업 스탯 포인트 분배 (§3.3) (DOM)
 // 성공률은 "링크 마진(SNR)" 막대로 보여 준다: 마진이 넉넉할수록 강화가 잘 붙는다. 실패해도 장비는 사라지지 않는다.
 
-import { GEAR, UPGRADE, upgradeCost, upgradeSuccess, STAT_META, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS } from "../core/balance.js";
+import { GEAR, UPGRADE, upgradeCost, upgradeSuccess, STAT_META, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, CONN_INTERVAL, COMBAT, ciIntervalMul } from "../core/balance.js";
 import { chapterUrl } from "../core/book.js";
 
 const overlay = document.getElementById("rflab");
@@ -89,7 +89,8 @@ function statsTab(p, stats) {
     const gain = STAT_POINT_GAIN[k];
     const cap = STAT_CAPS[k];
     const capped = cap !== undefined && stats[k] >= cap;
-    const btn = button(capped ? "상한" : `+1점 → ${m.label} +${fmt(gain)}${m.unit}`, () => hooks.onAllocate(k), "lib-btn lab-alloc");
+    const label = k === "ci" ? `+1점 → 쿨타임 −${Math.round(CONN_INTERVAL.STEP * 100)}%` : `+1점 → ${m.label} +${fmt(gain)}${m.unit}`;
+    const btn = button(capped ? "상한" : label, () => hooks.onAllocate(k), "lib-btn lab-alloc");
     btn.dataset.stat = k;
     btn.disabled = p.statPoints <= 0 || capped;
     return el("div", { class: "alloc-row" },
@@ -100,7 +101,7 @@ function statsTab(p, stats) {
   return [
     el("p", { class: "npc", textContent: `레벨이 오를 때마다 스탯 포인트 1점 — 장비 한 단계만큼의 힘일세. 남은 포인트: ${p.statPoints}점. 한 번 정하면 되돌릴 수 없으니 신중히!` }),
     rows,
-    el("p", { class: "muted", textContent: "🔋 PWR(배터리 효율)은 스킬 배터리가 생기면 열립니다. HOP는 이동 속도(m/s)입니다." })
+    el("p", { class: "muted", textContent: `⏱️ CI(연결 간격 단축): 1점마다 공격 쿨타임과 던전 링크의 연결 이벤트 간격이 ${Math.round(CONN_INTERVAL.STEP * 100)}% 짧아진다 — 대신 연결 이벤트가 잦아 전력을 더 써서 측정기 충전이 ${Math.round(CONN_INTERVAL.POWER * 100)}%씩 느려진다(PWR가 상쇄). 지금 쿨타임 ${(COMBAT.ADV_PACKET.cooldown * ciIntervalMul(stats.ci)).toFixed(2)}초. HOP는 이동 속도(m/s).` })
   ];
 }
 

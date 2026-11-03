@@ -100,6 +100,25 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("Stage 4 세이브(v1)가 진행도 손실 없이 v2로 마이그레이션된다", loadedV1.status === "loaded" && loadedV1.progress.bonus.hp === 5 && loadedV1.progress.skillSlots === 2 && loadedV1.progress.cr2032 === 0);
 }
 
+// ---------- Stage 11.15: CI(연결 간격 단축) 스탯 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const P = await imp("progress.js"), B = await imp("battle.js"), K = await imp("link.js"), Bal = await imp("balance.js");
+  const p = P.createProgress();
+  const base = { cd: 0, charge: P.chargeCfg(p).RECHARGE_SEC };
+  p.alloc.ci = 6;
+  const s = P.effectiveStats(p);
+  const battle = B.createBattle([]);
+  B.syncPlayerHp(battle, s.hp);
+  B.fireAdvPacket(battle, { x: 0, y: 0, z: 0, rotY: 0 }, null, { cooldownMul: Bal.ciIntervalMul(s.ci) });
+  const link = K.createLink(7, Bal.ciIntervalMul(s.ci));
+  p.alloc.ci = 9;
+  const capped = P.effectiveStats(p).ci;
+  check("CI 6점: 공격 쿨타임 −36%(0.8 → 0.51초), 던전 연결 이벤트 간격도 −36%, 대신 측정기 충전 +30% · 상한 6",
+    Math.abs(battle.player.fireCooldown - 0.512) < 1e-6 && Math.abs(link.interval - 0.32) < 1e-9 && P.chargeCfg({ ...p, alloc: { ...p.alloc, ci: 6 } }).RECHARGE_SEC === Math.round(base.charge * 1.3) && capped === 6,
+    `쿨타임 ${battle.player.fireCooldown.toFixed(3)}초 · 간격 ${link.interval}초 · 충전 ${base.charge} → ${Math.round(base.charge * 1.3)}초`);
+}
+
 // ---------- Stage 6: 전투 공식 & 훈련장 밸런스 (Node) ----------
 {
   const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
@@ -460,7 +479,7 @@ await page.waitForTimeout(300);
 const state = () => page.evaluate(() => window.__PK.state());
 const teleport = (x, z, y) => page.evaluate(([x, z, y]) => window.__PK.teleport(x, z, y ?? undefined), [x, z, y ?? null]);
 const tick = (ms) => page.evaluate((s) => window.__PK.tick(s), ms / 1000);
-const reset = async () => { await page.click("#btn-reset"); await tick(50); };
+const reset = async () => { await page.evaluate(() => window.__PK.resetToStart()); await tick(50); };   // 화면 버튼은 없앴다 (Stage 11.15)
 async function hold(code, ms) {
   await page.keyboard.down(code);
   await tick(ms);
@@ -1309,11 +1328,11 @@ await page.waitForFunction(() => window.__PK);
   // 모바일 폭: 트래커·퀘스트 버튼이 조이스틱·점프/발사 버튼과 겹치지 않는다
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const boxes = await page.evaluate(() => Object.fromEntries(["quest-tracker", "btn-quests", "joystick-zone", "btn-jump", "btn-fire", "btn-reset", "hp", "stats"]
+  const boxes = await page.evaluate(() => Object.fromEntries(["quest-tracker", "btn-quests", "joystick-zone", "btn-jump", "btn-fire", "hp", "stats"]
     .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   const overlaps = [];
-  for (const a of ["quest-tracker", "btn-quests"]) for (const b of ["joystick-zone", "btn-jump", "btn-fire", "btn-reset", "hp", "stats"]) if (hit(boxes[a], boxes[b])) overlaps.push(`${a}×${b}`);
+  for (const a of ["quest-tracker", "btn-quests"]) for (const b of ["joystick-zone", "btn-jump", "btn-fire", "hp", "stats"]) if (hit(boxes[a], boxes[b])) overlaps.push(`${a}×${b}`);
   check("모바일 폭(390px)에서 퀘스트 트래커·버튼이 다른 조작 UI와 겹치지 않는다", overlaps.length === 0 && boxes["quest-tracker"].right <= 390, overlaps.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }
@@ -1439,10 +1458,10 @@ await page.waitForFunction(() => window.__PK);
   const kept = await page.evaluate(() => window.__PK.quests.state());
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const boxes = await page.evaluate(() => Object.fromEntries(["btn-dash", "btn-fire", "btn-jump", "btn-reset", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"]
+  const boxes = await page.evaluate(() => Object.fromEntries(["btn-dash", "btn-fire", "btn-jump", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"]
     .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
-  const ov = ["btn-fire", "btn-jump", "btn-reset", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"].filter((k) => hit(boxes["btn-dash"], boxes[k]));
+  const ov = ["btn-fire", "btn-jump", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"].filter((k) => hit(boxes["btn-dash"], boxes[k]));
   check("Stage 10 진행이 저장되고, 모바일 폭에서 돌진 버튼이 겹치지 않는다", kept.active === null && kept.perks.aesShield && boxes["btn-dash"].width > 0 && ov.length === 0, ov.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }
@@ -1554,9 +1573,9 @@ await page.waitForFunction(() => window.__PK);
   // ⑦ 모바일 폭: 사운드 버튼이 배지·스탯과 겹치지 않는다
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const bx = await page.evaluate(() => Object.fromEntries(["btn-sound", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
+  const bx = await page.evaluate(() => Object.fromEntries(["btn-sound", "btn-guide", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
-  const ov = ["badge", "stats", "hud", "hp"].filter((k) => hit(bx["btn-sound"], bx[k]));
+  const ov = ["badge", "stats", "hud", "hp", "btn-guide"].filter((k) => hit(bx["btn-sound"], bx[k])).concat(["badge", "stats", "hp"].filter((k) => hit(bx["btn-guide"], bx[k])).map((k) => `❔×${k}`));
   check("모바일 폭에서 사운드 버튼이 다른 HUD와 겹치지 않는다", ov.length === 0, ov.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }

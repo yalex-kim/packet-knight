@@ -4,7 +4,7 @@
 /** @typedef {"hp"|"tx"|"rx"|"hop"|"sec"|"pwr"} StatKey */
 
 /** Lv1 기본 스탯 (PRD §8.4) */
-export const PLAYER_BASE = Object.freeze({ hp: 100, tx: 10, rx: 5, hop: 6.4, sec: 0, pwr: 100 });
+export const PLAYER_BASE = Object.freeze({ hp: 100, tx: 10, rx: 5, hop: 6.4, sec: 0, pwr: 100, ci: 0 });
 
 /** 스탯 표시 정보 */
 export const STAT_META = Object.freeze({
@@ -13,8 +13,17 @@ export const STAT_META = Object.freeze({
   rx:  { icon: "💨", label: "RX",  name: "회피율",     unit: "%" },
   hop: { icon: "🦘", label: "HOP", name: "속도",       unit: "" },
   sec: { icon: "🛡️", label: "SEC", name: "방어력",     unit: "" },
-  pwr: { icon: "🔋", label: "PWR", name: "배터리 효율", unit: "" }
+  pwr: { icon: "🔋", label: "PWR", name: "배터리 효율", unit: "" },
+  ci:  { icon: "⏱️", label: "CI",  name: "연결 간격 단축", unit: "" }
 });
+
+/**
+ * CI — 연결 간격 단축 (Stage 11.15, PRD §3.3). 1점마다 공격(ADV 패킷) 쿨타임과 던전 링크의 연결 이벤트 간격이 STEP씩 짧아진다.
+ * 대가: 연결 이벤트가 잦을수록 전력을 더 쓴다 — 측정기 충전 시간이 1점마다 POWER씩 늘어난다(PWR가 상쇄). 교과서 connection·power 장.
+ */
+export const CONN_INTERVAL = Object.freeze({ STEP: 0.06, POWER: 0.05 });
+/** CI 점수 → 간격 배율 (1 = 기본, 6점이면 0.64) */
+export const ciIntervalMul = (ci) => Math.max(0.4, 1 - CONN_INTERVAL.STEP * (ci ?? 0));
 
 /** 스탯이 아닌 기술 보상 (강좌 reward 키) */
 export const SKILL_REWARDS = Object.freeze({
@@ -184,9 +193,9 @@ export const GEAR = Object.freeze({
  * 레벨업 스탯 포인트 1점당 상승량과 상한 (PRD §8.4 "레벨업 시 분배 포인트" 열).
  * PWR는 스킬 배터리가 생기기 전까지 효과가 없어 분배를 막는다 (헛투자 방지).
  */
-export const STAT_POINT_GAIN = Object.freeze({ hp: 10, tx: 2, rx: 2, hop: 0.2, sec: 1, pwr: 5 });
-export const STAT_CAPS = Object.freeze({ rx: 40, hop: 9.0 });
-export const ALLOCATABLE_STATS = Object.freeze(["hp", "tx", "rx", "hop", "sec"]);
+export const STAT_POINT_GAIN = Object.freeze({ hp: 10, tx: 2, rx: 2, hop: 0.2, sec: 1, pwr: 5, ci: 1 });
+export const STAT_CAPS = Object.freeze({ rx: 40, hop: 9.0, ci: 6 });
+export const ALLOCATABLE_STATS = Object.freeze(["hp", "tx", "rx", "hop", "sec", "ci"]);
 
 /** 강화 (PRD §8.4): 비용 = round(UPGRADE_BASE × 1.4^n), 성공률 = max(30%, 95% − 10%p × n), 실패 시 재료만 소실 */
 export const UPGRADE = Object.freeze({ BASE: 7, GROWTH: 1.3, MAX_LEVEL: 8 });

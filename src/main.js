@@ -15,7 +15,7 @@ import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
 import { SPAWN_POS, landmark, JOB_AREA, LANDMARKS, VILLAGERS } from "./core/layout.js";
 import * as prisonUi from "./ui/prison.js";
 import * as cryptUi from "./ui/crypt.js";
-import { QUEST_SKILLS, RSSI_JOB, COMBAT } from "./core/balance.js";
+import { QUEST_SKILLS, RSSI_JOB, COMBAT, ciIntervalMul } from "./core/balance.js";
 import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
@@ -404,6 +404,7 @@ function performFire(target = null) {
   // 퀘스트 보상: DLE(사거리) · ADV 패킷 강화(데미지 계수) — Stage 9
   const perks = progress.quests.perks;
   const shot = fireAdvPacket(activeBattle(), motor, target, {
+    cooldownMul: ciIntervalMul(effectiveStats(progress).ci),   // CI 스탯 (Stage 11.15)
     rangeMul: perks.dle ? PERKS.dle.rangeMul : 1,
     ...(perks.advBoost ? { coef: PERKS.advBoost.coef } : {})
   });
@@ -526,7 +527,7 @@ function placeAtCheckpoint() {
   const b = createFloorBattle(run.layout);
   b.player = battle.player; // HP는 마을과 던전이 공유한다
   run.battle = b;
-  run.link = createLink(run.layout.hopIncrement);
+  run.link = createLink(run.layout.hopIncrement, ciIntervalMul(effectiveStats(progress).ci));   // CI가 연결 이벤트 간격도 줄인다
   run.phase = "combat";
   resetMotor(motor, { x: DUNGEON_ROOM.cx, y: DUNGEON_ROOM.floorY, z: DUNGEON_ROOM.cz });
   resetOrbit(DUNGEON_ROOM.floorY);
@@ -881,16 +882,15 @@ initInput({
   getZoom: () => orbit.distance
 });
 
-const btnReset = document.getElementById("btn-reset");
-btnReset.addEventListener("click", () => {
+// 시작 위치로 (Stage 11.15: 화면 버튼은 없앴다 — 평평한 섬이라 길을 잃을 일이 드물다. 테스트 훅으로만 남긴다)
+function resetToStart() {
   if (run) leaveDungeon(false); // 던전 안에서는 귀환
   resetMotor(motor, SPAWN_POS);
   resetOrbit(SPAWN_POS.y);
   clearMoveTarget();
   hud.hideModal();
   hud.setBadge("🛡️ GATT 빌리지 광장 · 평지");
-  btnReset.blur(); // 포커스가 남아 스페이스바가 버튼을 다시 누르지 않도록
-});
+}
 
 // ---------- 시뮬레이션 한 스텝 ----------
 const fireBtn = document.getElementById("btn-fire");
@@ -929,7 +929,8 @@ function simulate(dt) {
   }
   dashBtn.classList.toggle("cooling", dash.cooldown > 0);
   // 발사 쿨타임: 쏘면 어두워지고 시계 방향으로 걷힌다 (--cd 1 → 0)
-  const fcd = activeBattle().player.fireCooldown / COMBAT.ADV_PACKET.cooldown;
+  const fp = activeBattle().player;
+  const fcd = fp.fireCooldown / (fp.fireCooldownMax || COMBAT.ADV_PACKET.cooldown);
   fireBtn.classList.toggle("cooling", fcd > 0);
   fireBtn.style.setProperty("--cd", Math.max(0, fcd).toFixed(3));
   dashBtn.style.setProperty("--cd", (dash.cooldown / QUEST_SKILLS.DASH.cooldown).toFixed(3));
@@ -1102,6 +1103,7 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   quality: () => perf.level,
+  resetToStart,
   hopGuide: { open: showHopGuide, isOpen: isHopGuideOpen, example: hopGuideExample },
   tutorial: { open: showTutorial, state: tutorialState, next: tutorialNext },
   talk: { open: (id) => talkTo(VILLAGERS.find((v) => v.id === id)), close: closeTalk, state: talkState, more: talkMore },

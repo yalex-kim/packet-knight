@@ -3,8 +3,7 @@
 
 import {
   PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
-  GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, RSSI_JOB
-} from "./balance.js";
+  GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, RSSI_JOB, CONN_INTERVAL } from "./balance.js";
 import { applyGear, emptyGear, tryUpgrade } from "./gear.js";
 import { createQuestState, QUESTS } from "./quests.js";
 import { levelFromXp } from "./combat.js";
@@ -54,7 +53,7 @@ export function createProgress() {
 }
 
 const emptyDungeon = () => ({ maxFloor: 0, attempts: 0, clears: 0, kos: 0, rollbacks: 0, stars: {} });
-const emptyAlloc = () => ({ hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 });
+const emptyAlloc = () => ({ hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0, ci: 0 });   // ci: Stage 11.15 — 옛 세이브는 0으로 채워진다(버전 그대로)
 
 /** 구버전 세이브를 현재 버전으로 올린다 (진행도를 잃지 않는 것이 원칙) */
 function migrate(raw) {
@@ -230,7 +229,8 @@ export function applyPickup(progress, item, count) {
 
 /** 측정기 배터리 현황 */
 /** 측정기 충전 설정 — PWR(배터리 효율)이 높을수록 빨리 찬다: RECHARGE_SEC × 100 / PWR (Stage 10) */
-export const chargeCfg = (progress) => ({ ...RSSI_JOB, RECHARGE_SEC: Math.round(RSSI_JOB.RECHARGE_SEC * 100 / effectiveStats(progress).pwr) });
+// CI(연결 간격 단축)가 높을수록 전력을 더 써서 충전이 느려진다: × (1 + POWER × CI) (Stage 11.15)
+export const chargeCfg = (progress) => { const s = effectiveStats(progress); return { ...RSSI_JOB, RECHARGE_SEC: Math.round(RSSI_JOB.RECHARGE_SEC * 100 / s.pwr * (1 + CONN_INTERVAL.POWER * s.ci)) }; };
 export const jobChargesAt = (progress, now) => chargesAt(progress.job.charges, now, chargeCfg(progress));
 
 /** 알바 시작 시 배터리 1칸 사용 — 없으면 false (중도 이탈해도 돌려주지 않는다: 이탈 남용 방지) */

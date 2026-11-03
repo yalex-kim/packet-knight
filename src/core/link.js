@@ -14,9 +14,9 @@ export const LINK_COMBAT = Object.freeze({
   INSTANT_DELAY: 6     // 채널맵 갱신이 적용되기까지의 이벤트 수
 });
 
-/** @param {number} hopIncrement 층의 hopIncrement */
-export function createLink(hopIncrement) {
-  const link = { hopIncrement, event: 0, since: 0, map: allChannelsMap(), pending: null, channel: 0, remapped: false };
+/** @param {number} hopIncrement 층의 hopIncrement @param {number} [intervalMul] CI 스탯의 간격 배율 (Stage 11.15) */
+export function createLink(hopIncrement, intervalMul = 1) {
+  const link = { hopIncrement, event: 0, since: 0, map: allChannelsMap(), pending: null, channel: 0, remapped: false, interval: LINK_COMBAT.INTERVAL * intervalMul };
   advance(link);
   return link;
 }
@@ -35,8 +35,8 @@ function advance(link) {
 export function stepLink(link, dt) {
   link.since += dt;
   let n = 0;
-  while (link.since >= LINK_COMBAT.INTERVAL) {
-    link.since -= LINK_COMBAT.INTERVAL;
+  while (link.since >= link.interval) {
+    link.since -= link.interval;
     link.event += 1;
     advance(link);
     n++;
