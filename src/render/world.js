@@ -3,7 +3,7 @@
 
 import * as THREE from "three";
 import { WORLD } from "../core/config.js";
-import { forEachCell, groundHeightAt, surfaceTypeAt } from "../core/terrain.js";
+import { forEachCell, groundHeightAt, surfaceTypeAt, cellHeight } from "../core/terrain.js";
 import { landmark, TREE_POSITIONS, LAMP_POSITIONS, FOUNTAIN_RIM_HEIGHT } from "../core/layout.js";
 
 /** 월드 전체를 담는 루트 그룹 */
@@ -14,12 +14,14 @@ export const interactiveObjects = [];
 export const animated = {};
 
 // ---------- 재질 ----------
-const grassMat  = new THREE.MeshLambertMaterial({ color: 0x5ea840 });
-const pathMat   = new THREE.MeshLambertMaterial({ color: 0x8f98a2 });
-const plazaMat  = new THREE.MeshLambertMaterial({ color: 0xa8b1bc });
-const sandMat   = new THREE.MeshLambertMaterial({ color: 0xd9c78a });
-const dirtMat   = new THREE.MeshLambertMaterial({ color: 0x8a6a45 });
-const stoneMat  = new THREE.MeshLambertMaterial({ color: 0x6e737b });
+// 팔레트 (Stage 11.7): 원색에 가깝던 색을 부드러운 파스텔 쪽으로 — 그림자·톤 매핑과 함께 디오라마 느낌
+const grassMat  = new THREE.MeshLambertMaterial({ color: 0x86c25c });
+const pathMat   = new THREE.MeshLambertMaterial({ color: 0xbdb39e });
+const plazaMat  = new THREE.MeshLambertMaterial({ color: 0xd3cab5 });
+const sandMat   = new THREE.MeshLambertMaterial({ color: 0xead9a8 });
+const dirtMat   = new THREE.MeshLambertMaterial({ color: 0x9c7552 });
+const dirtDark  = new THREE.MeshLambertMaterial({ color: 0x7e5c40 });   // 절벽 지층
+const stoneMat  = new THREE.MeshLambertMaterial({ color: 0x8c9198 });
 const darkStone = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
 const waterMat  = new THREE.MeshLambertMaterial({ color: 0x226cb5, transparent: true, opacity: 0.88 });
 
@@ -37,7 +39,10 @@ function buildVoxelLayer(list, material) {
   return mesh;
 }
 
-const layer = { grass: [], path: [], plaza: [], sand: [], dirt: [], stone: [], darkStone: [] };
+const layer = { grass: [], path: [], plaza: [], sand: [], dirt: [], dirtDark: [], stone: [], darkStone: [] };
+// 떠 있는 섬 (Stage 11.7): 가장자리 칸은 지층이 보이는 깊은 절벽으로, 바닥은 칸마다 조금씩 다르게 (디오라마)
+const isEdgeCell = (i, j) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([di, dj]) => cellHeight(i + di, j + dj) === -Infinity);
+const hash = (i, j) => { const h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return h - Math.floor(h); };
 forEachCell((i, j, top) => {
   const type = surfaceTypeAt(i + 0.5, j + 0.5); // 칸 중심 기준
   layer[type].push([i, top, j]);
@@ -46,13 +51,13 @@ forEachCell((i, j, top) => {
     for (let y = top - 1; y > WORLD.BEDROCK_Y; y--) layer.stone.push([i, y, j]);
     return;
   }
-  // 하부 층: 이웃 칸보다 낮아지는 절벽 면이 비지 않도록 충분히 깊게 쌓는다
-  const depth = 4;   // 섬 가장자리 절벽이 바다 아래까지 꽉 차 보이게 (해안도 평지 — Stage 11.2)
+  // 하부 층: 안쪽 칸은 얕게(보이지 않음), 가장자리 칸은 지층 절벽 — 흙 → 짙은 흙 → 돌, 바닥은 들쭉날쭉
+  const edge = isEdgeCell(i, j);
+  const depth = edge ? 6 + Math.floor(hash(i, j) * 4) : 2;
   for (let d = 1; d <= depth; d++) {
     const y = top - d;
-    if (y <= WORLD.BEDROCK_Y) break;
-    if (d === depth) layer.stone.push([i, y, j]);
-    else layer[type === "sand" ? "sand" : "dirt"].push([i, y, j]);
+    const kind = d === 1 ? (type === "sand" ? "sand" : "dirt") : d <= 2 ? "dirt" : d <= 4 ? (d % 2 ? "dirtDark" : "dirt") : "stone";
+    layer[kind].push([i, y, j]);
   }
 });
 
@@ -63,6 +68,7 @@ terrain.add(buildVoxelLayer(layer.path,      pathMat));
 terrain.add(buildVoxelLayer(layer.plaza,     plazaMat));
 terrain.add(buildVoxelLayer(layer.sand,      sandMat));
 terrain.add(buildVoxelLayer(layer.dirt,      dirtMat));
+terrain.add(buildVoxelLayer(layer.dirtDark,  dirtDark));
 terrain.add(buildVoxelLayer(layer.stone,     stoneMat));
 terrain.add(buildVoxelLayer(layer.darkStone, darkStone));
 root.add(terrain);
@@ -315,9 +321,9 @@ placeLandmark(dungeonGate, "dungeonGate");
 
 
 // ----- 3.7 복셀 나무 & 가로등 데코레이션 -----
-const treeMatWood  = new THREE.MeshLambertMaterial({ color: 0x5a3d28 });
-const treeMatLeaf1 = new THREE.MeshLambertMaterial({ color: 0x2e7d32 });
-const treeMatLeaf2 = new THREE.MeshLambertMaterial({ color: 0x43a047 });
+const treeMatWood  = new THREE.MeshLambertMaterial({ color: 0x6e4a2e });
+const treeMatLeaf1 = new THREE.MeshLambertMaterial({ color: 0x5aa847 });
+const treeMatLeaf2 = new THREE.MeshLambertMaterial({ color: 0x7cc25a });
 
 function createVoxelTree(x, z, scale = 1.0) {
   const tree = new THREE.Group();
@@ -433,6 +439,16 @@ animated.lock = prison.userData.lock;
 animated.cryptGlow = crypt.userData.glow;
 
 /** 매 프레임 장식 애니메이션 */
+/** 그림자 (Stage 11.7): 빛나는 것(MeshBasic)·반투명은 그림자를 드리우지 않고, 나머지는 드리우고 받는다 */
+export function enableShadows(obj) {
+  obj.traverse((o) => {
+    if (!o.isMesh) return;
+    const glow = o.material?.isMeshBasicMaterial || o.material?.transparent;
+    o.castShadow = !glow;
+    o.receiveShadow = !o.material?.isMeshBasicMaterial;
+  });
+}
+
 export function animateWorld(t) {
   animated.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3.5)); // 비콘 점멸
   animated.rune.rotation.y = t * 1.5;                                                 // 분수대 룬 회전

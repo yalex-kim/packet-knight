@@ -36,7 +36,7 @@ export function cameraRelative(right, forward) {
 
 // ---------- 타이틀 화면 배경 · 착지 연출 (Stage 11.5) ----------
 // attract: 타이틀 뒤에서 마을 위 높은 곳을 천천히 돈다. landing: 시작하면 그 자리에서 기사 뒤 기본 시점으로 내려앉는다.
-const ATTRACT = { distance: 46, pitch: 0.95, spin: 0.08 };
+const ATTRACT = { distance: 50, pitch: 0.62, spin: 0.08 };   // 섬 옆면(지층)이 보이는 낮은 각도
 let attract = false;
 let landing = null;
 const easeOutCubic = (k) => 1 - (1 - k) ** 3;

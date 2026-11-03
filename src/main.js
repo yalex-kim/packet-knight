@@ -61,20 +61,49 @@ const app = document.getElementById("app");
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// 조명·그림자 (Stage 11.7, 벤치마크 반영): 부드러운 그림자 + ACES 톤 매핑
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8ec9e8);
-scene.fog = new THREE.Fog(0x8ec9e8, 90, 220);
+// 하늘: 위는 하늘색, 지평선은 밝은 안개색 — 떠 있는 섬 뒤로 보인다
+const VILLAGE_SKY_TEX = (() => {
+  const c = document.createElement("canvas");
+  c.width = 2; c.height = 256;
+  const g = c.getContext("2d").createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, "#7fbfea"); g.addColorStop(0.55, "#bfe0f2"); g.addColorStop(1, "#eef5f1");
+  const ctx = c.getContext("2d"); ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+const VILLAGE_FOG = new THREE.Color(0xd8ebf3);
+scene.background = VILLAGE_SKY_TEX;
+scene.fog = new THREE.Fog(VILLAGE_FOG, 70, 190);
 
-const sun = new THREE.DirectionalLight(0xfff5dd, 1.65); // 따뜻한 햇살 + 환경광
-sun.position.set(50, 75, 40);
+const sun = new THREE.DirectionalLight(0xffefd6, 2.1); // 따뜻한 햇살 — 섬 전체에 그림자
+sun.position.set(28, 46, 22);
+sun.castShadow = true;
+{
+  const small = Math.min(window.innerWidth, window.innerHeight) < 700;   // 모바일은 그림자 해상도를 낮춘다
+  sun.shadow.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
+  Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 5, far: 120 });
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.04;
+  sun.shadow.radius = 3;
+}
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xc6e0ff, 0.65));
-scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x3f6b3a, 0.55));
+scene.add(new THREE.AmbientLight(0xdcecff, 0.45));
+scene.add(new THREE.HemisphereLight(0xd6ecff, 0x7a8f5a, 0.85));
 
+world.enableShadows(world.root);
+world.sea.visible = false;   // 떠 있는 섬 — 바다 대신 하늘 (클릭 이동 레이캐스트도 보이는 것만 맞는다)
 scene.add(world.root);
 scene.add(battleView.battleRoot);
+world.enableShadows(battleView.battleRoot);   // 훈련장 봇
 scene.add(dungeonView.dungeonRoot);
 knightView.addKnightTo(scene);
 
@@ -471,13 +500,13 @@ let dungeonSeedBase = TEST_MODE ? 1234 : Date.now() >>> 0;
 let consoleCooldown = 0; // 콘솔 앞을 떠났다 돌아와야 다시 자동으로 열린다
 let portalCooldown = 0;
 
-const DUNGEON_SKY = new THREE.Color(0x07040f), VILLAGE_SKY = scene.background.clone();
+const DUNGEON_SKY = new THREE.Color(0x07040f);
 function setAmbience(underground) {
   audio.setBgm(underground ? "dungeon" : "village");
-  scene.background.copy(underground ? DUNGEON_SKY : VILLAGE_SKY);
-  scene.fog.color.copy(underground ? DUNGEON_SKY : VILLAGE_SKY);
-  scene.fog.near = underground ? 14 : 90;
-  scene.fog.far = underground ? 40 : 220;
+  scene.background = underground ? DUNGEON_SKY : VILLAGE_SKY_TEX;
+  scene.fog.color.copy(underground ? DUNGEON_SKY : VILLAGE_FOG);
+  scene.fog.near = underground ? 14 : 70;
+  scene.fog.far = underground ? 40 : 190;
   world.root.visible = !underground;
 }
 

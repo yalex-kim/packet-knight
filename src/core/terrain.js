@@ -55,7 +55,7 @@ export function forEachCell(cb) {
 export function surfaceTypeAt(x, z) {
   if (isDungeonCell(x, z)) return "darkStone";
   const r = Math.hypot(x, z);
-  if (r > WORLD.VILLAGE_RADIUS + 2.5) return "sand";
+  if (r > WORLD.ISLAND_RADIUS - 2) return "sand";   // 떠 있는 섬의 가장자리 모래 테두리 (Stage 11.7: 바다가 없어져 넓은 모래 띠 → 잔디)
   if (r <= 3.2) return "plaza";
   const { DUNGEON_X } = WORLD;
   const isNorthAve = Math.abs(x) <= 1 && z >= -9 && z <= 0;
