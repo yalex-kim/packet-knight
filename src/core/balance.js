@@ -224,8 +224,8 @@ export function floorPlan(floor) {
   if (floor === 3) return { theme: "kitchen", name: "부엌 아래 — 전자레인지가 깨어났다", roster: [W, W, M, F, F] };
   if (floor === 4) return { theme: "spy", name: "도청 회랑 — 중간자가 숨어 있다", roster: [W, W, W, S, F] };
   return floor % 2
-    ? { theme: "kitchen", name: `${floor}층 — 잡음과 광고의 소굴`, roster: [W, W, M, S, F] }
-    : { theme: "spy", name: `${floor}층 — 깊은 도청 회랑`, roster: [W, W, W, M, S] };
+    ? { theme: "kitchen", name: "잡음과 광고의 소굴", roster: [W, W, M, S, F] }
+    : { theme: "spy", name: "깊은 도청 회랑", roster: [W, W, W, M, S] };
 }
 
 /** 훈련장 (마을 남서쪽 풀밭) */

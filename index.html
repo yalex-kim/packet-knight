@@ -726,6 +726,7 @@
   .dc-brand { display: block; font-size: 20px; font-weight: 900; color: #fff; line-height: 1.1; }
   .dc-brand i { font-style: normal; color: #39d0ff; }
   .dc-top .dc-mono { font-size: 12px; color: #6f8aa6; }
+  .dc-top .dc-close { margin-left: 4px; flex: none; }
   .dc-online { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, monospace; font-size: 13px; color: #cfe8ff; border: 1px solid rgba(57, 208, 255, .35); border-radius: 999px; padding: 4px 12px; }
   .dc-online i { width: 8px; height: 8px; border-radius: 50%; background: #3ccf6e; box-shadow: 0 0 8px #3ccf6e; }
   #devcard .dc-close { min-width: 0; min-height: 0; outline: none; appearance: none; border: 0; background: none; color: #8fb0cc; font-size: 24px; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; }
@@ -770,6 +771,7 @@
     .dc-prompt { margin-left: 16px; }
     .dc-note, .dc-actions { margin-left: 16px; margin-right: 16px; }
     .dc-online { display: none; }
+    .dc-top .dc-close { margin-left: auto; }   /* online이 숨으면 닫기를 오른쪽 끝으로 (안쪽에 남던 문제) */
   }
   /* 왼쪽 위 엠블럼 (Stage 11.21) — 모바일에서도 늘 보이게. 데스크톱은 조작법 상자 머리에 있다 */
   #corner-emblem { display: none; }
@@ -777,6 +779,18 @@
     #corner-emblem { display: block; position: fixed; left: 6px; top: 4px; z-index: 11; width: 36px; height: auto; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
     #hp { left: 48px; width: calc(100vw - 134px); }
   }
+  /* 던전 브리핑 (Stage 12.3) */
+  .dg-brief-title { margin: 6px 0 8px; font-size: 14px; color: #ffd76b; }
+  .dg-brief { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dg-mon { display: grid; grid-template-columns: 64px 1fr; column-gap: 10px; align-items: start; background: rgba(14, 34, 60, .6); border: 1px solid #23476e; border-radius: 10px; padding: 8px 10px; }
+  .dg-mon-face { grid-row: 1 / span 3; width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 2px solid rgba(255, 255, 255, .15); }
+  .dg-mon-head { display: flex; align-items: center; gap: 8px; }
+  .dg-mon-head b { font-size: 14px; color: #fff; }
+  .dg-lv { margin-left: auto; font-size: 11px; font-weight: 800; color: #3a2400; background: #ffd76b; border-radius: 999px; padding: 1px 8px; }
+  .dg-mon-stats { margin-top: 3px; font-size: 12.5px; color: #ffb3a8; font-variant-numeric: tabular-nums; }
+  .dg-mon-tip { margin-top: 3px; font-size: 12px; color: #a4c7e8; line-height: 1.5; }
+  .dg-rules { margin: 10px 0 4px; padding-left: 18px; font-size: 12.5px; color: #a4c7e8; line-height: 1.6; }
+  @media (max-width: 640px) { .dg-brief { grid-template-columns: 1fr; } }
   /* 상점 (Stage 12.2) */
   .shop-panel { max-width: 720px; }
   .shop-note { margin: 4px 0 8px; padding: 6px 10px; border-radius: 8px; font-size: 13px; }

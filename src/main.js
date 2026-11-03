@@ -564,8 +564,7 @@ function startFloor(floor) {
   setAmbience(true);
   hud.hideModal();
   hud.setBadge(`⚔️ 호핑 던전 ${floor}층`);
-  const kinds = [...new Set(b.monsters.map((m) => MONSTERS[m.type].name))].join(" · ");
-  fx.showToast(`⚔️ ${floor}층 ${run.layout.name}\n${kinds} — ${b.monsters.length}마리. 빨간 예고(바닥 원·조준선)를 피하세요`, 4.5);
+  fx.showToast(`⚔️ ${floor}층 전투 시작! — ${b.monsters.length}마리 (브리핑대로)`, 2.5);   // 자세한 구성은 입장 브리핑에 (Stage 12.3)
   dungeonView.setTheme(run.layout.theme);
   if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
 }

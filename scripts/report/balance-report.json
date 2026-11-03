@@ -1,6 +1,6 @@
 {
   "generatedBy": "node scripts/simulate.mjs",
-  "balanceHash": "f38d6d24cfd42287",
+  "balanceHash": "643f4f2117f05592",
   "seed": 1,
   "bots": 1000,
   "strategy": "all",
@@ -822,5 +822,5 @@
       "note": "Stage 8에서 합격 판정에 포함 (사용자 결정: 도달 층 기준) — 공부 시간의 기회비용까지 따진 학습 인센티브"
     }
   ],
-  "elapsedSec": 119.5
+  "elapsedSec": 120.1
 }

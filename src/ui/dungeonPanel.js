@@ -1,6 +1,6 @@
 // 호핑 던전 UI — 입장 패널, 링크 정비 콘솔(채널맵 퍼즐), 던전 상단 바 (DOM)
 
-import { DUNGEON } from "../core/balance.js";
+import { DUNGEON, MONSTERS, floorPlan, floorHpScale, floorAtkScale } from "../core/balance.js";
 import { DATA_CHANNELS, MIN_USED_CHANNELS, usedChannels, dataChannelFreq } from "../core/hopping.js";
 import { LINK, wifiCountFor, interferenceSummary } from "../core/dungeon.js";
 import { chapterUrl } from "../core/book.js";
@@ -55,17 +55,36 @@ export function openEntry({ floor, fromPortal }) {
   const canPay = p.cr2032 >= DUNGEON.ENTRY_FEE;
   const best = p.dungeon.maxFloor;
   const stars = p.dungeon.stars[String(floor)] ?? 0;
-  const enter = button(canPay ? `⚔️ ${floor}층 도전 (CR2032 ${DUNGEON.ENTRY_FEE}개)` : `🪙 CR2032가 모자랍니다 (${p.cr2032}/${DUNGEON.ENTRY_FEE})`, () => hooks.onEnter(), "lib-btn primary dungeon-enter");
+  const enter = button(canPay ? `⚔️ 확인 — ${floor}층 전투 시작 (CR2032 ${DUNGEON.ENTRY_FEE})` : `🪙 CR2032가 모자랍니다 (${p.cr2032}/${DUNGEON.ENTRY_FEE})`, () => hooks.onEnter(), "lib-btn primary dungeon-enter");
   enter.disabled = !canPay;
+  // 몬스터 브리핑 (Stage 12.3): 이번 층에 나오는 종류·마릿수·레벨(= 층)·체력·공격·대처법
+  const plan = floorPlan(floor);
+  const counts = new Map();
+  for (const t of plan.roster) counts.set(t, (counts.get(t) ?? 0) + 1);
+  const TIPS = {
+    wifiInterferer: "광역 — 바닥 빨간 원 밖으로. 대역 채널을 채널맵에서 빼면 피해 0",
+    advFlooder: "빠른 근접 떼 — 회피(RX)로 피할 수 있다. 채널과 상관없이 맞는다",
+    microwave: "켜졌다 꺼졌다 하는 잡음 — 켜진 동안 그 대역에서 패킷이 깨진다. 광역 공격도 대역 밖이면 피해 0",
+    sniffer: "원거리 6 m — 빨간 조준선이 차오르면 사거리 밖으로 빠지거나 회피"
+  };
+  const hpMul = floorHpScale(floor), atkMul = floorAtkScale(floor);
+  const brief = el("div", { class: "dg-brief" }, [...counts].map(([t, n]) => {
+    const d = MONSTERS[t];
+    return el("div", { class: "dg-mon", "data-type": t },
+      el("img", { class: "dg-mon-face", src: `./src/assets/monsters/mon-${t}-v1.webp`, alt: d.name, width: 256, height: 256 }),   // Gemini로 생성한 도감 그림
+      el("div", { class: "dg-mon-head" },
+        el("b", { textContent: `${d.name} ×${n}` }),
+        el("span", { class: "dg-lv", textContent: `Lv ${floor}` })),
+      el("div", { class: "dg-mon-stats", textContent: `❤️ ${Math.round(d.hp * hpMul)} · ⚔️ ${Math.round(d.atk * atkMul)} · 🛡️ ${d.sec}${d.aoe ? " · 광역" : ""}` }),
+      el("div", { class: "dg-mon-tip", textContent: TIPS[t] ?? d.lore }));
+  }));
   render(
-    header(fromPortal ? "🌀 다음 층 포털" : "⚔️ 37채널 호핑 던전", fromPortal ? `${floor - 1}층 클리어!` : `최고 기록 ${best}층`),
-    el("p", { class: "npc", textContent: fromPortal
-      ? "링크가 안정됐다! 더 깊은 층의 Wi-Fi 간섭은 더 질기다네. 계속 내려가겠나, 마을로 돌아가 장비를 손보겠나?"
-      : "이 아래는 37개 데이터 채널로 이어진 지하. 층마다 Wi-Fi 간섭 몬스터를 쓰러뜨리고, 링크 콘솔에서 채널맵을 고쳐 연결을 안정시켜야 다음 층이 열린다네." }),
-    el("ul", {},
-      el("li", { textContent: `${floor}층: Wi-Fi 간섭 몬스터 ${DUNGEON.FLOOR_MONSTERS}마리 (체력 ×${(1 + DUNGEON.FLOOR_HP_SCALE * (floor - 1)).toFixed(2)}), 숨은 Wi-Fi 공유기 ${wifiCountFor(floor)}대` }),
-      el("li", { textContent: "광역 공격 예고: 바닥에 빨간 원이 차오르면 원 밖으로! (광역은 회피율(RX)로 못 피한다)" }),
-      el("li", { textContent: "쓰러지면 Connection Timeout — 마을로 재연결되고 보유 CR2032의 10%를 잃는다." }),
+    header(fromPortal ? "🌀 다음 층 포털" : "⚔️ 37채널 호핑 던전", `${floor}층 · ${plan.name}${fromPortal ? ` — ${floor - 1}층 클리어!` : ` · 최고 기록 ${best}층`}`),
+    el("h3", { class: "dg-brief-title", textContent: `📋 몬스터 브리핑 — ${plan.roster.length}마리` }),
+    brief,
+    el("ul", { class: "dg-rules" },
+      el("li", { textContent: `숨은 Wi-Fi 공유기 ${wifiCountFor(floor)}대 · 다 쓰러뜨리면 링크 콘솔에서 채널맵을 고쳐 다음 층으로` }),
+      el("li", { textContent: "쓰러지면 Connection Timeout — 보유 CR2032의 10%를 잃고 마을 또는 체크포인트로." }),
       el("li", { textContent: `입장료 CR2032 ${DUNGEON.ENTRY_FEE}개 · 보유 ${p.cr2032}개${stars ? ` · 이 층 최고 ★${stars}` : ""}` })
     ),
     el("div", { class: "lib-actions" },

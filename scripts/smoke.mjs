@@ -1013,6 +1013,13 @@ await reset();
   const label = await page.locator("#modal-action").textContent();
   check("던전 관문 모달에 '던전 입장' 버튼이 있다", label.includes("던전"), label);
   await page.click("#modal-action");
+  const brief = await page.evaluate(() => ({ faces: [...document.querySelectorAll("#dungeon-panel .dg-mon-face")].length, kinds: [...document.querySelectorAll("#dungeon-panel .dg-mon")].map((e) => e.dataset.type), lv: document.querySelector("#dungeon-panel .dg-lv")?.textContent, btn: document.querySelector("#dungeon-panel .dungeon-enter")?.textContent }));
+  check("던전 입장 창에 몬스터 브리핑(종류·레벨·능력치)이 나오고, 확인 버튼이 곧 전투 시작이다 (Stage 12.3)",
+    brief.kinds.length >= 1 && brief.faces === brief.kinds.length && brief.kinds.every((k) => k) && /Lv \d/.test(brief.lv) && /전투 시작/.test(brief.btn), JSON.stringify(brief));
+  await page.keyboard.press("Escape");
+  await page.mouse.click(gp.x, gp.y);
+  await tick(20);
+  await page.click("#modal-action");
   await page.locator("#dungeon-panel .dungeon-enter").click();
   await tick(50);
   const s1 = await dState();
