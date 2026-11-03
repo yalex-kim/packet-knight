@@ -5,170 +5,274 @@ import * as THREE from "three";
 const LAND_SQUASH_TIME = 0.22;
 const LANDING_RING_TIME = 0.28;
 
-// knight(위치·회전) > rig(스쿼시/바운스, 발밑 피벗) > 몸통·머리·팔·다리 (Stage 11.6 복셀 인체형 — PRD §3.1)
+// knight(위치·회전) > rig(스쿼시/바운스, 발밑 피벗) > 몸통·머리·팔·다리
+// Stage 12.5 다시 만듦: 툰 셰이딩 + 외곽선, 큰 머리 비율, 옷마다 형태가 다른 의상 세트, 빛 번지는 무기 (PRD §3.1)
 // 앞쪽은 +z. 팔·다리는 어깨·엉덩이를 피벗으로 흔든다.
 export const knight = new THREE.Group();
 const rig = new THREE.Group();
 knight.add(rig);
 
+// 툰 셰이딩: 3단 명암 (일러스트처럼 또렷하게)
+const TOON = (() => {
+  const d = new Uint8Array([90, 170, 255]);
+  const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+const toon = (color) => new THREE.MeshToonMaterial({ color, gradientMap: TOON });
+const glowMat = (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity });
+const OUTLINE = new THREE.MeshBasicMaterial({ color: 0x15202e, side: THREE.BackSide });
+const OUTLINE_W = 0.022;
+
 const MAT = {
-  steel: new THREE.MeshLambertMaterial({ color: 0xc9d3de }),
-  steelDark: new THREE.MeshLambertMaterial({ color: 0x8e9aa8 }),
-  tabard: new THREE.MeshLambertMaterial({ color: 0xd8443c }),
-  tabardDark: new THREE.MeshLambertMaterial({ color: 0xa8322b }),
-  gold: new THREE.MeshLambertMaterial({ color: 0xf2c14e }),
-  boot: new THREE.MeshLambertMaterial({ color: 0x4a3a32 }),
-  glow: new THREE.MeshBasicMaterial({ color: 0x39d0ff }),
-  glowTip: new THREE.MeshBasicMaterial({ color: 0x7de3ff }),
-  blade: new THREE.MeshBasicMaterial({ color: 0x7de3ff, transparent: true, opacity: 0.92 })
+  under: toon(0x3a4458),        // 속옷(사슬 갑옷)
+  steel: toon(0xd3dce6), steelDark: toon(0x8e9aa8),
+  tabard: toon(0xd8443c), tabardDark: toon(0xa8322b), trim: toon(0xe8eef5),
+  gold: toon(0xf2c14e), goldDark: toon(0xc9962a),
+  leather: toon(0x6b4a32), boot: toon(0x3d2c22),
+  coin: toon(0xdfe4ea), coinDark: toon(0x9aa3ad),
+  plume: toon(0xd8443c),
+  glow: glowMat(0x39d0ff), glowTip: glowMat(0x7de3ff),
+  blade: glowMat(0x7de3ff), halo: new THREE.MeshBasicMaterial({ color: 0x7de3ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })
 };
-/** 상자 하나 — (cx, cy, cz)는 부모 기준 중심 */
-function box(parent, w, h, d, mat, cx, cy, cz) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+/** 상자 하나 + 외곽선 (빛나는 재질은 외곽선 없음) — (cx, cy, cz)는 부모 기준 중심 */
+function box(parent, w, h, d, mat, cx, cy, cz, outline = true) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(geo, mat);
   m.position.set(cx, cy, cz);
-  m.castShadow = true;
+  m.castShadow = !mat.isMeshBasicMaterial;
+  if (outline && !mat.isMeshBasicMaterial) {
+    const o = new THREE.Mesh(geo, OUTLINE);
+    o.scale.set(1 + OUTLINE_W * 2 / w, 1 + OUTLINE_W * 2 / h, 1 + OUTLINE_W * 2 / d);
+    m.add(o);
+  }
   parent.add(m);
   return m;
 }
-/** 피벗 그룹 (팔·다리) */
-function pivot(parent, x, y, z) {
-  const g = new THREE.Group();
-  g.position.set(x, y, z);
-  parent.add(g);
-  return g;
+function pivot(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
+function group(parent, visible = false) { const g = new THREE.Group(); parent.add(g); g.visible = visible; return g; }
+
+// ---------- 몸 (공통) ----------
+const HIP_Y = 0.4, SHOULDER_Y = 0.8;
+const legL = pivot(rig, -0.11, HIP_Y, 0), legR = pivot(rig, 0.11, HIP_Y, 0);
+for (const leg of [legL, legR]) {
+  box(leg, 0.17, 0.26, 0.19, MAT.under, 0, -0.13, 0);
+  box(leg, 0.19, 0.1, 0.21, MAT.steelDark, 0, -0.06, 0.01);          // 무릎 받이
+  box(leg, 0.21, 0.13, 0.27, MAT.boot, 0, -0.33, 0.03);               // 장화
+}
+const torso = pivot(rig, 0, HIP_Y, 0);
+box(torso, 0.44, 0.42, 0.28, MAT.under, 0, 0.2, 0);
+box(torso, 0.48, 0.08, 0.3, MAT.leather, 0, 0.02, 0);                 // 허리띠
+box(torso, 0.1, 0.08, 0.04, MAT.gold, 0, 0.02, 0.16);                  // 버클
+// 머리: 큰 투구 (귀여운 비율) + 바이저 + BLE 안테나 깃
+const head = pivot(torso, 0, 0.44, 0);
+const helm = group(head, true);
+box(helm, 0.5, 0.44, 0.48, MAT.steel, 0, 0.22, 0);
+box(helm, 0.54, 0.08, 0.52, MAT.steelDark, 0, 0.02, 0);               // 목가리개
+box(helm, 0.36, 0.08, 0.03, MAT.glow, 0, 0.24, 0.245);                 // 바이저 슬릿
+box(helm, 0.07, 0.16, 0.03, MAT.steelDark, 0, 0.12, 0.25);             // 코 보호대
+box(helm, 0.52, 0.06, 0.5, MAT.steelDark, 0, 0.45, 0);                 // 정수리 띠
+const plume = group(head, true);
+box(plume, 0.08, 0.12, 0.42, MAT.plume, 0, 0.52, -0.04);
+box(plume, 0.08, 0.1, 0.2, MAT.plume, 0, 0.6, -0.16);
+const antenna = box(head, 0.03, 0.38, 0.03, MAT.steelDark, 0.18, 0.62, -0.1, false);
+const antennaTip = box(head, 0.08, 0.08, 0.08, MAT.glowTip, 0.18, 0.83, -0.1);
+// 팔
+const armL = pivot(rig, -0.29, SHOULDER_Y, 0), armR = pivot(rig, 0.29, SHOULDER_Y, 0);
+for (const arm of [armL, armR]) {
+  box(arm, 0.13, 0.32, 0.15, MAT.under, 0, -0.16, 0);
+  box(arm, 0.15, 0.1, 0.17, MAT.leather, 0, -0.34, 0);                 // 장갑
 }
 
-const HIP_Y = 0.42, SHOULDER_Y = 0.86;
-const legL = pivot(rig, -0.12, HIP_Y, 0), legR = pivot(rig, 0.12, HIP_Y, 0);
-for (const leg of [legL, legR]) {
-  box(leg, 0.2, 0.3, 0.22, MAT.steelDark, 0, -0.15, 0);       // 다리 갑옷
-  box(leg, 0.22, 0.12, 0.28, MAT.boot, 0, -0.36, 0.02);        // 장화
+// ---------- 의상 세트 (옷마다 형태가 다르다 — 상점 그림처럼) ----------
+const COSTUME = {};
+const capes = [];   // 펄럭이는 망토 조각 (걸을 때 흔든다)
+/** 어깨 갑옷 한 쌍 */
+function pauldrons(g, mat, edge, size = 0.2) {
+  for (const sx of [-1, 1]) {
+    const p = pivot(g, sx * 0.29, 0.43, 0);
+    box(p, size, 0.1, size + 0.02, mat, sx * 0.02, 0.03, 0);
+    box(p, size + 0.02, 0.05, size + 0.04, edge, sx * 0.02, -0.03, 0);
+  }
 }
-// 몸통: 은색 갑옷 + 빨간 겉옷 + 금색 벨트 + 가슴 신호 문양
-const torso = pivot(rig, 0, HIP_Y, 0);
-box(torso, 0.5, 0.46, 0.3, MAT.steel, 0, 0.23, 0);
-box(torso, 0.42, 0.5, 0.04, MAT.tabard, 0, 0.2, 0.16);           // 겉옷 앞
-box(torso, 0.42, 0.5, 0.04, MAT.tabardDark, 0, 0.2, -0.16);      // 겉옷 뒤
-box(torso, 0.52, 0.07, 0.32, MAT.gold, 0, 0.03, 0);              // 벨트
-const signalEmblem = [
-  box(torso, 0.06, 0.06, 0.02, MAT.glow, 0, 0.27, 0.185),          // 문양: 점
-  box(torso, 0.18, 0.035, 0.02, MAT.glow, 0, 0.34, 0.185),         //        작은 호
-  box(torso, 0.28, 0.035, 0.02, MAT.glow, 0, 0.4, 0.185)           //        큰 호
-];
-box(torso, 0.62, 0.12, 0.34, MAT.steelDark, 0, 0.44, 0);         // 어깨 갑옷
-// 투구: 은색 + 바이저 슬릿 + 볏 + BLE 안테나 깃
-const head = pivot(torso, 0, 0.5, 0);
-box(head, 0.4, 0.38, 0.4, MAT.steel, 0, 0.19, 0);
-box(head, 0.3, 0.06, 0.02, MAT.glow, 0, 0.2, 0.205);             // 바이저 슬릿
-box(head, 0.06, 0.14, 0.02, MAT.steelDark, 0, 0.1, 0.205);       // 코 보호대
-MAT.plume = new THREE.MeshLambertMaterial({ color: 0xd8443c });
-box(head, 0.08, 0.1, 0.36, MAT.plume, 0, 0.42, -0.02);          // 볏
-const antenna = box(head, 0.035, 0.42, 0.035, MAT.steelDark, 0.14, 0.55, -0.08);
-antenna.castShadow = false;
-const antennaTip = box(head, 0.09, 0.09, 0.09, MAT.glowTip, 0.14, 0.78, -0.08);
-// 팔: 오른손에 ADV 패킷 검, 왼팔에 작은 방패
-const armL = pivot(rig, -0.33, SHOULDER_Y, 0), armR = pivot(rig, 0.33, SHOULDER_Y, 0);
-for (const arm of [armL, armR]) {
-  box(arm, 0.15, 0.36, 0.17, MAT.steel, 0, -0.18, 0);
-  box(arm, 0.16, 0.09, 0.18, MAT.steelDark, 0, -0.38, 0);        // 장갑
+/** 펄럭이는 망토: 위 조각은 어깨에, 아래 조각은 위 조각 끝에 매달린다 */
+function cape(g, mat, trimMat) {
+  const top = pivot(g, 0, 0.46, -0.17);
+  box(top, 0.5, 0.36, 0.04, mat, 0, -0.18, 0);
+  if (trimMat) for (const sx of [-1, 1]) box(top, 0.03, 0.36, 0.05, trimMat, sx * 0.25, -0.18, 0, false);
+  const low = pivot(top, 0, -0.36, 0);
+  box(low, 0.56, 0.42, 0.04, mat, 0, -0.21, 0);
+  if (trimMat) { box(low, 0.58, 0.035, 0.05, trimMat, 0, -0.41, 0, false); for (const sx of [-1, 1]) box(low, 0.03, 0.42, 0.05, trimMat, sx * 0.28, -0.21, 0, false); }
+  capes.push({ top, low });
+  return { top, low };
 }
-const sword = pivot(armR, 0, -0.4, 0.06);
-box(sword, 0.05, 0.12, 0.05, MAT.boot, 0, 0, 0);                  // 손잡이
-box(sword, 0.2, 0.04, 0.06, MAT.gold, 0, 0.07, 0);                // 코등이
-const blade = box(sword, 0.06, 0.5, 0.03, MAT.blade, 0, 0.34, 0);  // 빛나는 날
-blade.castShadow = false;
+
+// 붉은 기사복: 은 흉갑 + 빨간 겉옷(은 테두리) + 하늘색 신호 문양
+{
+  const g = COSTUME.classic = group(torso);
+  box(g, 0.46, 0.3, 0.3, MAT.steel, 0, 0.3, 0);
+  box(g, 0.36, 0.5, 0.03, MAT.tabard, 0, 0.12, 0.165);
+  box(g, 0.36, 0.5, 0.03, MAT.tabard, 0, 0.12, -0.165);
+  for (const sx of [-1, 1]) box(g, 0.03, 0.5, 0.035, MAT.trim, sx * 0.18, 0.12, 0.168, false);
+  box(g, 0.36, 0.03, 0.035, MAT.trim, 0, -0.13, 0.168, false);
+  box(g, 0.06, 0.06, 0.02, MAT.glow, 0, 0.24, 0.185);
+  box(g, 0.16, 0.03, 0.02, MAT.glow, 0, 0.31, 0.185);
+  box(g, 0.26, 0.03, 0.02, MAT.glow, 0, 0.37, 0.185);
+  pauldrons(g, MAT.steel, MAT.steelDark);
+}
+// SIG 블루 제복: 무릎까지 오는 파란 튜닉 + 은 테두리 + 가슴의 흰 룬 ᛒ + 깃
+{
+  const g = COSTUME.sig = group(torso);
+  const blue = toon(0x0b62d6), blueDark = toon(0x0a4aa3);
+  box(g, 0.47, 0.42, 0.31, blue, 0, 0.21, 0);
+  box(g, 0.47, 0.22, 0.31, blueDark, 0, -0.12, 0);                       // 치마
+  box(g, 0.49, 0.04, 0.33, MAT.trim, 0, -0.23, 0, false);
+  for (const sx of [-1, 1]) box(g, 0.035, 0.6, 0.02, MAT.trim, sx * 0.08, 0.1, 0.162, false);
+  box(g, 0.3, 0.07, 0.33, MAT.trim, 0, 0.42, 0);                          // 깃
+  const rune = glowMat(0xffffff);
+  box(g, 0.035, 0.24, 0.02, rune, 0, 0.24, 0.17);
+  for (const [x, y, r] of [[0.045, 0.32, -0.8], [0.045, 0.17, 0.8], [-0.035, 0.29, 0.8], [-0.035, 0.2, -0.8]]) { const k = box(g, 0.03, 0.12, 0.02, rune, x, y, 0.172); k.rotation.z = r; }
+  pauldrons(g, blue, MAT.trim, 0.18);
+}
+// 오라캐스트 보라: 보라 겉옷 + 라벤더 테두리 망토(등에 빛나는 방송 문양) + 금 걸쇠
+{
+  const g = COSTUME.auracast = group(torso);
+  const purple = toon(0x7a5cc9), purpleDark = toon(0x4f3a8f), lav = toon(0xd5c6ff);
+  box(g, 0.46, 0.42, 0.3, purple, 0, 0.21, 0);
+  box(g, 0.46, 0.18, 0.3, purpleDark, 0, -0.1, 0);
+  box(g, 0.5, 0.06, 0.34, lav, 0, 0.42, 0);
+  for (const sx of [-1, 1]) box(g, 0.08, 0.08, 0.04, MAT.gold, sx * 0.17, 0.4, 0.17);
+  const c = cape(g, purpleDark, lav);
+  const emb = pivot(c.low, 0, -0.18, -0.03);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.015, 6, 24), glowMat(0xd5c6ff)); ring.rotation.y = Math.PI; emb.add(ring);
+  box(emb, 0.04, 0.04, 0.02, glowMat(0xffffff), 0, 0, 0);
+  pauldrons(g, purple, lav, 0.18);
+}
+// 메시 숲지기: 초록 후드 튜닉(뾰족 두건, 민트 테두리) + 잎 문양 — 투구 대신 두건
+{
+  const g = COSTUME.mesh = group(torso);
+  const green = toon(0x2f8f5a), greenDark = toon(0x22704a), mint = glowMat(0x7dffb5);
+  box(g, 0.47, 0.42, 0.31, green, 0, 0.21, 0);
+  box(g, 0.47, 0.26, 0.31, greenDark, 0, -0.13, 0);
+  box(g, 0.49, 0.03, 0.33, mint, 0, -0.27, 0, false);
+  for (const [x, y, r] of [[0, 0.2, 0], [-0.06, 0.28, 0.6], [0.06, 0.28, -0.6], [0, 0.34, 0]]) { const l = box(g, 0.05, 0.12, 0.02, mint, x, y, 0.165); l.rotation.z = r; }
+  COSTUME.meshHood = group(head);
+  const h = COSTUME.meshHood;
+  box(h, 0.56, 0.5, 0.54, green, 0, 0.25, -0.02);
+  box(h, 0.4, 0.14, 0.38, green, 0, 0.55, -0.08);
+  box(h, 0.22, 0.12, 0.2, greenDark, 0, 0.66, -0.16);                      // 뾰족한 끝
+  box(h, 0.4, 0.34, 0.04, toon(0x16202c), 0, 0.22, 0.26);                  // 두건 안 그늘
+  box(h, 0.3, 0.06, 0.03, MAT.glow, 0, 0.24, 0.285);                       // 눈빛
+  for (const sx of [-1, 1]) box(h, 0.03, 0.4, 0.05, mint, sx * 0.24, 0.24, 0.265, false);
+  box(h, 0.5, 0.03, 0.05, mint, 0, 0.44, 0.265, false);
+}
+// RPA 그림자: 검은 망토와 두건, 하늘색 빛 테두리
+{
+  const g = COSTUME.stealth = group(torso);
+  const black = toon(0x262b36), blackDark = toon(0x16191f), cyan = glowMat(0x39d0ff);
+  box(g, 0.47, 0.42, 0.31, black, 0, 0.21, 0);
+  box(g, 0.49, 0.3, 0.33, blackDark, 0, -0.14, 0);
+  for (const sx of [-1, 1]) box(g, 0.03, 0.62, 0.02, cyan, sx * 0.1, 0.06, 0.168, false);
+  box(g, 0.5, 0.03, 0.35, cyan, 0, -0.3, 0, false);
+  cape(g, blackDark, cyan);
+  COSTUME.stealthHood = group(head);
+  const h = COSTUME.stealthHood;
+  box(h, 0.56, 0.5, 0.54, black, 0, 0.25, -0.02);
+  box(h, 0.36, 0.12, 0.36, black, 0, 0.55, -0.1);
+  box(h, 0.4, 0.34, 0.04, toon(0x0b0d12), 0, 0.22, 0.26);
+  box(h, 0.3, 0.06, 0.03, cyan, 0, 0.24, 0.285);
+  for (const sx of [-1, 1]) box(h, 0.03, 0.42, 0.05, cyan, sx * 0.24, 0.24, 0.265, false);
+}
+// 황금 CR2032: 층층이 겹친 금판 흉갑 + 가슴·어깨의 코인 전지 + 금 투구
+{
+  const g = COSTUME.gold = group(torso);
+  for (let i = 0; i < 4; i++) box(g, 0.48 - i * 0.02, 0.12, 0.32, i % 2 ? MAT.goldDark : MAT.gold, 0, 0.42 - i * 0.11, 0);
+  box(g, 0.44, 0.18, 0.3, MAT.goldDark, 0, -0.08, 0);
+  const coin = (parent, x, y, z, r, rotX) => {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.035, 18), MAT.coin);
+    c.rotation.x = rotX; c.position.set(x, y, z); c.castShadow = true; parent.add(c);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r * 0.6, 0.04, 18), MAT.coinDark); ring.rotation.x = rotX; ring.position.set(x, y, z + (rotX ? 0.003 : 0)); parent.add(ring);
+  };
+  for (const [x, y] of [[-0.11, 0.33], [0.11, 0.33], [0, 0.2]]) coin(g, x, y, 0.17, 0.065, Math.PI / 2);
+  for (const sx of [-1, 1]) {
+    const p = pivot(g, sx * 0.3, 0.44, 0);
+    box(p, 0.22, 0.12, 0.24, MAT.gold, sx * 0.02, 0.03, 0);
+    coin(p, sx * 0.02, 0.1, 0, 0.1, 0);
+  }
+}
+const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"] };
+
+// ---------- 무기 ----------
+const shieldParts = [];
+const shield = pivot(armL, -0.1, -0.22, 0.02);
+shieldParts.push(shield);
+box(shield, 0.06, 0.36, 0.3, MAT.tabard, 0, 0, 0);
+box(shield, 0.07, 0.38, 0.04, MAT.trim, 0, 0, 0.15, false);
+box(shield, 0.07, 0.38, 0.04, MAT.trim, 0, 0, -0.15, false);
+box(shield, 0.075, 0.1, 0.1, MAT.glow, -0.01, 0.02, 0);
+
+/** 빛나는 날: 심 + 덧씌운 빛 번짐 */
+function glowBlade(parent, w, h, cy, mat = MAT.blade) {
+  box(parent, w, h, 0.03, mat, 0, cy, 0);
+  const halo = new THREE.Mesh(new THREE.BoxGeometry(w * 2.6, h * 1.08, 0.08), MAT.halo);
+  halo.position.set(0, cy, 0); parent.add(halo);
+}
+const sword = pivot(armR, 0, -0.38, 0.06);
 sword.rotation.x = Math.PI / 2.4;                                  // 앞으로 기울여 든다
-// 무기 모양 (Stage 12.2 상점가): 단검(짧은 날 둘)·장궁(활대 + 시위)·부채(펼친 날개)
-const weaponAlt = {
-  // 2M PHY 쌍단검: 금빛 날 + 갈색 손잡이, 양손에 하나씩 (아이템 그림처럼)
+const weaponSets = {
+  sword: (() => { const g = group(sword, true);
+    box(g, 0.05, 0.14, 0.05, MAT.leather, 0, 0, 0); box(g, 0.07, 0.06, 0.07, MAT.gold, 0, -0.09, 0);
+    box(g, 0.26, 0.05, 0.07, MAT.gold, 0, 0.09, 0); box(g, 0.06, 0.06, 0.08, MAT.gold, -0.13, 0.11, 0); box(g, 0.06, 0.06, 0.08, MAT.gold, 0.13, 0.11, 0);
+    glowBlade(g, 0.085, 0.62, 0.43); return [g]; })(),
   dagger: (() => {
-    const mk = (parent) => { const g = new THREE.Group(); parent.add(g); g.position.set(0, -0.4, 0.06); g.rotation.x = Math.PI / 2.4;
-      box(g, 0.05, 0.12, 0.05, MAT.boot, 0, 0, 0); box(g, 0.16, 0.04, 0.06, MAT.gold, 0, 0.07, 0);
-      const b = box(g, 0.07, 0.3, 0.03, MAT.blade, 0, 0.25, 0); b.castShadow = false; box(g, 0.04, 0.06, 0.03, MAT.blade, 0, 0.42, 0); return g; };
-    return [mk(armR), mk(armL)]; })(),
-  // Coded 장궁: 왼손에 갈색 활대(위아래로 휜 마디) + 민트 시위 + 오른손에 민트 화살
+    const mk = (parent) => { const g = pivot(parent, 0, -0.38, 0.06); g.rotation.x = Math.PI / 2.4;
+      box(g, 0.05, 0.12, 0.05, MAT.leather, 0, 0, 0); box(g, 0.18, 0.04, 0.06, MAT.gold, 0, 0.08, 0);
+      glowBlade(g, 0.075, 0.32, 0.27, glowMat(0xffd76b)); return g; };
+    const a = mk(armR), b = mk(armL); a.visible = b.visible = false; return [a, b]; })(),
   bow: (() => {
-    const g = new THREE.Group(); armL.add(g); g.position.set(-0.04, -0.4, 0.14);
-    const segs = [[0, 0, 0.08], [0.18, 0.04, 0.06], [0.34, 0.1, 0.05], [0.46, 0.17, 0.045]];
-    for (const sy of [1, -1]) for (const [y, z, w] of segs) box(g, w, 0.17, w, MAT.boot, 0, sy * y, -z);
-    box(g, 0.07, 0.1, 0.07, MAT.gold, 0, 0, 0.02);
-    const string = box(g, 0.014, 1.0, 0.014, MAT.blade, 0, 0, -0.2); string.castShadow = false;
-    const arrow = new THREE.Group(); armR.add(arrow); arrow.position.set(0, -0.38, 0.1); arrow.rotation.x = Math.PI / 2;
-    box(arrow, 0.025, 0.6, 0.025, MAT.boot, 0, 0.2, 0); box(arrow, 0.07, 0.09, 0.03, MAT.blade, 0, 0.53, 0); box(arrow, 0.08, 0.08, 0.01, MAT.blade, 0, -0.08, 0);
+    const g = pivot(armL, -0.04, -0.38, 0.14); g.visible = false;
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0.55, -0.14), new THREE.Vector3(0, 0, 0.22), new THREE.Vector3(0, -0.55, -0.14));
+    const limb = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.035, 6), MAT.leather); limb.castShadow = true; g.add(limb);
+    box(g, 0.07, 0.14, 0.07, MAT.gold, 0, 0, 0.13);
+    const str = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1.1, 4), glowMat(0x7dffb5)); str.position.z = -0.14; g.add(str);
+    const arrow = pivot(armR, 0, -0.36, 0.1); arrow.rotation.x = Math.PI / 2; arrow.visible = false;
+    box(arrow, 0.022, 0.62, 0.022, MAT.leather, 0, 0.2, 0, false);
+    glowBlade(arrow, 0.06, 0.1, 0.55, glowMat(0x7dffb5));
+    box(arrow, 0.09, 0.08, 0.01, glowMat(0x7dffb5), 0, -0.07, 0);
     return [g, arrow]; })(),
-  // 확장 광고 부채: 손잡이 + 펼친 갈색 살 + 보랏빛 날 세 장
-  fan: (() => {
-    const g = new THREE.Group(); sword.add(g);
-    box(g, 0.06, 0.16, 0.05, MAT.boot, 0, 0.02, 0);
-    for (const a of [-0.7, -0.35, 0, 0.35, 0.7]) { const r = box(g, 0.03, 0.3, 0.02, MAT.boot, 0, 0.2, 0); r.rotation.z = a; r.position.x = -Math.sin(a) * 0.1; }
-    for (const a of [-0.5, 0, 0.5]) { const r = box(g, 0.09, 0.46, 0.02, MAT.blade, 0, 0.36, 0.01); r.rotation.z = a; r.position.set(-Math.sin(a) * 0.2, 0.06 + Math.cos(a) * 0.3, 0.01); r.castShadow = false; }
+  fan: (() => { const g = group(sword);
+    box(g, 0.06, 0.16, 0.05, MAT.leather, 0, 0.02, 0);
+    for (const a of [-0.8, -0.4, 0, 0.4, 0.8]) { const r = box(g, 0.025, 0.32, 0.02, MAT.leather, -Math.sin(a) * 0.12, 0.14 + Math.cos(a) * 0.12, 0, false); r.rotation.z = a; }
+    const crystal = glowMat(0xb49bff);
+    for (const a of [-0.55, 0, 0.55]) {
+      const b = pivot(g, -Math.sin(a) * 0.22, 0.12 + Math.cos(a) * 0.3, 0); b.rotation.z = a;
+      const geo = new THREE.ConeGeometry(0.07, 0.42, 4); const m = new THREE.Mesh(geo, crystal); m.position.y = 0.06; b.add(m);
+      const halo = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.48, 4), MAT.halo); halo.position.y = 0.06; b.add(halo);
+    }
     return [g]; })()
 };
-for (const parts of Object.values(weaponAlt)) for (const g of parts) g.visible = false;
-const shieldParts = [];
+
 /** 무기 외형 — kind: sword · dagger · bow · fan (core/shop.js WEAPONS[].blade) */
 export function setWeapon(w) {
   MAT.blade.color.setHex(w.blade.color);
+  MAT.halo.color.setHex(w.blade.color);
   const kind = w.blade.kind;
-  blade.visible = kind === "sword";
-  sword.visible = kind === "sword" || kind === "fan";   // 쌍단검·장궁은 자기 손잡이가 따로 있다
-  for (const [k, parts] of Object.entries(weaponAlt)) for (const g of parts) g.visible = k === kind;
-  for (const p of shieldParts) p.visible = kind !== "bow" && kind !== "dagger";   // 활·쌍단검은 방패 대신
+  for (const [k, parts] of Object.entries(weaponSets)) for (const g of parts) g.visible = k === kind;
+  shield.visible = kind === "sword" || kind === "fan";               // 활·쌍단검은 방패 대신
 }
-// 옷 장식 (Stage 12.4 — 상점 그림처럼): 망토·후드·동전 갑옷·룬 문양·빛나는 테두리
-const OUT = {
-  cape: new THREE.MeshLambertMaterial({ color: 0x7a5cc9 }),
-  trim: new THREE.MeshBasicMaterial({ color: 0x39d0ff }),
-  coin: new THREE.MeshLambertMaterial({ color: 0xd9dde2 }),
-  rune: new THREE.MeshBasicMaterial({ color: 0xffffff })
-};
-const acc = {};
-function group(parent) { const g = new THREE.Group(); parent.add(g); g.visible = false; return g; }
-// 망토 (오라캐스트·RPA 그림자): 어깨에서 등 뒤로 늘어진 판 두 장 + 깃
-acc.cape = group(torso);
-box(acc.cape, 0.56, 0.7, 0.04, OUT.cape, 0, 0.12, -0.22);
-box(acc.cape, 0.62, 0.36, 0.04, OUT.cape, 0, -0.32, -0.26);
-box(acc.cape, 0.66, 0.08, 0.36, OUT.cape, 0, 0.5, -0.02);
-acc.capeTrim = group(torso);                                        // 망토 아래 빛나는 단
-box(acc.capeTrim, 0.64, 0.04, 0.05, OUT.trim, 0, -0.5, -0.27);
-box(acc.capeTrim, 0.04, 1.0, 0.05, OUT.trim, 0.3, 0, -0.25);
-box(acc.capeTrim, 0.04, 1.0, 0.05, OUT.trim, -0.3, 0, -0.25);
-// 후드 (메시 숲지기): 투구 위로 덮는 두건 + 잎 문양
-acc.hood = group(head);
-box(acc.hood, 0.48, 0.12, 0.48, MAT.tabard, 0, 0.42, -0.02);
-box(acc.hood, 0.08, 0.36, 0.46, MAT.tabard, 0.23, 0.22, -0.02);
-box(acc.hood, 0.08, 0.36, 0.46, MAT.tabard, -0.23, 0.22, -0.02);
-box(acc.hood, 0.46, 0.4, 0.08, MAT.tabardDark, 0, 0.2, -0.24);
-acc.leaf = group(torso);
-for (const [x, y, r] of [[0, 0.3, 0], [-0.06, 0.36, 0.6], [0.06, 0.36, -0.6]]) { const l = box(acc.leaf, 0.05, 0.12, 0.02, OUT.trim, x, y, 0.185); l.rotation.z = r; }
-// 동전 갑옷 (황금 CR2032): 가슴·어깨에 코인 전지
-acc.coins = group(torso);
-for (const [x, y] of [[-0.11, 0.3], [0.11, 0.3], [0, 0.16], [-0.11, 0.02], [0.11, 0.02]]) {
-  const c = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 14), OUT.coin); c.rotation.x = Math.PI / 2; c.position.set(x, y + 0.04, 0.19); acc.coins.add(c);
-}
-for (const sx of [-1, 1]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 14), OUT.coin); c.position.set(sx * 0.3, 0.51, 0); acc.coins.add(c); }
-// 룬 문양 (SIG 블루): 가슴에 흰 ᛒ — 세로 막대 + 꺾인 획
-acc.rune = group(torso);
-box(acc.rune, 0.035, 0.26, 0.02, OUT.rune, 0, 0.27, 0.186);
-for (const [x, y, r] of [[0.05, 0.36, -0.75], [0.05, 0.2, 0.75], [-0.04, 0.32, 0.75], [-0.04, 0.22, -0.75]]) { const k = box(acc.rune, 0.03, 0.13, 0.02, OUT.rune, x, y, 0.187); k.rotation.z = r; }
-const OUTFIT_ACC = {
-  classic: ["signal"], sig: ["rune"], auracast: ["cape", "signal"], mesh: ["hood", "leaf"], stealth: ["cape", "capeTrim"], gold: ["coins"]
-};
-
-/** 옷 외형 (core/shop.js OUTFITS) */
+/** 옷 외형 (core/shop.js OUTFITS) — 의상 세트를 통째로 바꾼다 */
 export function setOutfit(o) {
-  MAT.tabard.color.setHex(o.tabard);
-  MAT.tabardDark.color.setHex(o.tabardDark);
+  const on = new Set(OUTFIT_SET[o.id] ?? ["classic"]);
+  for (const [k, g] of Object.entries(COSTUME)) g.visible = on.has(k);
+  const hooded = on.has("meshHood") || on.has("stealthHood");
+  helm.visible = plume.visible = !hooded;
+  antenna.visible = antennaTip.visible = true;
   MAT.plume.color.setHex(o.plume);
-  MAT.steel.color.setHex(o.steel);
-  const on = new Set(OUTFIT_ACC[o.id] ?? ["signal"]);
-  for (const [k, g] of Object.entries(acc)) g.visible = on.has(k);
-  for (const m of signalEmblem) m.visible = on.has("signal");
-  OUT.cape.color.setHex(o.id === "stealth" ? 0x1a1d24 : o.tabardDark);
-  OUT.trim.color.setHex(o.id === "mesh" ? 0x7dffb5 : 0x39d0ff);
+  MAT.tabard.color.setHex(o.tabard);                                 // 방패 색도 옷을 따른다
+  MAT.steel.color.setHex(o.id === "gold" ? 0xf2c14e : 0xd3dce6);    // 황금 갑옷이면 투구도 금빛
 }
-shieldParts.push(box(armL, 0.06, 0.34, 0.3, MAT.tabard, -0.1, -0.22, 0.02));   // 방패
-shieldParts.push(box(armL, 0.065, 0.1, 0.1, MAT.glow, -0.135, -0.2, 0.02));   // 방패 문양
+setOutfit({ id: "classic", plume: 0xd8443c, tabard: 0xd8443c });
 
 // 착지 충격파 링
 export const landingRing = new THREE.Mesh(
@@ -251,6 +355,9 @@ export function syncKnight(m, isMoving, dt) {
   armL.rotation.x = -swing * 0.6 * k;
   armR.rotation.x = !m.grounded ? -0.9 : swing * 0.45;
   head.rotation.y = isMoving ? 0 : Math.sin(idleTime * 0.7) * 0.12;
+  // 망토 펄럭임: 걸으면 뒤로 날리고, 서 있으면 살랑
+  const flap = isMoving ? 0.35 + Math.sin(idleTime * 9) * 0.08 : 0.04 + Math.sin(idleTime * 2) * 0.03;
+  for (const c of capes) { c.top.rotation.x = -flap; c.low.rotation.x = -flap * 0.8; }
   antennaTip.scale.setScalar(1 + 0.25 * Math.max(0, Math.sin(idleTime * 5)));   // 광고 패킷처럼 깜빡
 }
 

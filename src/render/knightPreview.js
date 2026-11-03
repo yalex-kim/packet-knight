@@ -26,7 +26,7 @@ export function startPreview(canvas) {
   scene.add(model, base);
   const loop = (t) => {
     raf = requestAnimationFrame(loop);
-    model.rotation.y = t * 0.0006;
+    model.rotation.y = window.__previewYaw ?? Math.sin(t * 0.0007) * 0.9 + 0.35;   // 정면 위주로 좌우로 살짝 돈다 (뒤로 돌지 않게)
     renderer.render(scene, camera);
   };
   raf = requestAnimationFrame(loop);
