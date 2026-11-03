@@ -435,7 +435,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
 // 저장소 루트를 정적 서버처럼 제공 (index.html + src/*.js 모듈)
-const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json" };
+const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json", ".webp": "image/webp" };
 await page.route((url) => url.origin === ORIGIN, (r) => {
   const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
   const file = path.resolve(ROOT, rel);
