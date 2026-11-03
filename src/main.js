@@ -29,6 +29,7 @@ import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
 import { weaponById, outfitById } from "./core/shop.js";
+import { initInventory, openInventory, closeInventory, isInventoryOpen } from "./ui/inventory.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
@@ -590,6 +591,12 @@ initShop({
   onOpenChange: (open) => { setInputEnabled(!open); inputLocked = open; if (open) { clearMoveTarget(); hud.hideModal(); } }
 });
 applyLooks();
+initInventory({
+  getProgress: () => progress,
+  getStats: () => effectiveStats(progress),
+  onChange: () => { persist(); applyLooks(); sfx("select"); },
+  onOpenChange: (open) => { setInputEnabled(!open); inputLocked = open; if (open) { clearMoveTarget(); hud.hideModal(); } }
+});
 
 function talkTo(v) {
   hud.hideModal();
@@ -1155,6 +1162,7 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   devCard: { open: () => goToLandmark(landmark("billboard").info), isOpen: isDevCardOpen },
+  inventory: { open: openInventory, close: closeInventory, isOpen: isInventoryOpen },
   shop: { open: openShop, close: closeShop, isOpen: isShopOpen, state: () => structuredClone(progress.shop) },
   setView: (yaw, distance) => { orbit.yaw = yaw; if (distance) setOrbitDistance(distance); },   // 스크린샷·테스트용 카메라 방향
   quality: () => perf.level,

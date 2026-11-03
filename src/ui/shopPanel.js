@@ -62,7 +62,7 @@ function render() {
         : `<button type="button" class="lib-btn primary" data-act="buy" data-id="${it.id}" ${p.cr2032 < it.price ? "disabled" : ""}>🪙 ${it.price} 사기</button>`;
       const swatch = isW ? "" : `<span class="shop-swatch" style="background:#${it.tabard.toString(16).padStart(6, "0")};border-color:#${it.plume.toString(16).padStart(6, "0")}"></span>`;
       return `<div class="shop-item${on ? " on" : ""}" data-id="${it.id}">
-        <div class="shop-top"><span class="shop-icon">${it.icon}</span>${swatch}<b>${esc(it.name)}</b></div>
+        <div class="shop-top"><img class="shop-item-ico" src="./src/assets/items/item-${it.id}-v1.webp" alt="" width="256" height="256" loading="lazy" />${swatch}<b>${esc(it.name)}</b></div>
         <p>${esc(it.desc)}</p>
         ${isW ? `<p class="shop-stats">${weaponStats(it)}</p><p class="shop-lore">📖 ${esc(it.lore)} <a href="${chapterUrl(it.chapter)}" target="_blank" rel="noopener">교과서 ↗</a></p>` : ""}
         <div class="shop-buy">${btn}</div></div>`;

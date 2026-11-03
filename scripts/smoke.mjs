@@ -1763,6 +1763,31 @@ await page.waitForFunction(() => window.__PK);
     `CR2032 80 → ${after.cr} · 투사체 ${shots}발 · 옷 ${after2.outfit}`);
 }
 
+// ---------- Stage 12.4: 가방 ----------
+{
+  await reset();
+  await page.evaluate(() => { const p = window.__PK.progress(); p.shop = { weapons: ["adv", "coded"], weapon: "adv", outfits: ["classic", "mesh"], outfit: "classic" }; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  await page.keyboard.press("KeyI");
+  const opened = await page.evaluate(() => window.__PK.inventory.isOpen());
+  const items = await page.locator("#inventory .inv-item").count();
+  await page.locator('#inventory .inv-item[data-kind="weapon"][data-id="coded"]').click();
+  await page.locator('#inventory .inv-item[data-kind="outfit"][data-id="mesh"]').click();
+  const sh = await page.evaluate(() => window.__PK.shop.state());
+  const icons = await page.evaluate(async () => {
+    const imgs = [...document.querySelectorAll("#inventory .inv-item img")];
+    await Promise.all(imgs.map((i) => (i.complete ? 0 : new Promise((ok) => { i.onload = i.onerror = ok; }))));
+    return imgs.filter((i) => i.naturalWidth > 0).length;
+  });
+  await page.locator('#inventory .inv-tab[data-id="bag"]').click();
+  const bag = await page.locator("#inventory .inv-dex .inv-mon").count();
+  await page.keyboard.press("KeyI");
+  const closed = !(await page.evaluate(() => window.__PK.inventory.isOpen()));
+  check("가방(I 키): 가진 무기·옷 4개가 그림과 함께 보이고, 눌러서 바꿔 끼며(장궁·숲지기), 소지품 탭에 도감, I로 닫힌다",
+    opened && items === 4 && icons === 4 && sh.weapon === "coded" && sh.outfit === "mesh" && bag >= 5 && closed, `아이템 ${items} · 그림 ${icons} · ${sh.weapon}/${sh.outfit} · 도감 ${bag}`);
+}
+
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
 {
   const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });

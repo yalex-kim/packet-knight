@@ -502,8 +502,8 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.prestart :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-sound) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
   body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
@@ -809,6 +809,62 @@
   .shop-buy { margin-top: auto; padding-top: 4px; display: flex; justify-content: flex-end; }
   .shop-buy .lib-btn:disabled { opacity: .5; }
   @media (max-width: 640px) { .shop-grid { grid-template-columns: 1fr; } }
+  /* 가방 (Stage 12.4) */
+  #btn-bag { position: fixed; right: 100px; bottom: 120px; z-index: 20; display: flex; align-items: center; gap: 4px; padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    background: var(--glass); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+  #btn-bag:active { transform: scale(.96); }
+  .inv-panel { max-width: 760px; }
+  .inv-tabs { display: flex; gap: 6px; margin: 2px 0 10px; }
+  .inv-tab { appearance: none; border: 1px solid #23476e; background: rgba(14, 34, 60, .6); color: #cfe8ff; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .inv-tab.on { background: #1b4777; border-color: #39d0ff; color: #fff; }
+  .inv-body h3 { margin: 14px 0 8px; font-size: 14px; color: #ffd76b; }
+  .inv-body h3 small { color: #7fa6cc; font-weight: 500; margin-left: 6px; }
+  .inv-equip { display: grid; grid-template-columns: 200px 1fr; gap: 14px; align-items: center; }
+  .inv-preview { width: 200px; height: 240px; border-radius: 14px; background: radial-gradient(circle at 50% 40%, #1b3a5e, #0a1626); border: 1px solid #23476e; }
+  .inv-slots { display: flex; flex-direction: column; gap: 10px; }
+  .inv-slot { display: flex; gap: 10px; align-items: center; background: rgba(14, 34, 60, .6); border: 1px solid #23476e; border-radius: 12px; padding: 8px; }
+  .inv-slot-ico { width: 64px; height: 64px; border-radius: 10px; flex: none; }
+  .inv-slot small { display: block; color: #7fa6cc; font-size: 11px; }
+  .inv-slot b { display: block; color: #fff; }
+  .inv-slot span { display: block; font-size: 12px; color: #a4c7e8; line-height: 1.5; }
+  .inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .inv-item { position: relative; appearance: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 12px; color: #cfe8ff;
+    background: rgba(14, 34, 60, .6); border: 1px solid #23476e; }
+  .inv-item:hover { border-color: #39d0ff; }
+  .inv-item.on { border-color: #7dffb5; box-shadow: 0 0 12px rgba(125, 255, 181, .25); }
+  .inv-item i { position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 10px; font-weight: 800; color: #04121f; background: #7dffb5; border-radius: 999px; padding: 1px 6px; }
+  .inv-ico { width: 64px; height: 64px; border-radius: 10px; }
+  .inv-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #1b3554; }
+  .inv-row-ico { font-size: 22px; }
+  .inv-row b { display: block; color: #fff; font-size: 13.5px; }
+  .inv-row small { color: #a4c7e8; font-size: 12px; }
+  .inv-lv { margin-left: auto; display: flex; gap: 3px; }
+  .inv-lv i { width: 10px; height: 14px; border-radius: 3px; background: #1b3554; }
+  .inv-lv i.on { background: linear-gradient(#ffd76b, #f2a81d); }
+  .inv-stats { display: flex; flex-wrap: wrap; gap: 6px; }
+  .inv-stat { background: rgba(14, 34, 60, .6); border: 1px solid #23476e; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; }
+  .inv-stat b { color: #7dd8ff; }
+  .inv-note { margin-top: 10px; font-size: 13px; color: #c9b8ff; }
+  .inv-coins { display: flex; gap: 10px; align-items: center; background: rgba(242, 193, 78, .1); border: 1px solid rgba(242, 193, 78, .4); border-radius: 12px; padding: 10px 12px; }
+  .inv-coins > span { font-size: 28px; }
+  .inv-coins b { display: block; color: #ffd76b; font-size: 16px; }
+  .inv-coins small { color: #a4c7e8; font-size: 12px; }
+  .inv-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .inv-badges span { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(14, 34, 60, .6); color: #6f8aa6; border: 1px solid #1b3554; }
+  .inv-badges span.on { color: #fff; border-color: #ffd76b; }
+  .inv-dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .inv-mon { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; padding: 8px; border-radius: 12px; background: rgba(14, 34, 60, .6); border: 1px solid #23476e; }
+  .inv-mon img { width: 64px; height: 64px; border-radius: 10px; }
+  .inv-mon-emoji { font-size: 40px; line-height: 64px; }
+  .inv-mon b { font-size: 12.5px; color: #fff; }
+  .inv-mon small { font-size: 11px; color: #a4c7e8; }
+  .inv-mon.unseen img, .inv-mon.unseen .inv-mon-emoji { filter: brightness(0) opacity(.5); }
+  .shop-item-ico { width: 56px; height: 56px; border-radius: 10px; flex: none; }
+  @media (max-width: 640px) {
+    #btn-bag { right: 96px; bottom: 120px; padding: 6px 10px; }
+    .inv-equip { grid-template-columns: 1fr; }
+    .inv-preview { justify-self: center; width: 180px; height: 210px; }
+  }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }
@@ -890,12 +946,14 @@
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
     📜 퀘스트: <b>Q 키 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지<br />
     ⚡ 돌진: <b>E 키 / 돌진 버튼</b> (Q5 보상) · 🔒 보안의 감옥(북동) · 🪫 지하묘지(남동)<br />
+    🎒 가방: <b>I 키 / 가방 버튼</b> — 무기·옷 바꿔 끼기, RF 부품, 소지품<br />
     🔊 소리: <b>M 키 / 우상단 버튼</b> · 휠 줌은 맵 위에서만<br />
     <button type="button" class="tut-replay" data-action="tutorial">📘 설명서·튜토리얼 다시 보기</button>
   </div>
 </div>
 
 <button id="btn-sound" type="button" aria-label="소리 켜기/끄기 (M)" aria-pressed="true">🔊</button>
+<button id="btn-bag" type="button" aria-label="가방 (I)">🎒<span>가방</span></button>
 <button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">?</button>
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
 <img id="corner-emblem" src="./src/assets/emblem-v1.webp" alt="Packet Knight" width="491" height="512" />
