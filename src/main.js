@@ -27,6 +27,8 @@ import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNex
 import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
+import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
+import { weaponById, outfitById } from "./core/shop.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
@@ -413,10 +415,12 @@ function performFire(target = null) {
   if (inputLocked) return;
   // 퀘스트 보상: DLE(사거리) · ADV 패킷 강화(데미지 계수) — Stage 9
   const perks = progress.quests.perks;
+  const wpn = weaponById(progress.shop.weapon);   // 상점 무기 (Stage 12.2)
   const shot = fireAdvPacket(activeBattle(), motor, target, {
-    cooldownMul: ciIntervalMul(effectiveStats(progress).ci),   // CI 스탯 (Stage 11.15)
-    rangeMul: perks.dle ? PERKS.dle.rangeMul : 1,
-    ...(perks.advBoost ? { coef: PERKS.advBoost.coef } : {})
+    cooldownMul: ciIntervalMul(effectiveStats(progress).ci) * wpn.cooldownMul,   // CI 스탯 (Stage 11.15) × 무기
+    spread: wpn.spread,
+    rangeMul: (perks.dle ? PERKS.dle.rangeMul : 1) * wpn.rangeMul,
+    coef: (perks.advBoost ? PERKS.advBoost.coef : 1) * wpn.coef
   });
   if (shot) { clearMoveTarget(); sfx("fire"); }
 }
@@ -576,6 +580,18 @@ function pushOutOfVillagers() {
   }
 }
 
+// ---------- 상점가 (Stage 12.2) ----------
+function applyLooks() {
+  knightView.setWeapon(weaponById(progress.shop.weapon));
+  knightView.setOutfit(outfitById(progress.shop.outfit));
+}
+initShop({
+  getProgress: () => progress,
+  onChange: () => { persist(); applyLooks(); hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]); sfx("coin"); },
+  onOpenChange: (open) => { setInputEnabled(!open); inputLocked = open; if (open) { clearMoveTarget(); hud.hideModal(); } }
+});
+applyLooks();
+
 function talkTo(v) {
   hud.hideModal();
   clearMoveTarget();
@@ -622,7 +638,7 @@ function enterNextFloor() {
 function leaveDungeon(ko = false) {
   run = null;
   setAmbience(false);
-  const gate = { x: -9.0, z: -7.6 }; // 던전 관문 위 (layout.js dungeonGate walkPos)
+  const gate = landmark("dungeonGate").info.walkPos; // 던전 관문 위
   resetMotor(motor, { x: gate.x, y: groundHeightAt(gate.x, gate.z), z: gate.z });
   resetOrbit(motor.y);
   clearMoveTarget();
@@ -892,6 +908,7 @@ hud.setModalHandlers({
     else if (id === "prison") { hud.hideModal(); prisonUi.openPrison(); }
     else if (id === "crypt") { hud.hideModal(); cryptUi.openCrypt(); }
     else if (id === "gattBox") openGattBox();
+    else if (id === "weaponShop" || id === "outfitShop") { hud.hideModal(); openShop(id === "weaponShop" ? "weapon" : "outfit"); }
   },
   // 모달의 "교과서 챕터 보기" 클릭도 학습 지표로 센다 (PRD §1.3 ②)
   link: (href) => {
@@ -1129,7 +1146,7 @@ window.__PK = {
     /** 테스트용: 플레이어 HP 직접 설정 (Connection Timeout 재현) */
     setHp: (hp) => { battle.player.hp = hp; },
     state: () => ({
-      hp: battle.player.hp, maxHp: battle.player.maxHp, drops: activeBattle().drops.length,
+      hp: battle.player.hp, maxHp: battle.player.maxHp, drops: activeBattle().drops.length, projectiles: activeBattle().projectiles.length,
       monsters: activeBattle().monsters.map((m) => ({ id: m.id, hp: m.hp, maxHp: m.maxHp, state: m.state, x: m.x, z: m.z, type: m.type }))
     })
   },
@@ -1139,6 +1156,7 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   devCard: { open: () => goToLandmark(landmark("billboard").info), isOpen: isDevCardOpen },
+  shop: { open: openShop, close: closeShop, isOpen: isShopOpen, state: () => structuredClone(progress.shop) },
   setView: (yaw, distance) => { orbit.yaw = yaw; if (distance) setOrbitDistance(distance); },   // 스크린샷·테스트용 카메라 방향
   quality: () => perf.level,
   resetToStart,

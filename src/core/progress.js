@@ -1,6 +1,7 @@
 // 진행도 — 퀴즈 보상 스탯, 스킬 슬롯, 학습 지표. 저장소는 주입한다(브라우저 localStorage / Node Map).
 // 순수 로직 (THREE·DOM 의존 없음)
 
+import { emptyShop, validShop } from "./shop.js";
 import {
   PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
   GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, RSSI_JOB, CONN_INTERVAL } from "./balance.js";
@@ -46,6 +47,7 @@ export function createProgress() {
     dungeon: emptyDungeon(),
     gear: emptyGear(),
     alloc: emptyAlloc(),
+    shop: emptyShop(),   // Stage 12.2 상점가 — 옛 세이브는 기본값으로 (버전 그대로)
     lab: { tries: 0, success: 0, spent: 0 },
     quests: createQuestState(),
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
@@ -104,6 +106,7 @@ function validate(raw) {
     dungeon: { maxFloor: d.maxFloor, attempts: d.attempts, clears: d.clears, kos: d.kos, rollbacks: Number.isInteger(d.rollbacks) ? d.rollbacks : 0, stars: { ...(d.stars ?? {}) } },
     gear: { ...emptyGear(), ...raw.gear },
     alloc: { ...emptyAlloc(), ...raw.alloc },
+    shop: validShop(raw.shop),
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
     quests: { active: q.active, progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) }, claimed: { ...(q.claimed ?? {}) } },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),

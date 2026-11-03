@@ -98,7 +98,7 @@ export const LANDMARKS = [
       lore: "BLE 연결은 연결 이벤트(연결 간격 375µs~4s, Core 6.2+)마다 채널 선택 알고리즘(CSA #1/#2)으로 37개 데이터 채널(2404~2478MHz) 중 다음 채널로 건너뜁니다. 간섭이 심한 채널은 채널맵에서 빼는 적응형 호핑(AFH)입니다. (초당 1600회 호핑은 BR/EDR Classic의 이야기!)",
       link: CHAPTER("hopping.html"),
       action: { id: "dungeon", label: "⚔️ 던전 입장" },
-      walkPos: { x: WORLD.DUNGEON_X, y: S, z: -7.6 }
+      walkPos: { x: WORLD.DUNGEON_X, y: S, z: WORLD.DUNGEON_Z + 5.4 }
     }
   }
 ];
@@ -167,6 +167,37 @@ export const VILLAGERS = Object.freeze([
   { id: "walkerB",   name: "QA 엔지니어",   role: "호환성 테스트 담당",    route: [[-13.0, -3.6], [-6.6, -3.6]], shirt: 0xd9567a, hair: 0x1f1a17, face: "qa",        topics: ["security", "coexistence", "audio", "hopping"] }
 ]);
 
+/** 상점가 (Stage 12.2) — 북서쪽(옛 던전 자리)에 모아, 남쪽(기본 카메라 쪽)을 바라본다 */
+export const SHOPS = Object.freeze({ weapon: { x: -11.4, z: -11.5 }, outfit: { x: -7.4, z: -11.5 } });   // 북서쪽 옛 던전 자리 (사용자 요청)
+LANDMARKS.push({
+  id: "weaponShop",
+  pos: { x: SHOPS.weapon.x, y: S, z: SHOPS.weapon.z },
+  info: {
+    sign: "⚔️ 무기점",
+    title: "⚔️ 패킷 무기점",
+    sub: "[상점가 · CR2032로 무기 사기]",
+    desc: "ADV 패킷을 쏘는 방식이 다른 무기들 — 빠른 2M 쌍단검, 멀리 닿는 Coded 장궁, 세 갈래로 뿌리는 확장 광고 부채. 산 무기는 언제든 바꿔 낄 수 있어요.",
+    lore: "PHY는 속도·거리·전력을 맞바꾼다. 2M은 빠르지만 감도가 낮고, Coded는 멀리 가지만 느리다.",
+    link: CHAPTER("phy.html"),
+    action: { id: "weaponShop", label: "🛒 무기 보기" },
+    walkPos: { x: SHOPS.weapon.x, y: S, z: SHOPS.weapon.z + 2.3 }
+  }
+});
+LANDMARKS.push({
+  id: "outfitShop",
+  pos: { x: SHOPS.outfit.x, y: S, z: SHOPS.outfit.z },
+  info: {
+    sign: "👘 옷가게",
+    title: "👘 스펙트럼 옷가게",
+    sub: "[상점가 · 기사복 갈아입기]",
+    desc: "기사의 겉옷·볏·갑옷 색을 바꾸는 옷들. 능력치는 그대로, 멋만 달라져요.",
+    lore: "블루투스 이름은 덴마크 왕 하랄드 '블루투스'에서 왔다 — 로고는 그의 이니셜 룬 ᚼ·ᛒ을 겹친 것.",
+    link: CHAPTER("intro.html"),
+    action: { id: "outfitShop", label: "🛒 옷 보기" },
+    walkPos: { x: SHOPS.outfit.x, y: S, z: SHOPS.outfit.z + 2.3 }
+  }
+});
+
 /** 개발자 광고판 (Stage 11.18) — 도서관 왼쪽 앞, 대각선으로 훈련장·광장을 바라본다. 내용은 home.yalex-k.com (y.AI.ex) 기준 */
 export const BILLBOARD = Object.freeze({ x: -12.6, z: 4.6, width: 3.2, facing: Math.PI / 4 });   // 도서관 왼쪽 앞, 나무 하나를 치우고 대각선(남동쪽 — 훈련장·광장 쪽)으로 (사용자 지정)
 LANDMARKS.push({
@@ -210,9 +241,11 @@ export const OBSTACLE_BOXES = [
   { id: "forge",       minX: 7.4,   maxX: 10.6,  minZ: -2.4,  maxZ: 0.4,  top: S + 2.8 },
   { id: "tower",       minX: TOWER_POS.x - 0.9, maxX: TOWER_POS.x + 0.9, minZ: TOWER_POS.z - 0.9, maxZ: TOWER_POS.z + 0.9, top: S + 8.0 },
   { id: "prison",      minX: 8.5,   maxX: 11.5,  minZ: -13.3, maxZ: -10.7, top: S + 3.0 },
+  { id: "weaponShop",  minX: SHOPS.weapon.x - 1.35, maxX: SHOPS.weapon.x + 1.35, minZ: SHOPS.weapon.z - 1.1, maxZ: SHOPS.weapon.z + 1.1, top: S + 3.0 },
+  { id: "outfitShop",  minX: SHOPS.outfit.x - 1.35, maxX: SHOPS.outfit.x + 1.35, minZ: SHOPS.outfit.z - 1.1, maxZ: SHOPS.outfit.z + 1.1, top: S + 3.0 },
   { id: "crypt",       minX: CRYPT_POS.x - 1.0, maxX: CRYPT_POS.x + 1.0, minZ: CRYPT_POS.z - 0.8, maxZ: CRYPT_POS.z + 0.8, top: S + 1.9 },
   // 던전 관문 — 던전 구현(Stage 7) 전까지는 통과 불가
-  { id: "dungeonGate", minX: -10.6, maxX: -7.4,  minZ: -13.5, maxZ: -12.5, top: WORLD.DUNGEON_PIT_Y + 3.3 }
+  { id: "dungeonGate", minX: WORLD.DUNGEON_X - 1.6, maxX: WORLD.DUNGEON_X + 1.6, minZ: WORLD.DUNGEON_Z - 0.5, maxZ: WORLD.DUNGEON_Z + 0.5, top: WORLD.DUNGEON_PIT_Y + 3.3 }
 ];
 
 export const FOUNTAIN_RIM_HEIGHT = 0.7; // 걸어서는 못 오르고(STEP_MAX 0.55) 점프로 올라설 수 있다

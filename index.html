@@ -777,6 +777,24 @@
     #corner-emblem { display: block; position: fixed; left: 6px; top: 4px; z-index: 11; width: 36px; height: auto; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
     #hp { left: 48px; width: calc(100vw - 134px); }
   }
+  /* 상점 (Stage 12.2) */
+  .shop-panel { max-width: 720px; }
+  .shop-note { margin: 4px 0 8px; padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+  .shop-note.ok { background: rgba(60, 207, 110, .14); color: #9df0bd; }
+  .shop-note.bad { background: rgba(255, 90, 78, .14); color: #ffb3ad; }
+  .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .shop-item { display: flex; flex-direction: column; gap: 4px; background: rgba(14, 34, 60, .6); border: 1px solid #23476e; border-radius: 12px; padding: 10px 12px; }
+  .shop-item.on { border-color: #7dffb5; box-shadow: 0 0 12px rgba(125, 255, 181, .2); }
+  .shop-top { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .shop-icon { font-size: 24px; }
+  .shop-swatch { width: 22px; height: 22px; border-radius: 6px; border: 3px solid; flex: none; }
+  .shop-item p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c4dcf5; }
+  .shop-stats { color: #ffd76b !important; font-weight: 600; }
+  .shop-lore { color: #8bb6e2 !important; }
+  .shop-lore a { color: #7dd8ff; }
+  .shop-buy { margin-top: auto; padding-top: 4px; display: flex; justify-content: flex-end; }
+  .shop-buy .lib-btn:disabled { opacity: .5; }
+  @media (max-width: 640px) { .shop-grid { grid-template-columns: 1fr; } }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }
@@ -854,7 +872,7 @@
     📚 학습: <b>RF 이론 도서관</b> 클릭 → 강의실 입장<br />
     📡 알바: <b>전파의 등대</b>(남동쪽 바깥) 클릭 → 등대 둘레 노란 원 안에서 비콘 찾기 (B 키로 신고 · CR2032)<br />
     ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
-    🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
+    🌀 던전: <b>회관 뒤 북쪽 포털</b> 클릭 → 37채널 호핑 던전 · 🛒 상점가(북서쪽): 무기점·옷가게<br />
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
     📜 퀘스트: <b>Q 키 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지<br />
     ⚡ 돌진: <b>E 키 / 돌진 버튼</b> (Q5 보상) · 🔒 보안의 감옥(북동) · 🪫 지하묘지(남동)<br />

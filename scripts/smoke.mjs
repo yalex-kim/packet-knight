@@ -596,11 +596,13 @@ await reset();
   check("벽에 비스듬히 부딪히면 미끄러진다", b.x - a.x > 1.5 && b.z > -7.0 - 0.42 - 0.05, `${fmt(a)} → ${fmt(b)}`);
 }
 
+const { WORLD: WD } = await import(pathToFileURL(path.join(ROOT, "src/core/config.js")).href);   // 던전 위치 (Stage 12.2에 옮겼다)
+const DX = WD.DUNGEON_X, DZ = WD.DUNGEON_Z;
 // ---------- Stage 3: 지형 단차 ----------
 await reset();
 {
   // 마을 → 던전 계단 하강 → 다시 상승
-  await teleport(-9.0, -7.5);
+  await teleport(DX, DZ + 5.5);
   const down = await sampleWhileHolding("KeyW", 1300);
   const bottom = down[down.length - 1];
   const steps = new Set(down.map((s) => Math.round(s.y * 2) / 2));
@@ -615,18 +617,17 @@ await reset();
 await reset();
 {
   // 렌더링된 블록 윗면과 물리 높이가 일치하는지 (반 블록 양자화)
-  const quantized = await page.evaluate(() => {
+  const quantized = await page.evaluate((pts) => {
     const g = window.__PK.groundHeightAt;
-    const pts = [[-9, -10], [-9, -11.3], [-9.5, -12], [20, 0], [18.2, 0], [0, 0], [-5.3, 21.7]];
     return pts.every(([x, z]) => Number.isInteger(g(x, z) * 2));
-  });
+  }, [[DX, DZ + 3], [DX, DZ + 1.7], [DX - 0.5, DZ + 1], [20, 0], [18.2, 0], [0, 0], [-5.3, 21.7]]);
   check("지표 높이가 블록 윗면(0.5 단위)과 일치한다", quantized);
 }
 
 await reset();
 {
   // 고원에서 옆으로 걸어 던전 구덩이로 떨어진다
-  await teleport(-11.6, -11.5);
+  await teleport(DX - 2.6, DZ + 1.5);
   const samples = await sampleWhileHolding("KeyD", 500);
   const fell = samples.some((s) => !s.grounded);
   const end = samples[samples.length - 1];
@@ -636,7 +637,7 @@ await reset();
   const a = await state();
   await hold("KeyA", 600);
   const b = await state();
-  check("높은 단차(>STEP_MAX)는 걸어서 오르지 못한다", b.y < 1.0 && b.x > -11.05, `x ${a.x.toFixed(2)} → ${b.x.toFixed(2)}, y ${b.y.toFixed(2)}`);
+  check("높은 단차(>STEP_MAX)는 걸어서 오르지 못한다", b.y < 1.0 && b.x > DX - 2.05, `x ${a.x.toFixed(2)} → ${b.x.toFixed(2)}, y ${b.y.toFixed(2)}`);
 }
 
 await reset();
@@ -1003,9 +1004,10 @@ await page.reload();
 await page.waitForFunction(() => window.__PK);
 await reset();
 {
-  await teleport(-9.0, -7.0);
+  await teleport(DX, DZ + 6);
+  await page.evaluate(() => window.__PK.setView(0.7, 12));   // 회관 지붕 룬이 정면 시선을 가리지 않게 비스듬히 (Stage 12.2)
   await tick(500);
-  const gp = await page.evaluate(() => window.__PK.projectToScreen(-9.0, 0.8, -13.0)); // 던전 포털
+  const gp = await page.evaluate(([x, z]) => window.__PK.projectToScreen(x, 2.6, z), [DX, DZ]); // 던전 아치 윗부분 (회관 너머에서도 보이는 높이)
   await page.mouse.click(gp.x, gp.y);
   await tick(20);
   const label = await page.locator("#modal-action").textContent();
@@ -1160,7 +1162,7 @@ await page.waitForFunction(() => window.__PK);
   await tick(50);
   const ko = await state();
   const p2 = await page.evaluate(() => window.__PK.progress());
-  check("Connection Timeout 창에서 '마을로'를 고르면 던전 관문으로 돌아온다", (await dState()) === null && Math.hypot(ko.x + 9, ko.z + 7.6) < 1 && p2.dungeon.kos >= 2 && p2.dungeon.rollbacks === 1);
+  check("Connection Timeout 창에서 '마을로'를 고르면 던전 관문으로 돌아온다", (await dState()) === null && Math.hypot(ko.x - DX, ko.z - (DZ + 5.4)) < 1 && p2.dungeon.kos >= 2 && p2.dungeon.rollbacks === 1);
 
   await page.reload();
   await page.waitForFunction(() => window.__PK);
@@ -1726,6 +1728,32 @@ await page.waitForFunction(() => window.__PK);
   check("개발자 광고판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",
     bb.info.link === "https://home.yalex-k.com/" && /home/.test(bb.info.linkLabel) && posts.length === 2 && blocked && frontFree,
     `기둥 ${posts.length}개 · 정면 (${front.x.toFixed(1)}, ${front.z.toFixed(1)})`);
+}
+
+// ---------- Stage 12.2: 상점가 (무기점·옷가게) ----------
+{
+  await page.evaluate(() => { const p = window.__PK.progress(); p.cr2032 = 80; localStorage.setItem("packetKnight.save", JSON.stringify(p)); });
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  await reset();
+  await page.evaluate(() => window.__PK.shop.open("weapon"));
+  await page.locator('#shop button[data-act="buy"][data-id="extadv"]').click();
+  const after = await page.evaluate(() => ({ shop: window.__PK.shop.state(), cr: window.__PK.progress().cr2032 }));
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("KeyF");
+  await page.evaluate(() => window.__PK.tick(1 / 60));
+  const shots = await page.evaluate(() => window.__PK.battle.state().projectiles);
+  await page.evaluate(() => window.__PK.shop.open("outfit"));
+  const poor = await page.locator('#shop button[data-act="buy"][data-id="gold"]').isDisabled();   // 10개 남아 40짜리는 못 산다
+  await page.locator('#shop button[data-act="buy"][data-id="sig"]').isDisabled().then(async (d) => { if (!d) await page.locator('#shop button[data-act="buy"][data-id="sig"]').click(); });
+  const after2 = await page.evaluate(() => window.__PK.shop.state());
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await page.waitForFunction(() => window.__PK);
+  const kept = await page.evaluate(() => window.__PK.shop.state());
+  check("상점가: 확장 광고 부채(70)를 사면 바로 장착되어 한 번에 3발, 돈이 모자란 옷은 못 사고, 산 옷·무기는 새로고침 후에도 유지",
+    after.shop.weapon === "extadv" && after.cr === 10 && shots >= 3 && poor && after2.outfit !== "gold" && kept.weapon === "extadv" && kept.weapons.includes("extadv"),
+    `CR2032 80 → ${after.cr} · 투사체 ${shots}발 · 옷 ${after2.outfit}`);
 }
 
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------

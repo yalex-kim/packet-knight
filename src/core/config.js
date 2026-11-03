@@ -9,8 +9,8 @@ export const WORLD = Object.freeze({
   PLAY_RADIUS: 24.5,    // 섬 외곽 이동 한계
   HEIGHT_STEP: 0.5,     // 높이 양자화 단위 (반 블록 계단)
   BEDROCK_Y: -4,
-  DUNGEON_X: -9.0,      // 던전 입구 (북서쪽 외곽)
-  DUNGEON_Z: -13.0
+  DUNGEON_X: 0,         // 던전 입구 — 회관 뒤 북쪽 끝 (Stage 12.2: 북서쪽에서 옮겼다, 그 자리는 상점가)
+  DUNGEON_Z: -19.0
 });
 
 export const PHYSICS = Object.freeze({

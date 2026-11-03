@@ -59,7 +59,8 @@ const head = pivot(torso, 0, 0.5, 0);
 box(head, 0.4, 0.38, 0.4, MAT.steel, 0, 0.19, 0);
 box(head, 0.3, 0.06, 0.02, MAT.glow, 0, 0.2, 0.205);             // 바이저 슬릿
 box(head, 0.06, 0.14, 0.02, MAT.steelDark, 0, 0.1, 0.205);       // 코 보호대
-box(head, 0.08, 0.1, 0.36, MAT.tabard, 0, 0.42, -0.02);          // 볏
+MAT.plume = new THREE.MeshLambertMaterial({ color: 0xd8443c });
+box(head, 0.08, 0.1, 0.36, MAT.plume, 0, 0.42, -0.02);          // 볏
 const antenna = box(head, 0.035, 0.42, 0.035, MAT.steelDark, 0.14, 0.55, -0.08);
 antenna.castShadow = false;
 const antennaTip = box(head, 0.09, 0.09, 0.09, MAT.glowTip, 0.14, 0.78, -0.08);
@@ -75,8 +76,33 @@ box(sword, 0.2, 0.04, 0.06, MAT.gold, 0, 0.07, 0);                // 코등이
 const blade = box(sword, 0.06, 0.5, 0.03, MAT.blade, 0, 0.34, 0);  // 빛나는 날
 blade.castShadow = false;
 sword.rotation.x = Math.PI / 2.4;                                  // 앞으로 기울여 든다
-box(armL, 0.06, 0.34, 0.3, MAT.tabard, -0.1, -0.22, 0.02);         // 방패
-box(armL, 0.065, 0.1, 0.1, MAT.glow, -0.135, -0.2, 0.02);          // 방패 문양
+// 무기 모양 (Stage 12.2 상점가): 단검(짧은 날 둘)·장궁(활대 + 시위)·부채(펼친 날개)
+const weaponAlt = {
+  dagger: (() => { const g = new THREE.Group(); sword.add(g); box(g, 0.05, 0.3, 0.03, MAT.blade, 0, 0.24, 0); const g2 = new THREE.Group(); armL.add(g2); g2.position.set(0, -0.4, 0.06); g2.rotation.x = Math.PI / 2.4; box(g2, 0.05, 0.3, 0.03, MAT.blade, 0, 0.24, 0); box(g2, 0.14, 0.04, 0.05, MAT.gold, 0, 0.07, 0); return [g, g2]; })(),
+  bow: (() => { const g = new THREE.Group(); armL.add(g); g.position.set(-0.06, -0.38, 0.12);
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.03, 6, 20, Math.PI), MAT.boot); arc.rotation.z = Math.PI / 2; g.add(arc);
+    const string = box(g, 0.012, 0.84, 0.012, MAT.blade, 0.0, 0, 0); string.castShadow = false; return [g]; })(),
+  fan: (() => { const g = new THREE.Group(); sword.add(g); for (const a of [-0.45, -0.15, 0.15, 0.45]) { const r = box(g, 0.05, 0.42, 0.02, MAT.blade, 0, 0.26, 0); r.rotation.z = a; r.position.x = Math.sin(a) * 0.1; } return [g]; })()
+};
+for (const parts of Object.values(weaponAlt)) for (const g of parts) g.visible = false;
+const shieldParts = [];
+/** 무기 외형 — kind: sword · dagger · bow · fan (core/shop.js WEAPONS[].blade) */
+export function setWeapon(w) {
+  MAT.blade.color.setHex(w.blade.color);
+  const kind = w.blade.kind;
+  blade.visible = kind === "sword";
+  for (const [k, parts] of Object.entries(weaponAlt)) for (const g of parts) g.visible = k === kind;
+  for (const p of shieldParts) p.visible = kind !== "bow" && kind !== "dagger";   // 활·쌍단검은 방패 대신
+}
+/** 옷 외형 (core/shop.js OUTFITS) */
+export function setOutfit(o) {
+  MAT.tabard.color.setHex(o.tabard);
+  MAT.tabardDark.color.setHex(o.tabardDark);
+  MAT.plume.color.setHex(o.plume);
+  MAT.steel.color.setHex(o.steel);
+}
+shieldParts.push(box(armL, 0.06, 0.34, 0.3, MAT.tabard, -0.1, -0.22, 0.02));   // 방패
+shieldParts.push(box(armL, 0.065, 0.1, 0.1, MAT.glow, -0.135, -0.2, 0.02));   // 방패 문양
 
 // 착지 충격파 링
 export const landingRing = new THREE.Mesh(

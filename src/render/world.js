@@ -610,6 +610,57 @@ animated.lock = prison.userData.lock;
 animated.cryptGlow = crypt.userData.glow;
 
 /** 매 프레임 장식 애니메이션 */
+// ----- 🛒 상점가 (Stage 12.2): 무기점(돌·나무, 교차한 검 간판, 무기 걸이) · 옷가게(파스텔 벽, 줄무늬 차양, 마네킹) — 정면 남쪽 -----
+const weaponShop = new THREE.Group();
+{
+  bx(weaponShop, 2.8, 0.22, 2.3, stoneDark, 0, 0.11, 0);
+  bx(weaponShop, 2.6, 1.8, 2.0, stoneLight, 0, 1.12, -0.1);
+  for (const x of [-1.3, 1.3]) bx(weaponShop, 0.2, 1.9, 0.2, beamMat, x, 1.15, 0.9);
+  bx(weaponShop, 2.7, 0.14, 0.22, beamMat, 0, 2.05, 0.9);
+  const FZ = 0.9;
+  bx(weaponShop, 0.9, 1.35, 0.08, beamMat, -0.55, 0.9, FZ + 0.02);
+  bx(weaponShop, 0.74, 1.22, 0.08, woodMat, -0.55, 0.85, FZ + 0.05);
+  windowFront(weaponShop, 0.6, 1.15, FZ, 0.75, 0.55);
+  gableRoof(weaponShop, 2.6, 2.0, 2.02, 4, redRoof, redRoofDk);
+  // 교차한 검 간판
+  bx(weaponShop, 0.06, 0.4, 0.06, beamMat, 0, 2.9, FZ + 0.1);
+  const sg = new THREE.Group(); sg.position.set(0, 2.55, FZ + 0.16); weaponShop.add(sg);
+  bx(sg, 0.9, 0.42, 0.06, woodMat, 0, 0, 0);
+  for (const a of [-0.6, 0.6]) { const b = bx(sg, 0.06, 0.5, 0.03, metalMat, 0, 0, 0.05); b.rotation.z = a; }
+  bx(sg, 0.12, 0.12, 0.03, goldMat, 0, 0, 0.07);
+  // 무기 걸이 (밖)
+  bx(weaponShop, 0.8, 0.06, 0.1, beamMat, 0.75, 0.7, FZ + 0.32);
+  [[0.5, 0x7de3ff], [0.75, 0xffd76b], [1.0, 0xb49bff]].forEach(([x, c]) => bx(weaponShop, 0.04, 0.55, 0.04, new THREE.MeshBasicMaterial({ color: c }), x, 0.42, FZ + 0.34));
+  planter(weaponShop, -1.0, 0.3, FZ + 0.25, 0.5);
+}
+placeLandmark(weaponShop, "weaponShop");
+
+const outfitShop = new THREE.Group();
+{
+  const pastel = new THREE.MeshLambertMaterial({ color: 0xf6d6e0 });
+  const stripeA = new THREE.MeshLambertMaterial({ color: 0x7a5cc9 }), stripeB = new THREE.MeshLambertMaterial({ color: 0xf6f3ea });
+  bx(outfitShop, 2.8, 0.22, 2.3, stoneLight, 0, 0.11, 0);
+  bx(outfitShop, 2.6, 1.8, 2.0, pastel, 0, 1.12, -0.1);
+  for (const x of [-1.3, 1.3]) bx(outfitShop, 0.16, 1.9, 0.16, trimWhite, x, 1.15, 0.9);
+  const FZ = 0.9;
+  bx(outfitShop, 0.8, 1.35, 0.08, trimWhite, 0.6, 0.9, FZ + 0.02);
+  bx(outfitShop, 0.66, 1.22, 0.08, new THREE.MeshLambertMaterial({ color: 0x7a5cc9 }), 0.6, 0.85, FZ + 0.05);
+  // 진열창 + 마네킹 (기사복)
+  bx(outfitShop, 1.0, 1.0, 0.06, beamMat, -0.5, 1.05, FZ + 0.02);
+  bx(outfitShop, 0.88, 0.88, 0.07, new THREE.MeshLambertMaterial({ color: 0xfff6d8 }), -0.5, 1.05, FZ + 0.04);
+  bx(outfitShop, 0.22, 0.34, 0.06, new THREE.MeshLambertMaterial({ color: 0x0b62d6 }), -0.5, 1.0, FZ + 0.09);
+  bx(outfitShop, 0.14, 0.14, 0.06, new THREE.MeshLambertMaterial({ color: 0xf1c7a1 }), -0.5, 1.28, FZ + 0.09);
+  // 줄무늬 차양
+  for (let i = 0; i < 7; i++) { const st = bx(outfitShop, 0.4, 0.06, 0.7, i % 2 ? stripeB : stripeA, -1.2 + i * 0.4, 2.05, FZ + 0.25); st.rotation.x = 0.35; }
+  gableRoof(outfitShop, 2.6, 2.0, 2.02, 4, new THREE.MeshLambertMaterial({ color: 0x8b6bff }), new THREE.MeshLambertMaterial({ color: 0x5a3fa3 }));
+  // 옷걸이 (밖): 색색의 겉옷
+  bx(outfitShop, 0.05, 1.0, 0.05, metalMat, 1.55, 0.6, FZ + 0.45);
+  bx(outfitShop, 0.6, 0.04, 0.04, metalMat, 1.55, 1.08, FZ + 0.45);
+  [[0x0b62d6, -0.18], [0x2f8f5a, 0], [0xf2c14e, 0.18]].forEach(([c, dx]) => bx(outfitShop, 0.14, 0.4, 0.04, new THREE.MeshLambertMaterial({ color: c }), 1.55 + dx, 0.85, FZ + 0.45));
+  planter(outfitShop, 0.0, 0.3, FZ + 0.3, 0.45);
+}
+placeLandmark(outfitShop, "outfitShop");
+
 // ----- 📋 개발자 광고판 (Stage 11.18) — home.yalex-k.com (y.AI.ex) 내용을 판에 그린다 -----
 const BOARD_W = 1024, BOARD_H = 620;
 // home.yalex-k.com 맨 위(히어로) 모습: 남색 점 격자 배경, 고리 속 아바타, y.AI.ex 머리, ls artifacts/, 빛나는 제목
