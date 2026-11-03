@@ -108,6 +108,7 @@ LANDMARKS.push({
   id: "trainingSign",
   pos: { x: -9.0, y: S, z: 4.6 },
   info: {
+    sign: "⚔️ 패킷 훈련장",   // 건물 위 이름 표지판 (사용자 요청)
     title: "⚔️ 패킷 훈련장",
     sub: "[ADV 패킷 사격 연습 · Lv.1]",
     desc: "광고만 외치는 훈련용 비콘 봇들이 돌아다니는 연습장입니다. F 키·발사 버튼·몬스터 클릭으로 ADV 패킷을 쏘세요. 봇의 LED가 빨갛게 변하면 공격 예고 — 뒤로 물러나면 피할 수 있습니다. 쓰러뜨리면 경험치와 가끔 CR2032를 떨어뜨립니다.",
@@ -166,11 +167,28 @@ export const VILLAGERS = Object.freeze([
   { id: "walkerB",   name: "QA 엔지니어",   role: "호환성 테스트 담당",    route: [[-13.0, -3.6], [-6.6, -3.6]], shirt: 0xd9567a, hair: 0x1f1a17, face: "qa",        topics: ["security", "coexistence", "audio", "hopping"] }
 ]);
 
+/** 개발자 광고판 (Stage 11.18) — 도서관 왼쪽 앞, 대각선으로 훈련장·광장을 바라본다. 내용은 home.yalex-k.com (y.AI.ex) 기준 */
+export const BILLBOARD = Object.freeze({ x: -12.6, z: 4.6, width: 3.2, facing: Math.PI / 4 });   // 도서관 왼쪽 앞, 나무 하나를 치우고 대각선(남동쪽 — 훈련장·광장 쪽)으로 (사용자 지정)
+LANDMARKS.push({
+  id: "billboard",
+  pos: { x: BILLBOARD.x, y: S, z: BILLBOARD.z },
+  info: {
+    title: "📋 개발자 광고판 — y.AI.ex",
+    sub: "[Yalex의 바이브코딩 아티팩트]",
+    desc: "이 게임을 만든 Yalex의 작업실 홈입니다. 말로 설계하고 AI와 짝 코딩으로 굳힌 아티팩트들 — 블루투스 교과서 ConnectivityBook, 이 게임 Packet Knight, 바벨 투자 콘솔 Barbell Fund, 한국사 영상 에이전트 K-History Studio — 이 거기 모여 있어요.",
+    loreLabel: "🛠️ 만드는 방식: ",
+    lore: "① 말로 설계 — 코드보다 문장을 먼저 ② AI와 짝 코딩 — Claude Code와 함께, 결정은 사람이 ③ 돌려서 확인 — 테스트·스모크·팩트체크 ④ 바로 내보내기 — git push 하면 배포.",
+    link: "https://home.yalex-k.com/",
+    linkLabel: "🏠 home.yalex-k.com 열기",
+    walkPos: { x: BILLBOARD.x + Math.sin(BILLBOARD.facing) * 1.8, y: S, z: BILLBOARD.z + Math.cos(BILLBOARD.facing) * 1.8 }
+  }
+});
+
 /** 비콘 찾기 알바의 측정 구역 = 등대 둘레 (반경은 balance.js RSSI_JOB.AREA_R). 등대는 지원(Stage 10 지하묘지 자리)보다 더 바깥 */
 export const JOB_AREA = Object.freeze({ x: TOWER_POS.x, z: TOWER_POS.z });
 
 export const TREE_POSITIONS = [
-  [-13, -7, 1.1], [-12, 5, 0.9], [12, -7, 1.0], [13, 4, 1.1],
+  [-13, -7, 1.1], [12, -7, 1.0], [13, 4, 1.1],   // (−12, 5) 나무는 광고판 자리로 비웠다 (Stage 11.18)
   [-5, -12, 1.0], [5, -11, 0.95], [-4, 12, 1.1], [4, 12, 1.0],
   [-11, -1, 0.85], [11, -1, 0.85], [-6, 6, 1.0], [6, 6, 0.9],
   [-14, 0, 1.2], [14, 0, 1.1]
@@ -201,5 +219,7 @@ export const OBSTACLE_CIRCLES = [
   { id: "fountainPillar", x: 0, z: 0, r: 0.45, top: S + 1.7 },
   ...TREE_POSITIONS.map(([x, z, s]) => ({ id: "tree", x, z, r: 0.45, top: groundHeightAt(x, z) + 1.8 * s })),
   ...LAMP_POSITIONS.map(([x, z]) => ({ id: "lamp", x, z, r: 0.12, top: groundHeightAt(x, z) + 2.0 })),
-  { id: "trainingSign", x: -9.0, z: 4.6, r: 0.25, top: S + 1.8 }
+  { id: "trainingSign", x: -9.0, z: 4.6, r: 0.25, top: S + 1.8 },
+  // 개발자 광고판 기둥 2개 (판은 머리 위라 그 아래로 지나갈 수 있다)
+  ...[-1, 1].map((k) => ({ id: "billboardPost", x: BILLBOARD.x + Math.cos(BILLBOARD.facing) * k * (BILLBOARD.width / 2 - 0.15), z: BILLBOARD.z - Math.sin(BILLBOARD.facing) * k * (BILLBOARD.width / 2 - 0.15), r: 0.2, top: S + 3.6 }))
 ];

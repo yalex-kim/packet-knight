@@ -1114,6 +1114,7 @@ window.__PK = {
   crypt: { open: cryptUi.openCrypt, isOpen: cryptUi.isCryptOpen, state: cryptUi.cryptState },
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
+  setView: (yaw, distance) => { orbit.yaw = yaw; if (distance) setOrbitDistance(distance); },   // 스크린샷·테스트용 카메라 방향
   quality: () => perf.level,
   resetToStart,
   hopGuide: { open: showHopGuide, isOpen: isHopGuideOpen, example: hopGuideExample },

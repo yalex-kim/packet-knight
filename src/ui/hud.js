@@ -76,8 +76,9 @@ export function showModal(info) {
   modalTitle.textContent = info.title;
   modalSub.textContent = info.sub;
   modalDesc.textContent = info.desc;
-  modalLore.textContent = "📶 RF 이론: " + info.lore;
+  modalLore.textContent = (info.loreLabel ?? "📶 RF 이론: ") + info.lore;
   modalLink.href = info.link;
+  modalLink.textContent = info.linkLabel ?? "📖 교과서 챕터 보기";   // 광고판은 홈 링크 (Stage 11.18)
   modalAction.hidden = !info.action;
   if (info.action) {
     modalAction.textContent = info.action.label;

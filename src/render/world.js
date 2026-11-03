@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { WORLD } from "../core/config.js";
 import { forEachCell, groundHeightAt, surfaceTypeAt, cellHeight } from "../core/terrain.js";
-import { landmark, TREE_POSITIONS, LAMP_POSITIONS, FOUNTAIN_RIM_HEIGHT } from "../core/layout.js";
+import { landmark, TREE_POSITIONS, LAMP_POSITIONS, FOUNTAIN_RIM_HEIGHT, BILLBOARD } from "../core/layout.js";
 
 /** 월드 전체를 담는 루트 그룹 */
 export const root = new THREE.Group();
@@ -441,6 +441,111 @@ animated.lock = prison.userData.lock;
 animated.cryptGlow = crypt.userData.glow;
 
 /** 매 프레임 장식 애니메이션 */
+// ----- 📋 개발자 광고판 (Stage 11.18) — home.yalex-k.com (y.AI.ex) 내용을 판에 그린다 -----
+const BOARD_W = 1024, BOARD_H = 620;
+// home.yalex-k.com 맨 위(히어로) 모습: 남색 점 격자 배경, 고리 속 아바타, y.AI.ex 머리, ls artifacts/, 빛나는 제목
+const mark = new Image();
+mark.src = "./src/assets/yalex-mark-v1.webp";   // home.yalex-k.com assets/mark-512.webp
+function drawBoard(ctx) {
+  const F = '"Pretendard Variable", Pretendard, system-ui, sans-serif';
+  const M = 'ui-monospace, "JetBrains Mono", "D2Coding", Consolas, monospace';
+  const bg = ctx.createRadialGradient(240, 330, 40, 420, 310, 760);
+  bg.addColorStop(0, "#123a5c"); bg.addColorStop(0.55, "#0a2038"); bg.addColorStop(1, "#06121f");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, BOARD_W, BOARD_H);
+  ctx.fillStyle = "rgba(125, 216, 255, .12)";                         // 점 격자
+  for (let x = 24; x < BOARD_W; x += 34) for (let y = 24; y < BOARD_H; y += 34) ctx.fillRect(x, y, 2, 2);
+  ctx.textBaseline = "middle";
+  // 머리: 작은 마크 + y.AI.ex + vibe-coding artifacts · online
+  if (mark.complete && mark.naturalWidth) ctx.drawImage(mark, 34, 26, 58, 58);
+  ctx.font = `900 34px ${F}`;
+  ctx.fillStyle = "#ffffff"; ctx.fillText("y.", 106, 46);
+  let x = 106 + ctx.measureText("y.").width;
+  ctx.fillStyle = "#39d0ff"; ctx.fillText("AI", x, 46); x += ctx.measureText("AI").width;
+  ctx.fillStyle = "#ffffff"; ctx.fillText(".ex", x, 46);
+  ctx.font = `500 20px ${M}`; ctx.fillStyle = "#6f8aa6"; ctx.fillText("vibe-coding artifacts", 106, 78);
+  ctx.strokeStyle = "rgba(57, 208, 255, .35)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(BOARD_W - 168, 32, 134, 44, 22); ctx.stroke();
+  ctx.fillStyle = "#3ccf6e"; ctx.beginPath(); ctx.arc(BOARD_W - 144, 54, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.font = `500 22px ${M}`; ctx.fillStyle = "#cfe8ff"; ctx.fillText("online", BOARD_W - 126, 55);
+  // 왼쪽: 고리 속 아바타
+  const cx = 228, cy = 352, R = 150;
+  ctx.setLineDash([4, 6]); ctx.strokeStyle = "rgba(125, 216, 255, .35)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, R + 52, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.shadowColor = "#39d0ff"; ctx.shadowBlur = 24;
+  ctx.strokeStyle = "#39d0ff"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, R + 24, 0, Math.PI * 2); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(57, 208, 255, .45)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R + 36, -0.6, 2.2); ctx.stroke();
+  if (mark.complete && mark.naturalWidth) {
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R + 8, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(mark, cx - R - 8, cy - R - 8, (R + 8) * 2, (R + 8) * 2); ctx.restore();
+  }
+  for (const [dx, dy, r, c] of [[-120, -170, 7, "#3ccf6e"], [-212, 20, 11, "#39d0ff"], [200, 128, 7, "#7de3ff"]]) {
+    ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  // 오른쪽: ls artifacts/ + 빛나는 제목 + 설명
+  const X = 462;
+  ctx.font = `500 24px ${M}`; ctx.fillStyle = "#7fb6dd"; ctx.fillText("~/Yalex $ ls artifacts/", X, 168);
+  ctx.font = `900 64px ${F}`; ctx.fillStyle = "#f2f8ff"; ctx.fillText("Yalex의", X, 236);
+  ctx.shadowColor = "rgba(57, 208, 255, .85)"; ctx.shadowBlur = 22; ctx.fillStyle = "#4fd8f5";
+  ctx.fillText("바이브코딩", X, 310); ctx.fillText("아티팩트", X, 384);
+  ctx.shadowBlur = 0;
+  // 설명: 굵은 낱말이 섞인 세 줄
+  const lines = [
+    [["만들고 싶은 걸 ", 0], ["말로 설계", 1], ["하고, ", 0]],
+    [["AI와 짝 코딩", 1], ["으로 굳혔습니다.", 0]],
+    [["여기 있는 건 그렇게 나온 결과물이고,", 0]],
+    [["지금도 계속 고쳐지며 돌아갑니다.", 0]]
+  ];
+  lines.forEach((parts, i) => {
+    let lx = X;
+    for (const [t, b] of parts) {
+      ctx.font = `${b ? 800 : 500} 25px ${F}`;
+      ctx.fillStyle = b ? "#ffffff" : "#9db4cc";
+      ctx.fillText(t, lx, 448 + i * 36); lx += ctx.measureText(t).width;
+    }
+  });
+  ctx.font = `700 21px ${M}`; ctx.fillStyle = "#39d0ff"; ctx.textAlign = "right";
+  ctx.fillText("home.yalex-k.com ↗", BOARD_W - 34, BOARD_H - 30); ctx.textAlign = "left";
+}
+const billboard = new THREE.Group();
+{
+  const W = BILLBOARD.width, H = W * BOARD_H / BOARD_W, BOTTOM = 1.9;
+  const postMat = new THREE.MeshLambertMaterial({ color: 0x5b4636 });
+  for (const k of [-1, 1]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, BOTTOM + H + 0.2, 0.22), postMat);
+    post.position.set(k * (W / 2 - 0.15), (BOTTOM + H + 0.2) / 2, -0.08);
+    billboard.add(post);
+  }
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.24, H + 0.24, 0.14), new THREE.MeshLambertMaterial({ color: 0x1d2733 }));
+  frame.position.set(0, BOTTOM + H / 2, 0);
+  billboard.add(frame);
+  const canvas = document.createElement("canvas");
+  canvas.width = BOARD_W; canvas.height = BOARD_H;
+  const ctx = canvas.getContext("2d");
+  drawBoard(ctx);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: tex }));
+  face.position.set(0, BOTTOM + H / 2, 0.075);
+  billboard.add(face);
+  // 판 위 작은 조명 두 개 (밤에도 보일 것 같은 느낌)
+  for (const k of [-0.33, 0.33]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.4), postMat);
+    arm.position.set(k * W, BOTTOM + H + 0.22, 0.16);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.12), new THREE.MeshBasicMaterial({ color: 0xffe9a8 }));
+    lamp.position.set(k * W, BOTTOM + H + 0.18, 0.36);
+    billboard.add(arm, lamp);
+  }
+  // 아바타 이미지·글꼴(Pretendard)이 늦게 오면 그때 다시 그린다
+  const redraw = () => { drawBoard(ctx); tex.needsUpdate = true; };
+  mark.addEventListener("load", redraw);
+  document.fonts?.ready?.then(redraw);
+  billboard.rotation.y = BILLBOARD.facing;
+}
+placeLandmark(billboard, "billboard");
+
 /** 선택한 건물의 표지판을 금색으로 키운다 (Stage 11.8 — 정보 카드와 짝). id가 null이면 모두 원래대로 */
 let highlighted = undefined;
 export function highlightSign(id) {
