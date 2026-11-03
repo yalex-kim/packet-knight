@@ -1,0 +1,28 @@
+# packetknight.yalex-k.com 수동 배포 — Actions 탭의 "Deploy" → Run workflow, 또는 gh workflow run deploy.yml
+# main 머지만으로는 바뀌지 않는다 (예전 NAS 수동 배포와 같은 방식). 배포 전에 npm run smoke 를 통과시킨다.
+# 저장소 Secret CLOUDFLARE_API_TOKEN 이 필요하다.
+name: Deploy
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: false
+jobs:
+  cloudflare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: cloudflare
+      url: https://packetknight.yalex-k.com/
+    steps:
+      - uses: actions/checkout@v4
+      # index.html·src/ 만, 진입 모듈 주소를 ./v/<sha>/src/main.js 로
+      - name: Build site
+        run: sh tools/build_site.sh "$GITHUB_SHA"
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.156.2"
+          command: deploy -c cloudflare/wrangler.jsonc

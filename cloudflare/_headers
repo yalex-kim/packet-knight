@@ -1,0 +1,7 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# 배포마다 sha 가 바뀌는 주소라 길게 캐시해도 옛 모듈과 섞이지 않는다 (tools/stamp_assets.py)
+/v/*
+  Cache-Control: public, max-age=31536000, immutable

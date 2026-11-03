@@ -1,0 +1,13 @@
+// packetknight.yalex-k.com — Cloudflare Workers 정적 자산 + 작은 Worker (worker.js)
+// 배포: .github/workflows/deploy.yml (main push) — tools/build_site.sh 가 _site 를 만든다
+// 수동: sh tools/build_site.sh && npx wrangler deploy -c cloudflare/wrangler.jsonc
+{
+  "name": "packetknight",
+  "main": "./worker.js",
+  "compatibility_date": "2026-11-01",
+  "account_id": "c0def7a36886c178cce96f73375f8f97",
+  "assets": { "directory": "../_site", "binding": "ASSETS", "html_handling": "none" },
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "packetknight.yalex-k.com/*", "zone_name": "yalex-k.com" }]
+}

@@ -37,7 +37,7 @@ npm start                # → http://localhost:5173  (Node만 있으면 됨, np
 ```
 
 - 조작: **WASD/방향키**(한글 입력 상태에서도 동작) / **바닥 터치 및 마우스 클릭** / **모바일 가상 조이스틱** · **스페이스바 / 점프 버튼** 점프 · **화면 드래그/우클릭** 시점 회전 · **두 손가락 핀치/마우스 휠** 줌인·아웃
-- 라이브: **https://packetknight.yalex-k.com** (NAS 서빙, 아래 「배포」 참고). 2026-11-02에 GitHub Pages(`yalex-kim.github.io/packet-knight`)를 껐다 — 진행도는 도메인(origin)별 localStorage라 Pages에서 하던 진행도는 새 주소로 따라오지 않는다.
+- 라이브: **https://packetknight.yalex-k.com** (Cloudflare Workers 서빙, 아래 「배포」 참고). 2026-11-02에 GitHub Pages(`yalex-kim.github.io/packet-knight`)를 껐다 — 진행도는 도메인(origin)별 localStorage라 Pages에서 하던 진행도는 새 주소로 따라오지 않는다.
 - 현재 진행: **Stage 11.4 완료** (📡 알바는 등대 둘레 노란 원 안에서 비콘 찾기 + 측정기 미니맵의 추정 거리 원, 등대·지하묘지 자리 교환) · Stage 11.3 (모바일 던전 화면 정리, 퀘스트 트래커를 누르면 진행 중 퀘스트만 위로 펼침, 기본 줌 아웃) · Stage 11.2 (📡 알바가 비콘 찾기로 — 마을을 걸으며 RSSI로 숨은 비콘을 찾아 B 키로 신고, 모바일 상단 HUD 정리(스탯은 눌러서 펼침), 해안 계단을 평지로) · Stage 11.1 (교과서 원문은 새 탭으로, 건물 위 이름 표지판, 퀘스트 로그 "📍 길 안내", RF 랩 = 🔨 패킷 대장간 안, 퀘스트 트래커 한 줄) · Stage 11 (Web Audio 합성 효과음·생성형 BGM — 🔊 버튼/M 키로 음소거, 팝업 위 휠이 맵을 줌하던 버그 수정, UI 폴리싱. 퀘스트 Q0~Q8: 🔒 보안의 감옥·🪫 지하묘지, Q 키로 퀘스트 로그) → 다음: Stage 12 서재(교과서 사이트) 임베드
 - 지금 할 수 있는 것: 📚 도서관 퀴즈로 스탯 올리기 · 📡 등대 알바(비콘 찾기)로 CR2032 벌기(측정기 배터리 3칸, 5분마다 충전) · ⚔️ 훈련장에서 봇 사냥 · 🌀 북서쪽 관문에서 호핑 던전 도전(입장료 CR2032 3개) · 🔨 패킷 대장간 RF 랩에서 장비 강화·스탯 분배 (진행도는 브라우저에 자동 저장)
 - 전투: **F/J 키 · 📡 발사 버튼 · 몬스터 클릭** → ADV 패킷 발사. 봇의 LED가 빨개지면 공격 예고 — 뒤로 물러나면 피합니다.
@@ -45,15 +45,16 @@ npm start                # → http://localhost:5173  (Node만 있으면 됨, np
 
 ### 배포
 
-`https://packetknight.yalex-k.com` 은 NAS의 공용 Cloudflare 터널 스택([yalex-kim/edge](https://github.com/yalex-kim/edge))이 서빙한다. **수동 배포**라 `main`에 머지해도 바로 바뀌지 않는다.
+`https://packetknight.yalex-k.com` 은 Cloudflare Workers 정적 자산(`cloudflare/wrangler.jsonc`)이 서빙한다. 2026-11-03 NAS에서 옮겼다. **수동 배포**라 `main`에 머지해도 바로 바뀌지 않는다.
 
 ```bash
-# NAS의 edge 폴더에서 — main 최신 커밋을 releases/<sha> 에 풀고 current 링크를 원자적으로 교체
-docker compose run --rm packetknight-deploy
+gh workflow run deploy.yml          # main 최신 커밋을 배포 (Actions 탭 "Deploy" → Run workflow 와 같다)
+# 손으로: sh tools/build_site.sh && npx wrangler deploy -c cloudflare/wrangler.jsonc
 ```
 
-- 서빙하는 것은 `index.html`과 `src/`뿐이다(PRD·scripts·package.json은 404).
-- 배포할 때 `tools/stamp_assets.py <sha>`가 `index.html`의 진입 모듈을 `./v/<sha>/src/main.js`로 바꾼다. 상대 import라 하위 모듈도 모두 `/v/<sha>/src/…`로 받으므로, 배포마다 주소가 바뀌어 브라우저가 옛 모듈과 새 모듈을 섞지 않는다(Cloudflare가 `.js`에 4시간 캐시를 덧씌우기 때문 — 2026-11-02 모바일 빈 화면 사고). 저장소의 `index.html`은 그대로라 로컬 실행·스모크와 무관하다.
+- `tools/build_site.sh`가 커밋된 `index.html`과 `src/`만 `_site/`에 담는다(PRD·scripts·package.json은 404).
+- 배포할 때 `tools/stamp_assets.py <sha>`가 `index.html`의 진입 모듈을 `./v/<sha>/src/main.js`로 바꾼다. 상대 import라 하위 모듈도 모두 `/v/<sha>/src/…`로 받는다. 배포마다 주소가 바뀌므로 브라우저가 옛 모듈과 새 모듈을 섞지 않는다(2026-11-02 모바일 빈 화면 사고). `src/`를 `_site/v/<sha>/src/`에도 복사해 1년 immutable로 캐시한다(`cloudflare/_headers`). 지난 배포의 sha로 오는 요청은 `cloudflare/worker.js`가 지금 `src/`로 연결한다. 저장소의 `index.html`은 그대로라 로컬 실행·스모크와 무관하다.
+- 배포에는 저장소 Secret `CLOUDFLARE_API_TOKEN`이 필요하다.
 - 배포 전에 `npm run smoke`가 통과해야 한다(CI 게이트 없음).
 
 ## 🤖 봇 시뮬레이션

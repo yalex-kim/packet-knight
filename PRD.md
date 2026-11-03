@@ -560,7 +560,7 @@ Lv1 기본 스탯 봇이 훈련장 입구에서 60초 사냥(봇 2마리). 전�
 | 언어 | JavaScript(ESM) + JSDoc 타입 주석 — TypeScript 도입은 번들러 재평가(Stage 12) 때 함께 검토 | 빠른 프로토타이핑 우선 |
 | 빌드 | 없음 — Stage 1~3: 단일 index.html + CDN import map, Stage 3.5~: import map 기반 무빌드 ESM 모듈. Vite 등 번들러는 Stage 12에서 필요성 재평가 | 김플립 방법론: 초기에는 번들러조차 최소화. 빌드 전환과 기능 추가를 한 스테이지에 섞지 않는다 |
 | 로컬 실행 | `npm start` (무의존 정적 서버 `scripts/serve.mjs`) | ES 모듈은 `file://`에서 로드되지 않는다(브라우저 CORS 정책). 배포에는 영향 없음 |
-| 배포 | `https://packetknight.yalex-k.com` — NAS 공용 Cloudflare 터널(`yalex-kim/edge`)의 nginx가 `index.html`·`src/`만 서빙, 수동 배포(`docker compose run --rm packetknight-deploy`). 배포 때 `tools/stamp_assets.py`가 진입 모듈을 `./v/<sha>/src/main.js`로 바꿔 배포마다 모듈 주소가 달라진다(Cloudflare가 `.js`에 4시간 캐시를 덧씌우므로 `no-cache`만으로는 옛 모듈이 섞인다). GitHub Pages는 2026-11-02에 껐다 | 교과서(connbook.yalex-k.com)와 같은 NAS·같은 방식으로 운영. 무빌드 정적 파일이라 서버 코드가 없다. 진행도는 origin별 localStorage라 Pages에서 하던 진행도는 따라오지 않는다 |
+| 배포 | `https://packetknight.yalex-k.com` — Cloudflare Workers 정적 자산(2026-11-03 NAS에서 이전)이 `index.html`·`src/`만 서빙, 수동 배포(`gh workflow run deploy.yml`). 배포 때 `tools/stamp_assets.py`가 진입 모듈을 `./v/<sha>/src/main.js`로 바꿔 배포마다 모듈 주소가 달라진다(옛 모듈과 섞이지 않게). GitHub Pages는 2026-11-02에 껐다 | 교과서(connbook.yalex-k.com)와 같은 Cloudflare Workers 방식으로 운영. 무빌드 정적 파일이라 서버 코드가 없다. 진행도는 origin별 localStorage라 Pages에서 하던 진행도는 따라오지 않는다 |
 | 계층 규칙 | `src/core/` → `src/render/`·`src/ui/` → `src/main.js` 단방향 의존. `core/`는 THREE·DOM import 금지(스모크 테스트가 검사) | 게임 로직을 봇 시뮬레이터(§8)가 Node에서 그대로 재사용하기 위함 |
 | 테스트 | Playwright 헤드리스 스모크 테스트(`npm run smoke`) | DoD를 손이 아니라 자동으로 검증 (§7.1) |
 | 상태 | localStorage (진행도), 이후 필요 시 IndexedDB | 서버 없이 저장 |
@@ -593,6 +593,7 @@ Lv1 기본 스탯 봇이 훈련장 입구에서 60초 사냥(봇 2마리). 전�
 - [x] Stage 11.2: 알바 개편(비콘 찾기 — 걸어 다니며 RSSI로 찾기, 삼변측량 봇, 등급 S≥280/A≥160), 모바일 상단 HUD(HP 1줄·스탯 접기), 계단 해안 → 평지, 스모크 146/147(시뮬레이션 1분 DoD는 NAS 속도로 실패)
 - [x] Stage 11.1: 길 찾기·원문 열기 개선 — 원문 새 탭, 건물 이름 표지판, 퀘스트 "📍 길 안내", RF 랩 = 패킷 대장간 이름 통일, 퀘스트 트래커 한 줄 접기, 트래커 'false' 버그 수정, 스모크 145항목
 - [x] NAS 서빙 전환 (2026-11-02) — `packetknight.yalex-k.com`(edge 스택, 수동 배포), GitHub Pages 끔, 교과서 챕터 링크 14개·절 앵커 2개 응답 확인
+- [x] Cloudflare Workers 서빙 전환 (2026-11-03) — NAS nginx 대신 Workers 정적 자산, 수동 배포는 `Deploy` 워크플로(`tools/build_site.sh`)
 - [ ] Stage 12: 서재 웹사이트 임베드 — **다음 작업** (사용자 보류)
 - [ ] (권장) 2시간 봇 시뮬레이션 — Q4~Q8 보상 구간 밸런스 (§8.7 Stage 10)
 - [ ] (결정 대기) §8.7 "공부 시간까지 따진 퀴즈 이득" 목표치
