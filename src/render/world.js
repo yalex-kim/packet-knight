@@ -111,6 +111,8 @@ function placeLandmark(group, id) {
   if (info.sign) {
     const top = new THREE.Box3().setFromObject(group).max.y;  // 위치를 옮기기 전 = 그룹 기준 높이
     const sign = makeSign(info.sign, Number.isFinite(top) ? top : 2);
+    sign.userData.landmarkId = id;
+    sign.userData.baseScale = sign.scale.clone();
     group.add(sign);
     signs.push(sign);
   }
@@ -439,6 +441,18 @@ animated.lock = prison.userData.lock;
 animated.cryptGlow = crypt.userData.glow;
 
 /** 매 프레임 장식 애니메이션 */
+/** 선택한 건물의 표지판을 금색으로 키운다 (Stage 11.8 — 정보 카드와 짝). id가 null이면 모두 원래대로 */
+let highlighted = undefined;
+export function highlightSign(id) {
+  if (id === highlighted) return;
+  highlighted = id;
+  for (const s of signs) {
+    const on = s.userData.landmarkId === id;
+    s.material.color.setHex(on ? 0xffd76b : 0xffffff);
+    s.scale.copy(s.userData.baseScale).multiplyScalar(on ? 1.3 : 1);
+  }
+}
+
 /** 그림자 (Stage 11.7): 빛나는 것(MeshBasic)·반투명은 그림자를 드리우지 않고, 나머지는 드리우고 받는다 */
 export function enableShadows(obj) {
   obj.traverse((o) => {

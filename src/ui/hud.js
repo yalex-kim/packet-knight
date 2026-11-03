@@ -21,6 +21,23 @@ statsPanel.addEventListener("click", () => {
 
 document.getElementById("modal-close").addEventListener("click", hideModal);
 
+// 조작법 접기/펼치기 (Stage 11.8) — 버튼 또는 H 키
+const hudBox = document.getElementById("hud");
+const helpBtn = document.getElementById("btn-help");
+const helpBody = document.getElementById("hud-controls");
+export function toggleHelp(open = helpBody.hidden) {
+  helpBody.hidden = !open;
+  hudBox.classList.toggle("open", open);
+  helpBtn.setAttribute("aria-expanded", String(open));
+  helpBtn.textContent = open ? "✕ 접기" : "❔ 조작법";
+}
+helpBtn.addEventListener("click", () => toggleHelp());
+window.addEventListener("keydown", (e) => {
+  if (e.code !== "KeyH" || e.repeat || e.target instanceof HTMLInputElement) return;
+  if (document.querySelector(".overlay:not([hidden])")) return;
+  toggleHelp();
+});
+
 let onAction = () => {};
 let onLink = () => {};
 modalAction.addEventListener("click", () => onAction(modalAction.dataset.action));

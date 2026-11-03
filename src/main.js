@@ -12,7 +12,7 @@
 import * as THREE from "three";
 import { WORLD, PHYSICS } from "./core/config.js";
 import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
-import { SPAWN_POS, landmark, JOB_AREA } from "./core/layout.js";
+import { SPAWN_POS, landmark, JOB_AREA, LANDMARKS } from "./core/layout.js";
 import * as prisonUi from "./ui/prison.js";
 import * as cryptUi from "./ui/crypt.js";
 import { QUEST_SKILLS, RSSI_JOB } from "./core/balance.js";
@@ -196,6 +196,7 @@ function regionLabel() {
 /** 랜드마크 안내 모달을 띄우고 그 앞으로 걸어간다 — 건물 클릭과 퀘스트 "📍 길 안내"가 같이 쓴다 */
 function goToLandmark(info) {
   hud.showModal(modalInfo(info));
+  world.highlightSign(LANDMARKS.find((l) => l.info === info)?.id ?? null);
   sfx("open");
   const place = ["hall", "prison", "crypt"].find((id) => landmark(id).info === info);
   if (place) questProgress({ type: "visit", place });
@@ -936,6 +937,7 @@ function projectToScreen(x, y, z) {
 }
 
 function renderFrame(t, dt) {
+  if (!hud.openModalTitle()) world.highlightSign(null);
   battleView.syncBattle(activeBattle(), camera, t, dt);
   dungeonView.syncDungeon(run, t);
   fx.updateFx(projectToScreen, dt);
@@ -947,10 +949,33 @@ function renderFrame(t, dt) {
 const FIXED_DT = 1 / 60;
 const clock = new THREE.Clock();
 
+// 자동 품질 조절 (Stage 11.8): 그림자·고해상도가 버거운 기기는 2초마다 프레임 시간을 보고 한 단계씩 낮춘다
+// 1단계: 픽셀 비율 1 + 그림자 512 → 2단계: 그림자 끔. (테스트 모드는 렌더하지 않으므로 제외)
+const perf = { sum: 0, n: 0, level: 0 };
+function adaptQuality(rawDt) {
+  if (perf.level >= 2 || rawDt > 0.5) return;            // 탭 전환 등 큰 공백은 무시
+  perf.sum += rawDt; perf.n++;
+  if (perf.sum < 2) return;
+  const avg = perf.sum / perf.n;
+  perf.sum = 0; perf.n = 0;
+  if (avg < 1 / 25) return;
+  perf.level++;
+  if (perf.level === 1) {
+    renderer.setPixelRatio(1);
+    sun.shadow.mapSize.set(512, 512);
+    sun.shadow.map?.dispose(); sun.shadow.map = null;
+  } else {
+    renderer.shadowMap.enabled = false;
+    scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const raw = clock.getDelta();
+  const dt = Math.min(raw, 0.05);
   if (TEST_MODE) return;
+  adaptQuality(raw);
 
   simulate(dt);
   const t = clock.elapsedTime;
@@ -1024,6 +1049,7 @@ window.__PK = {
   crypt: { open: cryptUi.openCrypt, isOpen: cryptUi.isCryptOpen, state: cryptUi.cryptState },
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
+  quality: () => perf.level,
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
   chargeCfg: () => chargeCfg(progress),
   dungeon: {

@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>Packet Knight · 블루투스 LE 복셀 RPG</title>
+<!-- Pretendard: 렌더링을 막지 않게(media=print → 로드되면 all). 늦게 와도 시작 화면은 바로 뜨고, 글꼴만 나중에 바뀐다 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 132%22%3E%3Cpath d=%22M60 6 L108 22 V62 C108 94 88 116 60 126 C32 116 12 94 12 62 V22 Z%22 fill=%22%23071426%22 stroke=%22%2339d0ff%22 stroke-width=%228%22/%3E%3Ccircle cx=%2260%22 cy=%2296%22 r=%228%22 fill=%22%23ffd76b%22/%3E%3Cpath d=%22M44 82 A22 22 0 0 1 76 82 M34 70 A36 36 0 0 1 86 70%22 fill=%22none%22 stroke=%22%2339d0ff%22 stroke-width=%228%22 stroke-linecap=%22round%22/%3E%3C/svg%3E" />
 <meta name="theme-color" content="#071426" />
 <meta name="description" content="패킷 기사가 되어 블루투스 저전력(BLE)을 몸으로 배우는 3D 복셀 RPG. 퀘스트를 깨면 교과서 connectivityBook의 그 장으로 이어집니다." />
@@ -546,6 +549,88 @@
     #quest-tracker .qt-name { display: none; }   /* 좁은 화면: 제목 대신 다음 할 일을 보인다 */
     #btn-quests { right: 128px; padding: 7px 10px; }
   }
+
+  /* ===== 테마 층 (Stage 11.8, 벤치마크 반영) — 마을 HUD는 밝은 유리 알약, 폰트는 Pretendard =====
+     위치·크기 규칙은 위(와 모바일 미디어 쿼리)에 그대로 두고, 여기서는 색·배경·모서리·그림자만 덮는다.
+     메뉴 창(도서관 등)·알바 측정기·던전 HUD는 읽기·계기판 성격이라 어두운 바탕을 유지한다. */
+  :root {
+    --glass: rgba(255, 255, 255, .86); --glass-strong: rgba(255, 255, 255, .95);
+    --ink: #1d2733; --ink-2: #566474; --line: rgba(20, 40, 70, .12);
+    --accent: #0c93b8; --gold: #b07a10; --violet: #6b55c9; --green: #2f7a46;
+    --shadow: 0 6px 20px rgba(20, 40, 70, .16);
+  }
+  html, body { font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  .formula, .rssi-canvas, code { font-family: ui-monospace, "D2Coding", Consolas, monospace; }
+  #stats, #hp-text, #hunt .job-bar, #quest-tracker, .job-estimate { font-variant-numeric: tabular-nums; }
+  :is(#hud, #badge, #stats, #quest-tracker, #btn-quests, #btn-reset, #btn-sound, #toast) {
+    background: var(--glass); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow);
+    backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  }
+  :is(#badge, #btn-quests, #btn-reset, #quest-tracker) { border-radius: 999px; }
+  #hud, #stats { border-radius: 14px; }
+  #btn-sound { border-radius: 12px; }
+  #hud b { color: var(--accent); }
+  #hud .control-desc { color: var(--ink-2); }
+  /* 조작 안내는 접어 두고 "❔ 조작법"(H)으로 펼친다 — 12줄 상자가 화면을 가리던 문제 */
+  #hud { pointer-events: auto; padding: 7px 8px 7px 14px; }
+  #hud.open { padding: 10px 14px; }
+  #btn-help { margin-left: 8px; appearance: none; border: 1px solid var(--line); background: #fff; color: var(--accent); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  #btn-help[aria-expanded="true"] { background: rgba(12, 147, 184, .1); }
+  #badge { color: var(--green); font-weight: 600; }
+  #stats .stat b { color: var(--accent); }
+  #stats .slots { color: var(--green); border-top-color: var(--line); }
+  #stats .coins { color: var(--gold); }
+  #stats .level { color: var(--violet); }
+  #stats .st-sum, #stats .st-sum::after { color: var(--ink); }
+  #stats.open .st-sum { border-bottom-color: var(--line); }
+  @keyframes statUp { 0%, 40% { color: #e09a00; text-shadow: 0 0 8px rgba(255, 200, 60, .7); } 100% { color: inherit; text-shadow: none; } }
+  #hp { background: rgba(255, 255, 255, .7); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  #hp-fill { background: linear-gradient(90deg, #ef5a4f, #ff8a7a); }
+  #hp-text { font-weight: 700; }
+  #quest-tracker .qt-head { color: var(--gold); }
+  #quest-tracker .qt-next { color: var(--ink-2); }
+  #quest-tracker.ready { border-color: #9b7bff; box-shadow: 0 0 0 3px rgba(155, 123, 255, .25), var(--shadow); }
+  #quest-tracker.ready .qt-next { color: var(--violet); }
+  #quest-tracker:hover, #quest-tracker[aria-expanded="true"] { border-color: #f0b93a; }
+  #btn-quests { color: var(--gold); font-weight: 700; }
+  #btn-reset { color: var(--accent); font-weight: 600; }
+  #btn-reset:active, #btn-quests:active { background: var(--glass-strong); transform: scale(.97); }
+  #btn-sound { color: var(--ink); }
+  #toast { color: var(--ink); border: 1.5px solid rgba(12, 147, 184, .45); border-radius: 14px; font-weight: 500; }
+  #joystick-base { background: rgba(255, 255, 255, .28); border: 1.5px solid rgba(255, 255, 255, .7); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+  /* 퀘스트 팝오버: 밝은 카드 */
+  #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
+  #quest-pop .qp-head { color: var(--gold); }
+  #quest-pop .muted { color: var(--ink-2); }
+  #quest-pop .q-steps li { color: var(--ink); }
+  #quest-pop .q-steps li.done { color: var(--green); }
+  #quest-pop .q-reward { color: var(--violet); }
+  #quest-pop .close { color: var(--ink-2); }
+  #quest-pop .lib-btn { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  #quest-pop .lib-btn.primary { background: linear-gradient(100deg, #8b6bff, #b49bff); color: #fff; border: 0; }
+  #quest-pop .q-go { color: #8a5a00; background: #fff4d6; border-color: #f0c35a; }
+  /* 건물 정보 카드 (가운데 아래 모달 → 오른쪽 아래 카드, 모바일은 스탯 줄 아래) */
+  #info-modal {
+    left: auto; right: 14px; bottom: 64px; transform: none; width: min(340px, calc(100vw - 28px));
+    background: var(--glass-strong); color: var(--ink); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 14px 36px rgba(20, 40, 70, .22); animation: cardIn .22s cubic-bezier(.2, .8, .2, 1);
+  }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+  #info-modal .modal-header { border-bottom-color: var(--line); align-items: center; }
+  #info-modal .modal-title { color: var(--ink); font-size: 16px; font-weight: 800; }
+  #info-modal .modal-sub { display: inline-block; margin: 4px 0 0; color: var(--accent); background: rgba(12, 147, 184, .1); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+  #info-modal .modal-header > div { display: flex; flex-direction: column; align-items: flex-start; }
+  #info-modal .modal-close { color: var(--ink-2); }
+  #info-modal .modal-desc { color: var(--ink); }
+  #info-modal .modal-lore { color: var(--ink-2); background: rgba(12, 147, 184, .07); border-left-color: var(--accent); }
+  #info-modal .btn-action { background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-weight: 600; }
+  #info-modal .btn-action:hover { background: #f3f7fb; }
+  #info-modal .btn-action.primary { background: linear-gradient(100deg, #18b4dc, #3ccf9c); color: #fff; border: 0; }
+  @media (max-width: 640px) {
+    #info-modal { right: 8px; left: 8px; width: auto; top: 76px; bottom: auto; padding: 12px 14px; }
+    #info-modal .modal-desc { font-size: 12px; margin-bottom: 8px; }
+    #info-modal .modal-lore { font-size: 11px; }
+  }
 </style>
 </head>
 <body class="prestart">
@@ -590,8 +675,9 @@
 <div id="app"></div>
 
 <div id="hud">
-  <b>PACKET KNIGHT</b><span class="stage-label"> — 블루투스 LE 복셀 RPG</span><br />
-  <div class="control-desc" id="hud-controls">
+  <b>PACKET KNIGHT</b><span class="stage-label"> — 블루투스 LE 복셀 RPG</span>
+  <button type="button" id="btn-help" aria-expanded="false" aria-controls="hud-controls" title="조작법 펼치기 (H)">❔ 조작법</button>
+  <div class="control-desc" id="hud-controls" hidden>
     🎮 이동: <b>바닥 터치 / 조이스틱 / WASD</b><br />
     🦘 점프: <b>스페이스바 / 점프 버튼</b> (착지 충격파 & 스쿼시)<br />
     🧱 충돌: <b>건물·나무 슬라이딩</b> · 반 블록 계단은 걸어서, 분수대 턱은 점프로<br />

@@ -1572,18 +1572,20 @@ await page.waitForFunction(() => window.__PK);
     return r.fulfill({ body: readFileSync(file), contentType: MIME[path.extname(file)] ?? "application/octet-stream" });
   });
   if (existsSync(LOCAL_THREE)) await tp.route("**/three.module.js", (r) => r.fulfill({ body: readFileSync(LOCAL_THREE), contentType: "application/javascript" }));
-  await tp.goto(`${ORIGIN}/`);
+  await tp.goto(`${ORIGIN}/`, { waitUntil: "commit", timeout: 60000 });
+  await tp.waitForSelector("#splash", { state: "attached", timeout: 30000 });
   const early = await tp.evaluate(() => ({ splash: !!document.getElementById("splash"), pre: document.body.classList.contains("prestart"),
     emblem: !!document.querySelector("#splash .pk-emblem"), title: document.title, icon: !!document.querySelector('link[rel="icon"]') }));
-  await tp.waitForSelector("#splash.ready", { timeout: 20000 });
+  await tp.waitForSelector("#splash.ready", { timeout: 60000 });
   const label = await tp.locator("#splash-start").textContent();
   const hudHidden = await tp.evaluate(() => getComputedStyle(document.getElementById("hp")).opacity === "0");
   check("처음 들어오면 게임 마크·제목이 있는 로딩 화면이 바로 뜨고, 준비되면 시작 버튼이 나온다 (HUD는 숨김)",
     early.splash && early.pre && early.emblem && early.icon && !/Stage/.test(early.title) && label.includes("시작하기") && hudHidden,
     `제목 '${early.title}' · 버튼 '${label}'`);
   const z0 = await tp.evaluate(() => window.__PK.zoom());
-  await tp.click("#splash-start");
-  await tp.waitForFunction(() => !document.getElementById("splash") && !document.body.classList.contains("prestart"), null, { timeout: 5000 });
+  // 실제 렌더 루프(그림자 포함)가 소프트웨어 렌더링에서 무거워 Playwright 클릭 후 대기가 밀린다 → DOM 클릭 (Stage 11.8)
+  await tp.evaluate(() => document.getElementById("splash-start").click());
+  await tp.waitForFunction(() => !document.getElementById("splash") && !document.body.classList.contains("prestart"), null, { timeout: 20000 });
   const z1 = await tp.evaluate(() => window.__PK.zoom());
   check("시작을 누르면 타이틀이 걷히고 카메라가 하늘(줌 46)에서 기사 쪽으로 내려앉으며 HUD가 나타난다",
     z0 > 40 && z1 < z0, `줌 ${z0.toFixed(1)} → ${z1.toFixed(1)}`);
