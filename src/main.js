@@ -20,7 +20,9 @@ import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
 import * as knightView from "./render/knight.js";
-import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera } from "./render/camera.js";
+import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera, setAttract, startLanding } from "./render/camera.js";
+import * as splash from "./ui/splash.js";
+splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
 import * as hud from "./ui/hud.js";
 import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, chapterLink, lastChapterUrl } from "./ui/library.js";
@@ -929,8 +931,30 @@ function animate() {
   renderer.render(scene, camera);
 }
 knightView.syncKnight(motor, false, 0);
+if (!TEST_MODE) setAttract(true);   // 타이틀 뒤에서 마을 위를 천천히 돈다
 updateCamera(motor, 1);
 animate();
+
+// ---------- 타이틀 → 착지 (Stage 11.5) ----------
+if (!TEST_MODE) {
+  setInputEnabled(false);
+  const q = questById(progress.quests.active);
+  const save = loaded.status === "loaded"
+    ? `⭐ Lv ${levelFromXp(progress.xp).level} · 🪙 ${progress.cr2032}${q ? ` · 📜 ${q.code} ${q.title}` : " · 📜 모든 퀘스트 완료"}`
+    : null;
+  // 첫 화면이 실제로 그려진 뒤 타이틀로 바꾼다
+  requestAnimationFrame(() => requestAnimationFrame(() => splash.ready({
+    save,
+    onStart: () => {
+      startLanding(1.8);
+      setInputEnabled(true);
+      sfx("portal");
+      document.body.classList.add("revealing");
+      setTimeout(() => document.body.classList.remove("prestart"), 900);   // 거의 내려앉았을 때 HUD가 차례로
+      setTimeout(() => document.body.classList.remove("revealing"), 2200);
+    }
+  })));
+}
 
 window.addEventListener("resize", () => {
   resizeCamera();

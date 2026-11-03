@@ -34,7 +34,33 @@ export function cameraRelative(right, forward) {
   return { x: rightX * right + fwdX * forward, z: rightZ * right + fwdZ * forward };
 }
 
+// ---------- 타이틀 화면 배경 · 착지 연출 (Stage 11.5) ----------
+// attract: 타이틀 뒤에서 마을 위 높은 곳을 천천히 돈다. landing: 시작하면 그 자리에서 기사 뒤 기본 시점으로 내려앉는다.
+const ATTRACT = { distance: 46, pitch: 0.95, spin: 0.08 };
+let attract = false;
+let landing = null;
+const easeOutCubic = (k) => 1 - (1 - k) ** 3;
+
+export function setAttract(on) {
+  attract = on;
+  if (on) Object.assign(orbit, { distance: ATTRACT.distance, pitch: ATTRACT.pitch });
+}
+/** 지금 시점에서 기본 시점(거리 DEFAULT_DISTANCE, 기본 각도, 정면 yaw 0)으로 duration초 동안 내려앉는다 */
+export function startLanding(duration = 1.8) {
+  attract = false;
+  const yaw = ((orbit.yaw % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;   // −π~π: 가까운 쪽으로 돈다
+  landing = { t: 0, d: duration, from: { distance: orbit.distance, pitch: orbit.pitch, yaw }, to: { distance: DEFAULT_DISTANCE, pitch: DEFAULT_PITCH, yaw: 0 } };
+}
+export const isLanding = () => landing !== null;
+
 export function updateCamera(target, dt) {
+  if (attract) orbit.yaw += ATTRACT.spin * dt;
+  if (landing) {
+    landing.t += dt;
+    const k = easeOutCubic(Math.min(1, landing.t / landing.d));
+    for (const key of ["distance", "pitch", "yaw"]) orbit[key] = landing.from[key] + (landing.to[key] - landing.from[key]) * k;
+    if (k >= 1) landing = null;
+  }
   focusY += (target.y - focusY) * Math.min(1, dt * 6);
   const hDist = orbit.distance * Math.cos(orbit.pitch);
   const vDist = orbit.distance * Math.sin(orbit.pitch);

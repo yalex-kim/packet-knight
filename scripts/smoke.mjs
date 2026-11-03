@@ -1561,6 +1561,35 @@ await page.waitForFunction(() => window.__PK);
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
+// ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
+{
+  const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+  tp.on("pageerror", (e) => errors.push(`[타이틀] ${e.message}`));
+  await tp.route((url) => url.origin === ORIGIN, (r) => {
+    const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
+    const file = path.resolve(ROOT, rel);
+    if (!file.startsWith(ROOT + path.sep) || !existsSync(file)) return r.fulfill({ status: 404, body: "not found" });
+    return r.fulfill({ body: readFileSync(file), contentType: MIME[path.extname(file)] ?? "application/octet-stream" });
+  });
+  if (existsSync(LOCAL_THREE)) await tp.route("**/three.module.js", (r) => r.fulfill({ body: readFileSync(LOCAL_THREE), contentType: "application/javascript" }));
+  await tp.goto(`${ORIGIN}/`);
+  const early = await tp.evaluate(() => ({ splash: !!document.getElementById("splash"), pre: document.body.classList.contains("prestart"),
+    emblem: !!document.querySelector("#splash .pk-emblem"), title: document.title, icon: !!document.querySelector('link[rel="icon"]') }));
+  await tp.waitForSelector("#splash.ready", { timeout: 20000 });
+  const label = await tp.locator("#splash-start").textContent();
+  const hudHidden = await tp.evaluate(() => getComputedStyle(document.getElementById("hp")).opacity === "0");
+  check("처음 들어오면 게임 마크·제목이 있는 로딩 화면이 바로 뜨고, 준비되면 시작 버튼이 나온다 (HUD는 숨김)",
+    early.splash && early.pre && early.emblem && early.icon && !/Stage/.test(early.title) && label.includes("시작하기") && hudHidden,
+    `제목 '${early.title}' · 버튼 '${label}'`);
+  const z0 = await tp.evaluate(() => window.__PK.zoom());
+  await tp.click("#splash-start");
+  await tp.waitForFunction(() => !document.getElementById("splash") && !document.body.classList.contains("prestart"), null, { timeout: 5000 });
+  const z1 = await tp.evaluate(() => window.__PK.zoom());
+  check("시작을 누르면 타이틀이 걷히고 카메라가 하늘(줌 46)에서 기사 쪽으로 내려앉으며 HUD가 나타난다",
+    z0 > 40 && z1 < z0, `줌 ${z0.toFixed(1)} → ${z1.toFixed(1)}`);
+  await tp.close();
+}
+
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));
 
 await browser.close();
