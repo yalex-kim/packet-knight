@@ -58,7 +58,7 @@ export const LANDMARKS = [
       lore: "저전력 BLE 기기의 수명과 성능을 좌우하는 CR2032 전원 설계 및 RF 매칭 회로를 은유합니다.",
       link: CHAPTER("power.html"),
       action: { id: "rflab", label: "🔧 RF 랩 입장 (장비 강화·스탯 분배)" },
-      walkPos: { x: 6.6, y: S, z: -1.0 }
+      walkPos: { x: 8.6, y: S, z: 3.4 }   // 정면(남쪽) 앞 — 광장 가로등을 비켜 걸어올 수 있게
     }
   },
   {
@@ -144,7 +144,7 @@ LANDMARKS.push({
     lore: "평균 전류 ≈ 수면 전류 + 이벤트 전하 ÷ 간격, 수명 ≈ 용량 ÷ 평균 전류. 간격이 길수록 창 넓히기((ppm÷10⁶)×시간 + 16 µs)가 커집니다.",
     link: CHAPTER("power.html"),
     action: { id: "crypt", label: "🔋 배터리 계약" },
-    walkPos: { x: CRYPT_POS.x, y: S, z: CRYPT_POS.z - 2.2 }
+    walkPos: { x: CRYPT_POS.x, y: S, z: CRYPT_POS.z + 2.2 }   // 정면(남쪽) 앞
   }
 });
 
@@ -190,8 +190,11 @@ export const JOB_AREA = Object.freeze({ x: TOWER_POS.x, z: TOWER_POS.z });
 export const TREE_POSITIONS = [
   [-13, -7, 1.1], [12, -7, 1.0], [13, 4, 1.1],   // (−12, 5) 나무는 광고판 자리로 비웠다 (Stage 11.18)
   [-5, -12, 1.0], [5, -11, 0.95], [-4, 12, 1.1], [4, 12, 1.0],
-  [-11, -1, 0.85], [11, -1, 0.85], [-6, 6, 1.0], [6, 6, 0.9],
-  [-14, 0, 1.2], [14, 0, 1.1]
+  [-6, 6, 1.0], [6, 6, 0.9],   // (±11, −1) 나무는 도서관·대장간과 겹쳐 치웠다 (Stage 11.20)
+  [-14, 0, 1.2], [14, 0, 1.1],
+  // 동서 숲 (Stage 11.20 — 과하지 않게 몇 그루씩)
+  [-18, -6, 1.15], [-20.5, -3, 1.0], [-17.5, -2.5, 0.9], [-21, 1.5, 1.2], [-19, 4, 0.95], [-20.5, -7.5, 0.9], [-16.5, -9.5, 1.0],
+  [18, -6, 1.1], [20.5, -2.5, 1.0], [17.5, -2, 0.9], [21, 2, 1.2], [19, 4.5, 0.95], [20.5, -8, 0.9], [16.5, -9.5, 1.0]
 ];
 
 /** [x, z] */
@@ -216,7 +219,7 @@ export const FOUNTAIN_RIM_HEIGHT = 0.7; // 걸어서는 못 오르고(STEP_MAX 0
 
 export const OBSTACLE_CIRCLES = [
   { id: "fountainRim",    x: 0, z: 0, r: 1.85, top: S + FOUNTAIN_RIM_HEIGHT },
-  { id: "fountainPillar", x: 0, z: 0, r: 0.45, top: S + 1.7 },
+  { id: "fountainPillar", x: 0, z: 0, r: 0.95, top: S + 2.0 },   // 2층 그릇 아래로는 못 들어간다 (Stage 11.20)
   ...TREE_POSITIONS.map(([x, z, s]) => ({ id: "tree", x, z, r: 0.45, top: groundHeightAt(x, z) + 1.8 * s })),
   ...LAMP_POSITIONS.map(([x, z]) => ({ id: "lamp", x, z, r: 0.12, top: groundHeightAt(x, z) + 2.0 })),
   { id: "trainingSign", x: -9.0, z: 4.6, r: 0.25, top: S + 1.8 },

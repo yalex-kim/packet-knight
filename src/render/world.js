@@ -264,7 +264,7 @@ const library = new THREE.Group();
 placeLandmark(library, "library");
 
 
-// ----- 3.3 🔨 패킷 대장간 — 돌벽·나무 기둥·차양·화로·모루·통과 상자·안테나 걸이 (정면이 광장 쪽 = 서쪽) -----
+// ----- 3.3 🔨 패킷 대장간 — 돌벽·나무 기둥·차양·화로·모루·통과 상자·안테나 걸이 (정면 = 남쪽) -----
 const forge = new THREE.Group();
 {
   bx(forge, 2.7, 0.25, 3.1, stoneDark, 0, 0.125, 0);
@@ -299,7 +299,7 @@ const forge = new THREE.Group();
   bx(forge, 0.5, 0.32, 0.05, woodMat, 1.2, 1.5, 1.62);
   bx(forge, 0.26, 0.08, 0.06, metalMat, 1.2, 1.52, 1.66);
   forge.userData.ember = ember;
-  forge.rotation.y = -Math.PI / 2;
+  // 정면(+z)이 기본 카메라 쪽(남쪽)을 본다 (사용자 요청)
 }
 placeLandmark(forge, "forge");
 
@@ -333,26 +333,100 @@ const tower = new THREE.Group();
 placeLandmark(tower, "tower");
 
 
-// ----- 3.5 ⛲ 중앙 광장 분수대 (Central Bluetooth Fountain) -----
+// ----- 3.5 ⛲ 중앙 광장 분수대 — 2층 분수·블루투스 마크·흐르는 물 (Stage 11.20) -----
+/** 블루투스 마크 (원 안의 룬 ᛒ) 캔버스 텍스처 */
+function bluetoothTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const x = c.getContext("2d");
+  const g = x.createRadialGradient(64, 64, 10, 64, 64, 62);
+  g.addColorStop(0, "#2f8cff"); g.addColorStop(1, "#0b4fc4");
+  x.fillStyle = g; x.beginPath(); x.arc(64, 64, 60, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = "#ffffff"; x.lineWidth = 9; x.lineJoin = "round"; x.lineCap = "round";
+  x.beginPath();                                   // ᛒ: 왼쪽 위 → 오른쪽 아래 → 가운데 아래 → 가운데 위 → 오른쪽 위 → 왼쪽 아래
+  x.moveTo(40, 42); x.lineTo(86, 84); x.lineTo(64, 104); x.lineTo(64, 24); x.lineTo(86, 44); x.lineTo(40, 86);
+  x.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 const fountain = new THREE.Group();
+const fountainFx = { jets: [], falls: [], ripples: [] };
 {
-  // 수반 턱 높이 0.7 — 걸어서는 못 오르고(STEP_MAX 0.55) 점프로 올라설 수 있다
-  const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, FOUNTAIN_RIM_HEIGHT, 12), stoneMat);
-  basin.position.y = FOUNTAIN_RIM_HEIGHT / 2;
+  const R = FOUNTAIN_RIM_HEIGHT;                   // 수반 턱 높이 0.7 — 걸어서는 못 오르고 점프로 올라선다
+  const waterLight = new THREE.MeshLambertMaterial({ color: 0x4fb3e8, transparent: true, opacity: 0.85 });
+  const spray = new THREE.MeshBasicMaterial({ color: 0xd8f3ff, transparent: true, opacity: 0.85 });
+  // 1층: 팔각 돌 수반 (아래가 조금 넓다) + 턱 + 물
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.85, R, 8), stoneLight);
+  basin.position.y = R / 2;
   fountain.add(basin);
-
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 0.5, 12), waterMat);
-  water.position.y = 0.48;
-  fountain.add(water);
-
-  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1.1, 8), stoneMat);
-  pillar.position.y = 0.75;
-  fountain.add(pillar);
-
-  const rune = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), cyanEmblem);
-  rune.position.y = 1.5;
+  const lip = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.1, 8), stoneMat);
+  lip.position.y = R + 0.02;
+  fountain.add(lip);
+  const pool = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.06, 32), waterLight);
+  pool.position.y = R - 0.08;
+  fountain.add(pool);
+  // 기둥 + 2층 그릇 + 그 물
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.34, 1.0, 8), stoneLight);
+  stem.position.y = R + 0.4;
+  fountain.add(stem);
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.45, 0.32, 8), stoneLight);
+  bowl.position.y = 1.55;
+  fountain.add(bowl);
+  const bowlLip = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.07, 8), stoneMat);
+  bowlLip.position.y = 1.72;
+  fountain.add(bowlLip);
+  const upperWater = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.04, 24), waterLight);
+  upperWater.position.y = 1.68;
+  fountain.add(upperWater);
+  // 꼭대기: 작은 기둥 + 회전하는 블루투스 마크
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.5, 8), stoneLight);
+  top.position.y = 1.95;
+  fountain.add(top);
+  const rune = new THREE.Mesh(new THREE.CircleGeometry(0.3, 32), new THREE.MeshBasicMaterial({ map: bluetoothTexture(), side: THREE.DoubleSide, transparent: true }));
+  rune.position.y = 2.55;
   fountain.add(rune);
   fountain.userData.rune = rune;
+  // 꼭대기에서 솟는 물줄기 (작은 물방울 상자들이 포물선)
+  const dropGeo = new THREE.BoxGeometry(0.07, 0.12, 0.07);
+  for (let i = 0; i < 16; i++) {
+    const m = new THREE.Mesh(dropGeo, spray);
+    fountain.add(m);
+    fountainFx.jets.push({ m, a: (i / 16) * Math.PI * 2, phase: (i * 0.37) % 1 });
+  }
+  // 2층 그릇 가장자리에서 1층으로 떨어지는 물 (8곳 × 3방울)
+  for (let k = 0; k < 8; k++) for (let j = 0; j < 3; j++) {
+    const m = new THREE.Mesh(dropGeo, spray);
+    fountain.add(m);
+    fountainFx.falls.push({ m, a: (k / 8) * Math.PI * 2 + Math.PI / 8, phase: j / 3 });
+  }
+  // 1층 물 위 물결 고리
+  for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 0.97, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = R - 0.04;
+    fountain.add(ring);
+    fountainFx.ripples.push({ m: ring, phase: i / 3 });
+  }
+}
+/** 분수 물 애니메이션 (animateWorld에서) */
+function animateFountain(t) {
+  for (const d of fountainFx.jets) {               // 꼭대기 0.15 m 위에서 솟아 그릇으로
+    const k = (t * 0.9 + d.phase) % 1;
+    const r = 0.1 + k * 0.6;
+    d.m.position.set(Math.cos(d.a) * r, 2.85 + Math.sin(k * Math.PI) * 0.55 - k * 1.1, Math.sin(d.a) * r);
+  }
+  for (const d of fountainFx.falls) {              // 그릇 가장자리(r 0.95, y 1.7)에서 수면(y 0.62)으로
+    const k = (t * 1.3 + d.phase) % 1;
+    const r = 0.98 + k * 0.25;
+    d.m.position.set(Math.cos(d.a) * r, 1.7 - k * k * 1.08, Math.sin(d.a) * r);
+    d.m.scale.y = 1 + k * 1.5;
+  }
+  for (const d of fountainFx.ripples) {
+    const k = (t * 0.45 + d.phase) % 1;
+    d.m.scale.setScalar(1 + k * 0.6);
+    d.m.material.opacity = 0.5 * (1 - k);
+  }
 }
 placeLandmark(fountain, "fountain");
 
@@ -495,7 +569,6 @@ placeLandmark(prison, "prison");
 const crypt = new THREE.Group();
 {
   // 작은 영묘: 계단식 기단·앞 기둥 둘·박공 지붕·어두운 문·꺼져 가는 CR2032·이끼·작은 비석 (Stage 11.19)
-  // 모델의 앞(+z)이 마을 쪽(북, −z)을 보도록 뒤집는다
   const slate = new THREE.MeshLambertMaterial({ color: 0x4a4f5a });
   const moss = new THREE.MeshLambertMaterial({ color: 0x5f8a4a });
   bx(crypt, 2.0, 0.2, 1.6, stoneDark, 0, 0.1, 0);
@@ -526,7 +599,7 @@ const crypt = new THREE.Group();
     bx(crypt, 0.24, 0.4, 0.08, stoneMat, gx, 0.4, gz);
     bx(crypt, 0.12, 0.04, 0.1, stoneDark, gx, 0.48, gz + 0.01);
   }
-  crypt.rotation.y = Math.PI;
+  // 정면(+z)이 기본 카메라 쪽(남쪽)을 본다 (사용자 요청)
 }
 placeLandmark(crypt, "crypt");
 
@@ -666,8 +739,9 @@ export function enableShadows(obj) {
 
 export function animateWorld(t) {
   animated.beacon.material.color.setHSL(0.55, 0.9, 0.45 + 0.35 * Math.sin(t * 3.5)); // 비콘 점멸
-  animated.rune.rotation.y = t * 1.5;                                                 // 분수대 룬 회전
-  animated.rune.position.y = 1.5 + Math.sin(t * 2.5) * 0.08;
+  animated.rune.rotation.y = t * 1.2;                                                 // 분수대 블루투스 마크 회전
+  animated.rune.position.y = 2.55 + Math.sin(t * 2.5) * 0.06;
+  animateFountain(t);
   animated.portal.scale.set(1 + 0.06 * Math.sin(t * 4), 1 + 0.06 * Math.cos(t * 3), 1); // 포털 맥동
   sea.position.z = Math.sin(t * 0.3) * 0.4;
   animated.lock.rotation.z = Math.sin(t * 2) * 0.15;                                   // 흔들리는 자물쇠

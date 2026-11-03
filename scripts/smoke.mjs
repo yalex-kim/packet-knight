@@ -1224,7 +1224,7 @@ await page.waitForFunction(() => window.__PK);
   check("HUD 퀘스트 트래커에는 길 안내 버튼도, 새어 나온 'false' 글자도 없다",
     (await page.locator("#quest-tracker .q-go").count()) === 0 && !trackerText.includes("false"), trackerText.slice(-40));
   check("퀘스트 로그의 '📍 길 안내'가 그 단계의 건물(RF 랩 → 패킷 대장간)로 데려간다",
-    goes.includes("forge") && goes.includes("tower") && closed && s0.modal.includes("패킷 대장간") && s1.badge.includes("패킷 대장간") && Math.hypot(s1.x - 6.6, s1.z + 1.0) < 1.2,
+    goes.includes("forge") && goes.includes("tower") && closed && s0.modal.includes("패킷 대장간") && s1.badge.includes("패킷 대장간") && Math.hypot(s1.x - 8.6, s1.z - 3.4) < 1.2,
     `${goes.join(",")} · ${s0.modal} · ${s1.badge} @ (${s1.x.toFixed(1)}, ${s1.z.toFixed(1)})`);
   await page.keyboard.press("Escape");
 }
