@@ -168,7 +168,7 @@ function tagTexture(w) {
     ctx.font = "bold 24px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`Wi-Fi ${w}`, 64, 21);
+    ctx.fillText(String(w), 64, 21);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tagTextures.set(w, tex);
@@ -176,8 +176,104 @@ function tagTexture(w) {
   return tagTextures.get(w);
 }
 
+/** 광역 공격 예고 원 (반경 = 사거리) */
+function makeAoe(g, range) {
+  const mk = (geo, op) => {
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff3b30, side: THREE.DoubleSide, transparent: true, opacity: op, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2; mesh.visible = false; g.add(mesh); return mesh;
+  };
+  const aoe = mk(new THREE.RingGeometry(range - 0.15, range, 48), 0); aoe.position.y = 0.04;
+  const aoeFill = mk(new THREE.CircleGeometry(range, 48), 0); aoeFill.position.y = 0.03;
+  return { aoe, aoeFill };
+}
+
+/** 광고 폭주 비콘 (Stage 12.1): 작은 주황 로봇 + 확성기 + 세 색(37·38·39) 안테나 */
+function makeFlooder(g) {
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xff9a3c, emissive: 0x000000 });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x5a3418 });
+  const ledMat = new THREE.MeshBasicMaterial({ color: 0xfff1a8 });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1d2733 });
+  const rig = new THREE.Group(); g.add(rig);
+  const legs = [joint(rig, -0.1, 0.16, 0), joint(rig, 0.1, 0.16, 0)];
+  for (const l of legs) part(l, 0.1, 0.16, 0.12, dark, 0, -0.08, 0);
+  part(rig, 0.42, 0.36, 0.36, bodyMat, 0, 0.35, 0);
+  part(rig, 0.26, 0.12, 0.02, ledMat, 0, 0.4, 0.19);
+  const eyes = [part(rig, 0.05, 0.07, 0.02, eyeMat, -0.06, 0.4, 0.2), part(rig, 0.05, 0.07, 0.02, eyeMat, 0.06, 0.4, 0.2)];
+  const horn = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.3, 12, 1, true), new THREE.MeshLambertMaterial({ color: 0xfff1a8, side: THREE.DoubleSide }));
+  horn.rotation.x = -Math.PI / 2; horn.position.set(0.24, 0.45, 0.2); rig.add(horn);
+  const antennas = [0x39d0ff, 0x7dffb5, 0xffd76b].map((c, i) => {
+    const j = joint(rig, -0.12 + i * 0.12, 0.53, 0);
+    part(j, 0.03, 0.22, 0.03, dark, 0, 0.11, 0);
+    part(j, 0.08, 0.08, 0.08, new THREE.MeshBasicMaterial({ color: c }), 0, 0.25, 0);
+    return j;
+  });
+  return { rig, bodyMat, ledMat, eyeMat, eyes, legs, antennas };
+}
+
+/** 전자레인지 재머 (Stage 12.1): 하얀 오븐 몸통 + 문 창(켜지면 주황 빛) + 다이얼 + 짧은 다리 */
+function makeMicrowave(g) {
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xe8ecf0, emissive: 0x000000 });
+  const trim = new THREE.MeshLambertMaterial({ color: 0x6b7480 });
+  const ledMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a });     // 문 안의 빛 (켜짐/꺼짐)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x7dffb5 });     // 표시창
+  const rig = new THREE.Group(); g.add(rig);
+  const legs = [];
+  for (const [x, z] of [[-0.5, 0.3], [0.5, 0.3], [-0.5, -0.3], [0.5, -0.3]]) { const j = joint(rig, x, 0.22, z); part(j, 0.14, 0.24, 0.14, trim, 0, -0.1, 0); legs.push(j); }
+  part(rig, 1.3, 0.8, 0.9, bodyMat, 0, 0.66, 0);
+  part(rig, 0.82, 0.58, 0.04, trim, -0.16, 0.66, 0.46);
+  const doorGlow = part(rig, 0.7, 0.46, 0.03, ledMat, -0.16, 0.66, 0.48);
+  part(rig, 0.26, 0.6, 0.03, trim, 0.46, 0.66, 0.46);
+  part(rig, 0.18, 0.08, 0.02, eyeMat, 0.46, 0.86, 0.48);
+  const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.05, 12), trim);
+  dial.rotation.x = Math.PI / 2; dial.position.set(0.46, 0.6, 0.49); rig.add(dial);
+  part(rig, 0.08, 0.2, 0.06, trim, -0.62, 1.12, 0);                    // 손잡이 같은 뿔
+  const wave = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 40), new THREE.MeshBasicMaterial({ color: 0xffa040, side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false }));
+  wave.rotation.x = -Math.PI / 2; wave.position.y = 0.06; g.add(wave);
+  return { rig, bodyMat, ledMat, eyeMat, legs, wave, doorGlow, dial, ...makeAoe(g, MONSTERS.microwave.attackRange) };
+}
+
+/** 중간자 스니퍼 (Stage 12.1): 후드 쓴 그림자 + 큰 헤드폰 + 초록 외눈, 떠 다닌다. 조준선으로 원거리 공격 예고 */
+function makeSniffer(g) {
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3a3f4f, emissive: 0x000000 });
+  const hood = new THREE.MeshLambertMaterial({ color: 0x23262f });
+  const ledMat = new THREE.MeshBasicMaterial({ color: 0x4fd89a });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x7dffb5 });
+  const rig = new THREE.Group(); g.add(rig);
+  part(rig, 0.56, 0.7, 0.44, bodyMat, 0, 0.75, 0);                     // 망토 몸통
+  part(rig, 0.66, 0.2, 0.5, hood, 0, 0.42, 0);                         // 옷자락
+  const head = joint(rig, 0, 1.15, 0);
+  part(head, 0.5, 0.44, 0.46, hood, 0, 0.18, 0);
+  part(head, 0.36, 0.26, 0.04, new THREE.MeshBasicMaterial({ color: 0x0b0d12 }), 0, 0.14, 0.23);
+  const eye = part(head, 0.12, 0.08, 0.03, eyeMat, 0, 0.16, 0.25);
+  for (const sx of [-1, 1]) { part(head, 0.1, 0.24, 0.24, new THREE.MeshLambertMaterial({ color: 0x1b1f27 }), sx * 0.3, 0.16, 0); part(head, 0.04, 0.06, 0.06, ledMat, sx * 0.36, 0.16, 0); }
+  part(head, 0.56, 0.06, 0.08, new THREE.MeshLambertMaterial({ color: 0x1b1f27 }), 0, 0.42, 0);   // 헤드폰 띠
+  const arms = [joint(rig, -0.34, 0.95, 0), joint(rig, 0.34, 0.95, 0)];
+  for (const a of arms) part(a, 0.12, 0.42, 0.14, hood, 0, -0.18, 0);
+  // 조준선: 앞으로 사거리만큼 (예고 동안 차오른다)
+  const laser = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1), new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0, depthWrite: false }));
+  laser.position.set(0, 1.1, MONSTERS.sniffer.attackRange / 2);
+  laser.scale.z = MONSTERS.sniffer.attackRange;
+  laser.visible = false;
+  g.add(laser);
+  return { rig, bodyMat, ledMat, eyeMat, eyes: [eye], arms, head, laser };
+}
+
 function makeMonster(m) {
   const g = new THREE.Group();
+  if (m.type === "advFlooder" || m.type === "microwave" || m.type === "sniffer") {
+    const parts = m.type === "advFlooder" ? makeFlooder(g) : m.type === "microwave" ? makeMicrowave(g) : makeSniffer(g);
+    const bar = makeBar(g, m.type === "microwave" ? 1.5 : m.type === "sniffer" ? 1.9 : 1.05);
+    let tag = null;
+    if (m.type === "microwave") {
+      tag = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+      tag.scale.set(1.3, 0.34, 1); tag.position.y = 1.85; tag.visible = false; tag.renderOrder = 11; g.add(tag);
+    }
+    g.userData = { monsterId: m.id, ...parts, ...bar, tag, tagWifi: null };
+    battleRoot.add(g);
+    monsterTargets.push(g);
+    monsterMeshes.set(m.id, g);
+    return g;
+  }
   if (m.type === "wifiInterferer") {
     const parts = makeRouter(g);
     const bar = makeBar(g, 2.05);   // 안테나 끝(약 1.9) 위
@@ -241,11 +337,12 @@ export function syncBattle(battle, camera, t, dt) {
     if (!g.visible) continue;
     const { tag } = g.userData;
     if (tag) {
-      tag.visible = Boolean(m.revealed && m.wifi);
-      if (tag.visible && g.userData.tagWifi !== m.wifi) {
-        tag.material.map = tagTexture(m.wifi);
+      const label = m.wifi ? `Wi-Fi ${m.wifi}` : m.band ? (m.on ? "전자레인지 ON" : "전자레인지 OFF") : null;
+      tag.visible = Boolean(m.revealed && label);
+      if (tag.visible && g.userData.tagWifi !== label) {
+        tag.material.map = tagTexture(label);
         tag.material.needsUpdate = true;
-        g.userData.tagWifi = m.wifi;
+        g.userData.tagWifi = label;
       }
     }
     if (aoe) {
@@ -279,7 +376,28 @@ export function syncBattle(battle, camera, t, dt) {
     }
     // 몸짓 (Stage 11.11): 비콘 봇은 통통 뛰며 팔을 흔들고 가끔 눈을 깜빡, 공유기 괴물은 다리를 버둥대며 안테나를 꿈틀
     const ph = t * 7 + m.id * 1.7;
-    if (m.type === "wifiInterferer") {
+    if (m.type === "advFlooder") {                     // 통통 튀며 달려든다, 안테나가 번갈아 반짝
+      rig.position.y = Math.abs(Math.sin(ph * 1.6)) * 0.14;
+      legs.forEach((l, i) => { l.rotation.x = Math.sin(ph * 3 + i * Math.PI) * 0.6; });
+      antennas.forEach((a, i) => { a.scale.setScalar(Math.floor(t * 9 + m.id) % 3 === i ? 1.4 : 1); });
+      if (!windup) ledMat.color.setHex(Math.sin(t * 20) > 0 ? 0xfff1a8 : 0xff9a3c);
+    } else if (m.type === "microwave") {               // 켜지면 문 창이 주황으로 빛나고 잡음 고리가 퍼진다
+      const on = m.on !== false;
+      if (!windup) ledMat.color.setHex(on ? (Math.sin(t * 30) > 0 ? 0xffb050 : 0xff7a1a) : 0x2a1a10);
+      g.userData.dial.rotation.z = t * (on ? 4 : 0.3);
+      rig.position.y = on ? Math.abs(Math.sin(t * 25)) * 0.02 : 0;
+      legs.forEach((l, i) => { l.rotation.x = Math.sin(ph * 0.8 + i) * 0.2; });
+      const w = (t * 0.9 + m.id * 0.3) % 1;
+      wave.scale.setScalar(1 + w * 3);
+      wave.material.opacity = on && !windup ? 0.5 * (1 - w) : 0;
+    } else if (m.type === "sniffer") {                 // 둥둥 떠 있고, 예고 동안 조준선이 차오른다
+      rig.position.y = 0.15 + Math.sin(t * 2 + m.id) * 0.08;
+      g.userData.head.rotation.y = windup ? 0 : Math.sin(t * 1.3 + m.id) * 0.5;
+      arms.forEach((a, i) => { a.rotation.x = windup ? -1.2 : Math.sin(ph * 0.5 + i) * 0.2; });
+      const laser = g.userData.laser;
+      laser.visible = windup;
+      if (windup) laser.material.opacity = 0.25 + 0.65 * (1 - m.t / MONSTERS.sniffer.windup);
+    } else if (m.type === "wifiInterferer") {
       rig.position.y = Math.abs(Math.sin(ph * 0.6)) * 0.05;
       legs?.forEach((l, i) => { l.rotation.x = Math.sin(ph + i * 1.6) * 0.35; });
       antennas?.forEach((a, i) => { a.rotation.x = Math.sin(t * 3 + i + m.id) * 0.18; });

@@ -2,7 +2,7 @@
 import { MONSTERS, TRAINING_GROUND, DUNGEON } from "../../src/core/balance.js";
 import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket } from "../../src/core/battle.js";
 import { createMotor, stepMotor } from "../../src/core/motor.js";
-import { DUNGEON_ROOM, generateFloor, createFloorBattle, stepAcs } from "../../src/core/dungeon.js";
+import { DUNGEON_ROOM, generateFloor, createFloorBattle, stepAcs, stepMicrowaves } from "../../src/core/dungeon.js";
 import { createLink, stepLink, applyAfh, interferenceFor } from "../../src/core/link.js";
 import { VILLAGE } from "../../src/core/collision.js";
 import { REACTION } from "./rssi.mjs";
@@ -91,6 +91,7 @@ export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush
     stepLink(link, COMBAT_DT);
     if (t >= afhAt) { applyAfh(link, battle); afhAt = Infinity; }
     for (const e of stepAcs(battle, floor, COMBAT_DT, rng)) if (afh && e.monster.revealed) afhAt = Math.min(afhAt, t + AFH_DELAY[afh]);
+    stepMicrowaves(battle, COMBAT_DT);   // Stage 12.1
     botStep(battle, pl, mode, COMBAT_DT, stats, fire);
     for (const e of stepBattle(battle, COMBAT_DT, { player: pl, stats, rng, interference })) {
       if (e.type === "hit") {

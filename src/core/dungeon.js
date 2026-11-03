@@ -4,7 +4,7 @@
 // 층마다 시드로 hopIncrement·숨은 Wi-Fi 간섭원·몬스터 배치가 달라진다 ("매번 다른 채널 배치").
 // 전투 수치는 Stage 6.5 시뮬레이션의 던전 가정치 그대로 (balance.js DUNGEON, PRD §8.7).
 
-import { DUNGEON, floorHpScale, floorAtkScale } from "./balance.js";
+import { DUNGEON, floorHpScale, floorAtkScale, floorPlan, MONSTERS } from "./balance.js";
 import { createRng } from "./quiz.js";
 import { createArena } from "./arena.js";
 import { createBattle } from "./battle.js";
@@ -54,7 +54,7 @@ export function generateFloor(floor, seed) {
   const rng = createRng((seed ^ Math.imul(floor, 0x9e3779b1)) >>> 0);
   const hopIncrement = HOP_MIN + Math.floor(rng() * (HOP_MAX - HOP_MIN + 1));
   const wifi = pickWifiChannels(wifiCountFor(floor), rng);
-  const n = DUNGEON.FLOOR_MONSTERS;
+  const n = floorPlan(floor).roster.length;   // Stage 12.1: 층마다 마릿수가 다르다
   const base = rng() * Math.PI * 2;
   const spawns = Array.from({ length: n }, (_, i) => {
     const a = base + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.5;
@@ -62,7 +62,9 @@ export function generateFloor(floor, seed) {
   });
   // 몬스터마다 자기 Wi-Fi 채널 (전투 중 간섭 대역 — Stage 8). 벽 속 숨은 공유기(wifi)와는 별개
   const monsterWifi = spawns.map(() => 1 + Math.floor(rng() * 13));
-  return { floor, seed, hopIncrement, wifi, monsterWifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor), atkScale: floorAtkScale(floor) };
+  const plan = floorPlan(floor);
+  return { floor, seed, hopIncrement, wifi, monsterWifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor), atkScale: floorAtkScale(floor),
+    roster: plan.roster, theme: plan.theme, name: plan.name };
 }
 
 /**
@@ -77,7 +79,7 @@ export function stepAcs(battle, floor, dt, rng) {
   const events = [];
   if (!period) return events;
   for (const m of battle.monsters) {
-    if (m.state === "dead") continue;
+    if (m.state === "dead" || !m.wifi) continue;   // ACS는 Wi-Fi 몬스터만
     m.acsT = (m.acsT ?? period * (0.5 + rng() * 0.5)) - dt;
     if (m.acsT > 0) continue;
     m.acsT = period;
@@ -91,9 +93,37 @@ export function stepAcs(battle, floor, dt, rng) {
 
 /** 층의 전투 생성 — 몬스터마다 Wi-Fi 채널(m.wifi)을 붙인다. 체크포인트 롤백은 같은 layout으로 다시 만든다 */
 export function createFloorBattle(layout) {
-  const battle = createBattle(layout.spawns, "wifiInterferer", DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
-  battle.monsters.forEach((m, i) => { m.wifi = layout.monsterWifi[i]; m.revealed = false; });
+  const roster = layout.roster ?? layout.spawns.map(() => "wifiInterferer");
+  const battle = createBattle(layout.spawns, roster, DUNGEON_WORLD, { hpScale: layout.hpScale, atkScale: layout.atkScale });
+  battle.monsters.forEach((m, i) => {
+    m.revealed = false;
+    if (m.type === "wifiInterferer") m.wifi = layout.monsterWifi[i];
+    if (m.type === "microwave") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.microwave.duty.on * (0.4 + 0.6 * ((i * 0.37) % 1)); }
+  });
   return battle;
+}
+
+/** 전자레인지가 덮는 LE 채널 (2442~2466 MHz) */
+export const MICROWAVE_BAND = (() => {
+  const { fromMhz, toMhz } = MONSTERS.microwave.band;
+  const s = new Set();
+  for (let c = 0; c < 37; c++) { const f = dataChannelFreq(c); if (f >= fromMhz && f <= toMhz) s.add(c); }
+  return s;
+})();
+
+/** 전자레인지 켜짐/꺼짐 박자 (Stage 12.1) — 바뀔 때 이벤트 */
+export function stepMicrowaves(battle, dt) {
+  const events = [];
+  const { on, off } = MONSTERS.microwave.duty;
+  for (const m of battle.monsters) {
+    if (m.type !== "microwave" || m.state === "dead") continue;
+    m.dutyT -= dt;
+    if (m.dutyT > 0) continue;
+    m.on = !m.on;
+    m.dutyT = m.on ? on : off;
+    events.push({ type: "microwave", monster: m, on: m.on });
+  }
+  return events;
 }
 
 /** 링크 퍼즐 상태 */

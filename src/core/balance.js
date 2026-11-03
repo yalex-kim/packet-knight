@@ -35,7 +35,7 @@ export const SKILL_REWARDS = Object.freeze({
  * 퀴즈 만점 보너스 크기 (PRD §8.4 "퀴즈 만점 보너스" 열) — 강좌 하나 = 장비 강화 1단계와 같은 가치.
  * (Stage 6.5 시뮬레이션: 원안 HP+5·TX+1·RX+1·PWR+5로는 퀴즈를 건너뛰고 알바한 쪽이 더 빨리 성장했다 — PRD §8.7)
  */
-export const QUIZ_BONUS = Object.freeze({ hp: 15, tx: 5, rx: 3, hop: 0.3, sec: 3, pwr: 10 });
+export const QUIZ_BONUS = Object.freeze({ hp: 15, tx: 6, rx: 3, hop: 0.3, sec: 3, pwr: 10 });   // Stage 12.1: TX 5 → 6 (새 몬스터로 층이 섞이며 퀴즈 이득이 1.17배로 내려가 1.2배 기준에 맞춤)
 
 export const QUIZ = Object.freeze({
   QUESTIONS_PER_QUIZ: 3,   // PRD §4.1 "레슨 후 3문제 퀴즈"
@@ -158,8 +158,75 @@ export const MONSTERS = Object.freeze({
     scan: "블루투스 패킷이 아니라 응답이 없다 — 2.4 GHz를 20 MHz 폭으로 넓게 덮는 Wi-Fi 신호다.",
     lore: "Wi-Fi 채널 1·6·11(20 MHz 폭)은 BLE 데이터 채널 여러 개를 한꺼번에 덮는다.",
     chapter: "coexistence.html"
+  }),
+  // ---- Stage 12.1: 층마다 다른 몬스터 (PRD §4.3.4) ----
+  // 광고 폭주 비콘: 빠르고 약한 떼. 근접·회피 가능, 간섭 대역 없음
+  advFlooder: Object.freeze({
+    id: "advFlooder",
+    name: "광고 폭주 비콘",
+    hp: 48, atk: 13, sec: 0,
+    speed: 4.4, aggro: 16, leash: 30,
+    attackRange: 1.3, windup: 0.4, cooldown: 1.0,
+    respawn: Infinity,
+    xp: 12,
+    drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.1 }]),
+    role: "광고 폭주 (ADV flood)",
+    pdu: "ADV_IND × advInterval 20 ms",
+    scan: "광고 간격 20 ms로 쉬지 않고 외친다 — 빨리 찾히지만 코인 전지가 금방 바닥난다.",
+    lore: "광고 간격이 짧을수록 발견은 빠르지만 전력과 채널 혼잡이 커진다. 떼로 몰려오면 광고 채널이 꽉 막힌다.",
+    chapter: "advertising.html"
+  }),
+  // 전자레인지 재머: 2.45 GHz 넓은 잡음이 켜졌다 꺼졌다(반파 정류). 켜져 있을 때만 그 대역에서 내 패킷이 깨진다.
+  // 광역 공격은 회피(RX) 불가, 지금 채널이 그 대역 밖이면 피해 0 (Wi-Fi 몬스터와 같은 규칙)
+  microwave: Object.freeze({
+    id: "microwave",
+    name: "전자레인지 재머",
+    hp: 230, atk: 42, sec: 4,
+    speed: 1.7, aggro: 16, leash: 30,
+    attackRange: 3.6, aoe: true, windup: 1.2, cooldown: 2.2,
+    respawn: Infinity,
+    xp: 40,
+    drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.6 }]),
+    role: "광대역 잡음원 (Broadband jammer)",
+    pdu: "2.45 GHz 마그네트론 — 켜졌다 꺼졌다",
+    scan: "패킷이 아니다. 2450 MHz 근처를 넓게 덮는 잡음이 일정한 박자로 켜졌다 꺼진다 — 꺼진 틈에는 그 채널도 쓸 수 있다.",
+    lore: "전자레인지는 ISM 대역의 오래된 이웃이다. 반파 정류 마그네트론이라 잡음이 켜졌다 꺼지기를 되풀이하고, 2450 MHz 근처 LE 채널 여러 개를 한꺼번에 덮는다.",
+    chapter: "coexistence.html",
+    band: Object.freeze({ fromMhz: 2442, toMhz: 2466 }),
+    duty: Object.freeze({ on: 3.0, off: 2.0 })
+  }),
+  // 중간자 스니퍼: 멀리서 위조 패킷을 쏜다. 예고(빨간 조준선) 동안 사거리 밖으로 빠지거나 RX로 피한다
+  sniffer: Object.freeze({
+    id: "sniffer",
+    name: "중간자 스니퍼",
+    hp: 100, atk: 28, sec: 3,
+    speed: 3.0, aggro: 16, leash: 30,
+    attackRange: 6.0, windup: 0.8, cooldown: 1.6,
+    respawn: Infinity,
+    xp: 30,
+    drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.5 }]),
+    role: "중간자 (MITM)",
+    pdu: "가로챈 LL_ENC_REQ · 위조 CONNECT_IND",
+    scan: "두 기기 사이에 끼어들어 엿듣고 바꿔치기한다 — 레거시 페어링이나 Just Works라면 막을 수 없다.",
+    lore: "중간자는 숫자 비교·패스키 같은 인증으로만 막는다. 도청은 암호화가, 바꿔치기는 사람의 확인이 막는다.",
+    chapter: "security.html"
   })
 });
+
+/**
+ * 층 구성 (Stage 12.1, PRD §4.3.4) — 층마다 몬스터 조합과 테마가 다르다. 5층부터는 4·5층 조합을 번갈아 쓴다.
+ * @returns {{ theme: string, name: string, roster: string[] }}
+ */
+export function floorPlan(floor) {
+  const W = "wifiInterferer", F = "advFlooder", M = "microwave", S = "sniffer";
+  if (floor === 1) return { theme: "router", name: "공유기 지하실", roster: [W, W, W] };
+  if (floor === 2) return { theme: "router", name: "광고가 넘치는 복도", roster: [W, W, W, F, F] };
+  if (floor === 3) return { theme: "kitchen", name: "부엌 아래 — 전자레인지가 깨어났다", roster: [W, W, M, F, F] };
+  if (floor === 4) return { theme: "spy", name: "도청 회랑 — 중간자가 숨어 있다", roster: [W, W, W, S, F] };
+  return floor % 2
+    ? { theme: "kitchen", name: `${floor}층 — 잡음과 광고의 소굴`, roster: [W, W, M, S, F] }
+    : { theme: "spy", name: `${floor}층 — 깊은 도청 회랑`, roster: [W, W, W, M, S] };
+}
 
 /** 훈련장 (마을 남서쪽 풀밭) */
 /**

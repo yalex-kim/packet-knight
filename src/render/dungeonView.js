@@ -11,20 +11,31 @@ export const dungeonRoot = new THREE.Group();
 dungeonRoot.visible = false;
 
 // ---------- 방 ----------
+const roomMat = { floor: new THREE.MeshLambertMaterial({ color: 0x3a4660 }), ring: new THREE.MeshBasicMaterial({ color: 0x4f7fb8, side: THREE.DoubleSide }), wall: new THREE.MeshLambertMaterial({ color: 0x2a2440, side: THREE.BackSide }) };
+/** 층 테마 (Stage 12.1) — 공유기 지하실(파랑) · 부엌 아래(주황) · 도청 회랑(초록) */
+const THEMES = {
+  router:  { floor: 0x3a4660, ring: 0x4f7fb8, wall: 0x2a2440 },
+  kitchen: { floor: 0x5a4636, ring: 0xd98a4a, wall: 0x3a2618 },
+  spy:     { floor: 0x2f4a40, ring: 0x4fd89a, wall: 0x16302a }
+};
+export function setTheme(theme) {
+  const t = THEMES[theme] ?? THEMES.router;
+  roomMat.floor.color.setHex(t.floor); roomMat.ring.color.setHex(t.ring); roomMat.wall.color.setHex(t.wall);
+}
 {
-  const floor = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.6, radius + 0.6, 0.6, 48), new THREE.MeshLambertMaterial({ color: 0x3a4660 }));
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(radius + 0.6, radius + 0.6, 0.6, 48), roomMat.floor);
   floor.position.set(cx, floorY - 0.3, cz);
   dungeonRoot.add(floor);
   // 바닥의 동심원 무늬 (전파 은유)
   for (const r of [3, 6, 9]) {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.05, r + 0.05, 64), new THREE.MeshBasicMaterial({ color: 0x4f7fb8, side: THREE.DoubleSide }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.05, r + 0.05, 64), roomMat.ring);
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(cx, floorY + 0.01, cz);
     dungeonRoot.add(ring);
   }
   const wall = new THREE.Mesh(
     new THREE.CylinderGeometry(radius + 1.4, radius + 1.4, 5, 48, 1, true),
-    new THREE.MeshLambertMaterial({ color: 0x2a2440, side: THREE.BackSide })
+    roomMat.wall
   );
   wall.position.set(cx, floorY + 2.5, cz);
   dungeonRoot.add(wall);

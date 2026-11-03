@@ -50,8 +50,8 @@ import { levelFromXp } from "./core/combat.js";
 import * as battleView from "./render/battleView.js";
 import * as fx from "./ui/fx.js";
 import { VILLAGE } from "./core/collision.js";
-import { DUNGEON_ROOM, DUNGEON_WORLD, generateFloor, createLinkPuzzle, toggleChannel, resetMap, observe, runLinkTest, createFloorBattle, stepAcs } from "./core/dungeon.js";
-import { createLink, stepLink, toggleLinkChannel, applyAfh, requestMap, interferenceFor } from "./core/link.js";
+import { DUNGEON_ROOM, DUNGEON_WORLD, generateFloor, createLinkPuzzle, toggleChannel, resetMap, observe, runLinkTest, createFloorBattle, stepAcs, stepMicrowaves } from "./core/dungeon.js";
+import { createLink, stepLink, toggleLinkChannel, applyAfh, requestMap, interferenceFor, hasBand, bandLabel } from "./core/link.js";
 import { allChannelsMap } from "./core/hopping.js";
 import { hasAfhSkill } from "./core/progress.js";
 import * as chmap from "./ui/chmap.js";
@@ -428,7 +428,7 @@ function handleBattleEvents(events) {
     switch (e.type) {
       case "hit": {
         const m = e.monster;
-        if (m.wifi && !m.revealed) m.revealed = true; // 스캔 = 대역 판명
+        if (hasBand(m) && !m.revealed) m.revealed = true; // 스캔 = 대역 판명
         fx.floatText(m.x, m.y + 0.6, m.z, `${e.amount}${e.crit ? "!" : ""}`, e.crit ? "crit" : "");
         sfx(e.crit ? "crit" : "hit");
         questProgress({ type: "hit", monsterType: m.type });
@@ -474,7 +474,7 @@ function handleBattleEvents(events) {
       case "packetLost": {
         // 간섭 채널 위에서 쏜 패킷이 깨졌다 — 이 몬스터의 대역이 드러난다(채널 분류)
         const m = e.monster;
-        if (!m.revealed) { m.revealed = true; fx.showToast(`🔍 Wi-Fi ${m.wifi}번 대역 발견 — 채널 ${run?.link?.channel}에서 패킷이 깨졌다. 채널맵에서 빼면 피할 수 있다`, 3.5); }
+        if (!m.revealed) { m.revealed = true; fx.showToast(`🔍 ${bandLabel(m)} 대역 발견 — 채널 ${run?.link?.channel}에서 패킷이 깨졌다. 채널맵에서 빼면 피할 수 있다`, 3.5); }
         fx.floatText(m.x, m.y + 0.8, m.z, `패킷 손실 ✗ch${run?.link?.channel ?? "?"}`, "dodge");
         sfx("packetLost");
         break;
@@ -560,7 +560,9 @@ function startFloor(floor) {
   setAmbience(true);
   hud.hideModal();
   hud.setBadge(`⚔️ 호핑 던전 ${floor}층`);
-  fx.showToast(`⚔️ ${floor}층 — Wi-Fi 간섭 몬스터 ${b.monsters.length}마리! 바닥의 빨간 원(광역 예고) 밖으로 피하세요`, 4);
+  const kinds = [...new Set(b.monsters.map((m) => MONSTERS[m.type].name))].join(" · ");
+  fx.showToast(`⚔️ ${floor}층 ${run.layout.name}\n${kinds} — ${b.monsters.length}마리. 빨간 예고(바닥 원·조준선)를 피하세요`, 4.5);
+  dungeonView.setTheme(run.layout.theme);
   if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
 }
 /** 기사(반경 KNIGHT_RADIUS)가 주민 원과 겹치면 겹친 만큼 바깥으로 — 밀려난 자리가 막혀 있으면 그대로 둔다 */
@@ -982,6 +984,9 @@ function simulate(dt) {
   let interference = null;
   if (run?.phase === "combat") {
     stepLink(run.link, dt);
+    for (const e of stepMicrowaves(run.battle, dt)) {
+      if (e.monster.revealed) fx.floatText(e.monster.x, e.monster.y + 1.6, e.monster.z, e.on ? "📶 잡음 ON" : "잡음 OFF — 틈!", e.on ? "crit" : "dodge");
+    }
     for (const e of stepAcs(run.battle, run.floor, dt, dungeonRng)) {
       if (e.monster.revealed) fx.floatText(e.monster.x, e.monster.y + 1.2, e.monster.z, `ACS: Wi-Fi ${e.from}→${e.to}`, "crit");
     }

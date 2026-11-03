@@ -100,6 +100,32 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   check("Stage 4 세이브(v1)가 진행도 손실 없이 v2로 마이그레이션된다", loadedV1.status === "loaded" && loadedV1.progress.bonus.hp === 5 && loadedV1.progress.skillSlots === 2 && loadedV1.progress.cr2032 === 0);
 }
 
+// ---------- Stage 12.1: 층마다 다른 몬스터 (Node) ----------
+{
+  const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
+  const D = await imp("dungeon.js"), K = await imp("link.js");
+  const kinds = (f) => D.createFloorBattle(D.generateFloor(f, 77)).monsters.map((m) => m.type);
+  const f1 = kinds(1), f3 = kinds(3), f4 = kinds(4);
+  const b3 = D.createFloorBattle(D.generateFloor(3, 77));
+  const mw = b3.monsters.find((m) => m.type === "microwave");
+  const link = K.createLink(7);
+  const ch = [...D.MICROWAVE_BAND][0];
+  link.channel = ch;
+  const I = K.interferenceFor(link);
+  mw.on = true;
+  const lostOn = I.packetLost({ monsters: [mw] });
+  mw.on = false;
+  const lostOff = I.packetLost({ monsters: [mw] });
+  const hitOff = I.playerHit(mw);
+  let toggled = 0;
+  for (let i = 0; i < 600; i++) toggled += D.stepMicrowaves(b3, 1 / 60).length;
+  const flooder = b3.monsters.find((m) => m.type === "advFlooder");
+  check("층마다 몬스터 구성이 다르다 (1층 Wi-Fi만 · 3층 전자레인지 · 4층 스니퍼), 전자레인지는 켜졌을 때만 패킷을 깨고 박자대로 켜졌다 꺼진다, 광고 폭주 비콘은 채널과 상관없이 맞는다",
+    f1.every((t) => t === "wifiInterferer") && f3.includes("microwave") && f3.includes("advFlooder") && f4.includes("sniffer")
+      && lostOn && !lostOff && hitOff && toggled >= 1 && I.playerHit(flooder),
+    `1층 ${f1.join(",")} · 3층 ${f3.join(",")} · 4층 ${f4.join(",")} · 10초에 ${toggled}번 전환`);
+}
+
 // ---------- Stage 11.15: CI(연결 간격 단축) 스탯 (Node) ----------
 {
   const imp = (f) => import(pathToFileURL(path.join(ROOT, "src/core", f)).href);
@@ -1051,10 +1077,11 @@ await reset();
     hudCells === 37 && L1.event === L0.event + 2 && L1.channel === expectCh && nowCell === String(L1.channel), `이벤트 #${L0.event}→#${L1.event}, 채널 ${L1.channel}`);
 
   // 쏘면 몬스터가 스캔되어 Wi-Fi 대역이 HUD에 드러난다
-  await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 60 && !pk.dungeon.monsters().some((m) => m.revealed); i++) { pk.battle.fire(); pk.tick(0.1); } });
+  // (Stage 12.1: 층에 대역 없는 몬스터도 섞이므로 Wi-Fi 몬스터가 드러날 때까지 쏜다)
+  await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 120 && !pk.dungeon.monsters().some((m) => m.revealed && m.wifi); i++) { pk.battle.fire(); pk.tick(0.1); } });
   const scanned = await page.evaluate(() => window.__PK.dungeon.monsters());
   const bandCells = await page.locator("#chmap .cm.band").count();
-  check("몬스터를 맞히면(스캔) 그 Wi-Fi 대역이 채널맵에 표시된다", scanned.some((m) => m.revealed) && bandCells >= 9, `대역 칸 ${bandCells}개`);
+  check("몬스터를 맞히면(스캔) 그 Wi-Fi 대역이 채널맵에 표시된다", scanned.some((m) => m.revealed && m.wifi) && bandCells >= 9, `대역 칸 ${bandCells}개`);
 
   // AFH 버튼 (퀘스트 Q4 보상) → 6 이벤트 뒤에 적용, 이후 드러난 대역으로 도약하지 않는다
   const afhLocked = await page.locator("#chmap .cm-afh").isDisabled();

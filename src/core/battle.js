@@ -25,8 +25,10 @@ let nextId = 1;
 
 /** @param {import("./collision.js").CollisionWorld} [world] 전투가 벌어지는 맵 (기본값 마을) */
 export function createBattle(spawns, type = "trainingBot", world = VILLAGE, { hpScale = 1, atkScale = 1 } = {}) {
-  const monsters = spawns.map(([x, z]) => spawnMonster(type, x, z, world));
-  for (const m of monsters) { m.maxHp = Math.round(MONSTERS[type].hp * hpScale); m.hp = m.maxHp; m.atk = Math.round(MONSTERS[type].atk * atkScale); }
+  // type: 한 종류 또는 자리마다 종류 배열 (Stage 12.1 — 층마다 섞인 몬스터)
+  const types = Array.isArray(type) ? type : spawns.map(() => type);
+  const monsters = spawns.map(([x, z], i) => spawnMonster(types[i], x, z, world));
+  for (const m of monsters) { m.maxHp = Math.round(MONSTERS[m.type].hp * hpScale); m.hp = m.maxHp; m.atk = Math.round(MONSTERS[m.type].atk * atkScale); }
   return {
     world,
     monsters,

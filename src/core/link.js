@@ -86,10 +86,14 @@ export function applyAfh(link, battle) {
 }
 
 /** Wi-Fi 몬스터 한 마리가 덮는 LE 채널 */
-export const monsterBand = (m) => (m.wifi ? wifiBlockedChannels([m.wifi]) : new Set());
+export const monsterBand = (m) => (m.wifi ? wifiBlockedChannels([m.wifi]) : m.band ?? new Set());
+/** 대역이 있는 몬스터 (Wi-Fi·전자레인지) — 없는 몬스터(광고 폭주·스니퍼)는 채널과 상관없이 맞는다 */
+export const hasBand = (m) => Boolean(m.wifi || m.band);
+/** 화면에 쓰는 대역 이름 */
+export const bandLabel = (m) => (m.wifi ? `Wi-Fi ${m.wifi}번` : m.band ? "전자레인지" : "");
 
-/** 지금 채널이 이 몬스터의 대역 안인가 */
-export const exposedTo = (link, m) => monsterBand(m).has(link.channel);
+/** 지금 채널이 이 몬스터의 대역 안인가 (active: 전자레인지는 켜져 있을 때만 패킷을 깬다) */
+export const exposedTo = (link, m, active = false) => (!active || !m.band || m.on) && monsterBand(m).has(link.channel);
 
 /**
  * battle.js에 넘기는 간섭 판정
@@ -98,8 +102,8 @@ export const exposedTo = (link, m) => monsterBand(m).has(link.channel);
 export function interferenceFor(link) {
   return {
     // 살아 있는 Wi-Fi 몬스터 중 하나라도 지금 채널을 덮으면 내 패킷은 깨진다
-    packetLost: (battle) => battle.monsters.some((m) => m.state !== "dead" && exposedTo(link, m)),
+    packetLost: (battle) => battle.monsters.some((m) => m.state !== "dead" && exposedTo(link, m, true)),
     // 광역 공격은 지금 채널이 그 몬스터 대역 안일 때만 들어온다
-    playerHit: (m) => !m.wifi || exposedTo(link, m)
+    playerHit: (m) => !hasBand(m) || exposedTo(link, m)
   };
 }
