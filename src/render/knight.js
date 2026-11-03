@@ -1,31 +1,82 @@
-// 기사 렌더링 — 큐브 기사 메시, 착지 충격파, 이동 목표 마커, 스쿼시/스트레치/보행 애니메이션 (THREE 의존)
+// 기사 렌더링 — 복셀 기사 모델(Stage 11.6), 착지 충격파, 이동 목표 마커, 스쿼시/스트레치/보행 애니메이션 (THREE 의존)
 
 import * as THREE from "three";
-import { metalMat } from "./world.js";
 
 const LAND_SQUASH_TIME = 0.22;
 const LANDING_RING_TIME = 0.28;
 
-// knight(위치·회전) > rig(스쿼시/바운스, 발밑 피벗) > 몸통·바이저·안테나
+// knight(위치·회전) > rig(스쿼시/바운스, 발밑 피벗) > 몸통·머리·팔·다리 (Stage 11.6 복셀 인체형 — PRD §3.1)
+// 앞쪽은 +z. 팔·다리는 어깨·엉덩이를 피벗으로 흔든다.
 export const knight = new THREE.Group();
 const rig = new THREE.Group();
 knight.add(rig);
-{
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.85, 0.85, 0.85),
-    new THREE.MeshLambertMaterial({ color: 0xd8443c }) // 기사 붉은 갑옷
-  );
-  body.position.y = 0.425;
-  rig.add(body);
 
-  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.06), new THREE.MeshBasicMaterial({ color: 0x39d0ff }));
-  visor.position.set(0, 0.52, 0.44);
-  rig.add(visor);
-
-  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 6), metalMat);
-  antenna.position.set(0.24, 1.05, 0);
-  rig.add(antenna);
+const MAT = {
+  steel: new THREE.MeshLambertMaterial({ color: 0xc9d3de }),
+  steelDark: new THREE.MeshLambertMaterial({ color: 0x8e9aa8 }),
+  tabard: new THREE.MeshLambertMaterial({ color: 0xd8443c }),
+  tabardDark: new THREE.MeshLambertMaterial({ color: 0xa8322b }),
+  gold: new THREE.MeshLambertMaterial({ color: 0xf2c14e }),
+  boot: new THREE.MeshLambertMaterial({ color: 0x4a3a32 }),
+  glow: new THREE.MeshBasicMaterial({ color: 0x39d0ff }),
+  glowTip: new THREE.MeshBasicMaterial({ color: 0x7de3ff }),
+  blade: new THREE.MeshBasicMaterial({ color: 0x7de3ff, transparent: true, opacity: 0.92 })
+};
+/** 상자 하나 — (cx, cy, cz)는 부모 기준 중심 */
+function box(parent, w, h, d, mat, cx, cy, cz) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(cx, cy, cz);
+  m.castShadow = true;
+  parent.add(m);
+  return m;
 }
+/** 피벗 그룹 (팔·다리) */
+function pivot(parent, x, y, z) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  parent.add(g);
+  return g;
+}
+
+const HIP_Y = 0.42, SHOULDER_Y = 0.86;
+const legL = pivot(rig, -0.12, HIP_Y, 0), legR = pivot(rig, 0.12, HIP_Y, 0);
+for (const leg of [legL, legR]) {
+  box(leg, 0.2, 0.3, 0.22, MAT.steelDark, 0, -0.15, 0);       // 다리 갑옷
+  box(leg, 0.22, 0.12, 0.28, MAT.boot, 0, -0.36, 0.02);        // 장화
+}
+// 몸통: 은색 갑옷 + 빨간 겉옷 + 금색 벨트 + 가슴 신호 문양
+const torso = pivot(rig, 0, HIP_Y, 0);
+box(torso, 0.5, 0.46, 0.3, MAT.steel, 0, 0.23, 0);
+box(torso, 0.42, 0.5, 0.04, MAT.tabard, 0, 0.2, 0.16);           // 겉옷 앞
+box(torso, 0.42, 0.5, 0.04, MAT.tabardDark, 0, 0.2, -0.16);      // 겉옷 뒤
+box(torso, 0.52, 0.07, 0.32, MAT.gold, 0, 0.03, 0);              // 벨트
+box(torso, 0.06, 0.06, 0.02, MAT.glow, 0, 0.27, 0.185);          // 문양: 점
+box(torso, 0.18, 0.035, 0.02, MAT.glow, 0, 0.34, 0.185);         //        작은 호
+box(torso, 0.28, 0.035, 0.02, MAT.glow, 0, 0.4, 0.185);          //        큰 호
+box(torso, 0.62, 0.12, 0.34, MAT.steelDark, 0, 0.44, 0);         // 어깨 갑옷
+// 투구: 은색 + 바이저 슬릿 + 볏 + BLE 안테나 깃
+const head = pivot(torso, 0, 0.5, 0);
+box(head, 0.4, 0.38, 0.4, MAT.steel, 0, 0.19, 0);
+box(head, 0.3, 0.06, 0.02, MAT.glow, 0, 0.2, 0.205);             // 바이저 슬릿
+box(head, 0.06, 0.14, 0.02, MAT.steelDark, 0, 0.1, 0.205);       // 코 보호대
+box(head, 0.08, 0.1, 0.36, MAT.tabard, 0, 0.42, -0.02);          // 볏
+const antenna = box(head, 0.035, 0.42, 0.035, MAT.steelDark, 0.14, 0.55, -0.08);
+antenna.castShadow = false;
+const antennaTip = box(head, 0.09, 0.09, 0.09, MAT.glowTip, 0.14, 0.78, -0.08);
+// 팔: 오른손에 ADV 패킷 검, 왼팔에 작은 방패
+const armL = pivot(rig, -0.33, SHOULDER_Y, 0), armR = pivot(rig, 0.33, SHOULDER_Y, 0);
+for (const arm of [armL, armR]) {
+  box(arm, 0.15, 0.36, 0.17, MAT.steel, 0, -0.18, 0);
+  box(arm, 0.16, 0.09, 0.18, MAT.steelDark, 0, -0.38, 0);        // 장갑
+}
+const sword = pivot(armR, 0, -0.4, 0.06);
+box(sword, 0.05, 0.12, 0.05, MAT.boot, 0, 0, 0);                  // 손잡이
+box(sword, 0.2, 0.04, 0.06, MAT.gold, 0, 0.07, 0);                // 코등이
+const blade = box(sword, 0.06, 0.5, 0.03, MAT.blade, 0, 0.34, 0);  // 빛나는 날
+blade.castShadow = false;
+sword.rotation.x = Math.PI / 2.4;                                  // 앞으로 기울여 든다
+box(armL, 0.06, 0.34, 0.3, MAT.tabard, -0.1, -0.22, 0.02);         // 방패
+box(armL, 0.065, 0.1, 0.1, MAT.glow, -0.135, -0.2, 0.02);          // 방패 문양
 
 // 착지 충격파 링
 export const landingRing = new THREE.Mesh(
@@ -73,11 +124,14 @@ export function onLanded(x, y, z) {
 }
 
 /** 모터 상태를 메시에 반영하고 애니메이션 진행 @param {import("../core/motor.js").MotorState} m */
+let idleTime = 0;
 export function syncKnight(m, isMoving, dt) {
   knight.position.set(m.x, m.y, m.z);
   knight.rotation.y = m.rotY;
+  idleTime += dt;
 
   // 착지 스쿼시 / 체공 스트레치 / 보행 바운스 — 리그 전체에 적용
+  let swing = 0;
   if (squashTime > 0) {
     squashTime -= dt;
     const p = Math.max(0, squashTime / LAND_SQUASH_TIME);
@@ -87,14 +141,25 @@ export function syncKnight(m, isMoving, dt) {
     const stretch = Math.min(0.18, Math.abs(m.vy) * 0.015);
     rig.scale.set(1 - stretch * 0.5, 1 + stretch, 1 - stretch * 0.5);
     rig.position.y = 0;
+    swing = 0.5;                                    // 체공: 팔다리를 벌린 자세
   } else if (isMoving) {
-    walkAnimTime += dt * 14;
+    walkAnimTime += dt * 12;
     rig.scale.set(1, 1, 1);
-    rig.position.y = Math.abs(Math.sin(walkAnimTime)) * 0.06;
+    rig.position.y = Math.abs(Math.sin(walkAnimTime)) * 0.05;
+    swing = Math.sin(walkAnimTime);
   } else {
-    rig.scale.set(1, 1, 1);
+    const breathe = Math.sin(idleTime * 2.2) * 0.012;
+    rig.scale.set(1 + breathe * 0.5, 1 + breathe, 1 + breathe * 0.5);
     rig.position.y = 0;
   }
+  // 걷기: 팔다리를 번갈아 (체공 중엔 고정 자세)
+  const k = !m.grounded ? 1 : 0.7;
+  legL.rotation.x = swing * 0.7 * k;
+  legR.rotation.x = !m.grounded ? -swing * 0.5 : -swing * 0.7;
+  armL.rotation.x = -swing * 0.6 * k;
+  armR.rotation.x = !m.grounded ? -0.9 : swing * 0.45;
+  head.rotation.y = isMoving ? 0 : Math.sin(idleTime * 0.7) * 0.12;
+  antennaTip.scale.setScalar(1 + 0.25 * Math.max(0, Math.sin(idleTime * 5)));   // 광고 패킷처럼 깜빡
 }
 
 /** 이펙트(충격파·마커) 애니메이션 */
