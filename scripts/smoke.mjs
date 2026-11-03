@@ -878,8 +878,10 @@ await reset();
   });
   check("봇을 처치하면 경험치를 얻는다", hunt.kills >= 1 && hunt.xp === hunt.kills * 10, `${hunt.kills}마리 · XP ${hunt.xp}`);
   check("처치한 봇이 떨어뜨린 CR2032를 주워 잔액이 오른다", hunt.cr >= 1, `CR2032 ${hunt.cr} (${hunt.t}초)`);
-  const hudLv = await page.locator('#stats [data-stat="level"]').textContent();
-  check("HUD에 레벨·경험치가 표시된다", hudLv.includes("Lv") && hudLv.includes(`XP`), hudLv);
+  const hudLv = await page.locator("#xpbar .xp-text").textContent();
+  const fill = await page.evaluate(() => parseFloat(document.querySelector("#xpbar .xp-fill").style.width));
+  const statsHasLv = (await page.locator("#stats").textContent()).includes("Lv");
+  check("맨 아래 XP 바에 레벨·경험치가 표시되고(채움 = XP 비율), 스탯 상자에는 레벨이 없다 (Stage 11.16)", hudLv.includes("Lv") && hudLv.includes("XP") && fill > 0 && !statsHasLv, `${hudLv} · ${fill}%`);
 
   // 가만히 맞아 HP가 줄었다가, 물러나 쉬면 회복된다
   const hpTest = await page.evaluate(() => {
@@ -1325,14 +1327,14 @@ await page.waitForFunction(() => window.__PK);
   const t1 = await tracker();
   check("퀘스트 진행·칭호가 저장되고 새로고침 후 유지된다 (트래커는 Q1)", closed && Boolean(re.done.Q0) && re.active === "Q1" && t1.includes("Q1") && re.title === "패킷 나이트", `${t1.slice(0, 50)} · 칭호 ${re.title}`);
 
-  // 모바일 폭: 트래커·퀘스트 버튼이 조이스틱·점프/발사 버튼과 겹치지 않는다
+  // 모바일 폭: 트래커가 조이스틱·점프/발사 버튼과 겹치지 않는다 (퀘스트 버튼은 Stage 11.15에서 없앴다)
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const boxes = await page.evaluate(() => Object.fromEntries(["quest-tracker", "btn-quests", "joystick-zone", "btn-jump", "btn-fire", "hp", "stats"]
+  const boxes = await page.evaluate(() => Object.fromEntries(["quest-tracker", "joystick-zone", "btn-jump", "btn-fire", "hp", "stats"]
     .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   const overlaps = [];
-  for (const a of ["quest-tracker", "btn-quests"]) for (const b of ["joystick-zone", "btn-jump", "btn-fire", "hp", "stats"]) if (hit(boxes[a], boxes[b])) overlaps.push(`${a}×${b}`);
+  for (const a of ["quest-tracker"]) for (const b of ["joystick-zone", "btn-jump", "btn-fire", "hp", "stats"]) if (hit(boxes[a], boxes[b])) overlaps.push(`${a}×${b}`);
   check("모바일 폭(390px)에서 퀘스트 트래커·버튼이 다른 조작 UI와 겹치지 않는다", overlaps.length === 0 && boxes["quest-tracker"].right <= 390, overlaps.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }
@@ -1458,10 +1460,10 @@ await page.waitForFunction(() => window.__PK);
   const kept = await page.evaluate(() => window.__PK.quests.state());
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const boxes = await page.evaluate(() => Object.fromEntries(["btn-dash", "btn-fire", "btn-jump", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"]
+  const boxes = await page.evaluate(() => Object.fromEntries(["btn-dash", "btn-fire", "btn-jump", "quest-tracker", "stats", "hp", "joystick-zone"]
     .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
-  const ov = ["btn-fire", "btn-jump", "btn-quests", "quest-tracker", "stats", "hp", "joystick-zone"].filter((k) => hit(boxes["btn-dash"], boxes[k]));
+  const ov = ["btn-fire", "btn-jump", "quest-tracker", "stats", "hp", "joystick-zone"].filter((k) => hit(boxes["btn-dash"], boxes[k]));
   check("Stage 10 진행이 저장되고, 모바일 폭에서 돌진 버튼이 겹치지 않는다", kept.active === null && kept.perks.aesShield && boxes["btn-dash"].width > 0 && ov.length === 0, ov.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }

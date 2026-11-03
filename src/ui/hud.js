@@ -56,6 +56,21 @@ export function getBadge() {
   return badge.textContent;
 }
 
+// ---------- 맨 아래 레벨·XP 바 (Stage 11.16) ----------
+const xpBar = document.getElementById("xpbar");
+let lastLevel = null;
+function renderXpBar(lv, statPoints, changed) {
+  const ratio = lv.toNext ? lv.intoLevel / lv.toNext : 1;
+  xpBar.querySelector(".xp-fill").style.width = `${(ratio * 100).toFixed(1)}%`;
+  xpBar.querySelector(".xp-text").textContent = `⭐ Lv ${lv.level} · XP ${lv.intoLevel} / ${lv.toNext}${statPoints ? ` · ✨ 스탯 포인트 ${statPoints}` : ""}`;
+  xpBar.dataset.level = String(lv.level);
+  if (changed || (lastLevel !== null && lv.level > lastLevel)) {
+    xpBar.classList.remove("gain"); void xpBar.offsetWidth; xpBar.classList.add("gain");
+  }
+  if (lastLevel !== null && lv.level > lastLevel) { xpBar.classList.remove("levelup"); void xpBar.offsetWidth; xpBar.classList.add("levelup"); }
+  lastLevel = lv.level;
+}
+
 /** @param {import("../core/layout.js").LandmarkInfo} info */
 export function showModal(info) {
   modalTitle.textContent = info.title;
@@ -102,15 +117,12 @@ export function renderStats(stats, { skillSlots, cr2032, xp, statPoints }, chang
   coins.dataset.stat = "cr2032";
   coins.textContent = `🪙 CR2032 ${cr2032}`;
   const lv = levelFromXp(xp);
-  const level = document.createElement("div");
-  level.className = `slots level${changed.includes("xp") ? " up" : ""}`;
-  level.dataset.stat = "level";
-  level.textContent = `⭐ Lv ${lv.level} · XP ${lv.intoLevel}/${lv.toNext}${statPoints ? ` · 포인트 ${statPoints}` : ""}`;
+  renderXpBar(lv, statPoints, changed.includes("xp"));
   const sum = document.createElement("button");
   sum.type = "button";
   sum.className = `st-sum${changed.length ? " up" : ""}`;
   sum.setAttribute("aria-expanded", String(statsPanel.classList.contains("open")));
   sum.setAttribute("aria-label", "스탯 펼치기/접기");
-  sum.textContent = `${STAT_META.tx.icon} ${stats.tx} · ${STAT_META.rx.icon} ${stats.rx}${STAT_META.rx.unit} · 🪙 ${cr2032} · ⭐ Lv ${lv.level}${statPoints ? ` · ✨${statPoints}` : ""}`;
-  statsPanel.replaceChildren(sum, ...cells, slots, coins, level);
+  sum.textContent = `${STAT_META.tx.icon} ${stats.tx} · ${STAT_META.rx.icon} ${stats.rx}${STAT_META.rx.unit} · 🪙 ${cr2032}`;
+  statsPanel.replaceChildren(sum, ...cells, slots, coins);   // 레벨·XP는 맨 아래 XP 바로 (Stage 11.16)
 }

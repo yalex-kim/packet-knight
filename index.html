@@ -377,11 +377,6 @@
   .q-steps li.done { color: #7dffb5; }
   .q-go { margin-left: 8px; padding: 1px 8px; font: inherit; font-size: 12px; color: #ffd36b; background: rgba(255, 211, 107, .1); border: 1px solid rgba(255, 211, 107, .45); border-radius: 999px; cursor: pointer; vertical-align: 1px; }
   .q-go:hover, .q-go:focus-visible { background: rgba(255, 211, 107, .22); }
-  #btn-quests {
-    position: fixed; right: 176px; bottom: 30px; z-index: 10;   /* 돌진 왼쪽 */
-    background: rgba(40, 30, 10, 0.88); color: #ffd76b; border: 1px solid #6b5520; border-radius: 8px;
-    padding: 7px 13px; font-size: 11.5px; cursor: pointer; font-family: inherit;
-  }
   .q-list { display: flex; flex-wrap: wrap; gap: 5px; }
   .q-item { background: #12263f; color: #cfe8ff; border: 1px solid #23476e; border-radius: 6px; padding: 5px 9px; font-size: 12px; cursor: pointer; font-family: inherit; }
   .q-item.on { border-color: #ffd76b; color: #ffd76b; }
@@ -507,11 +502,11 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#hud, #badge, #stats, #hp, #btn-sound, #btn-guide, #quest-tracker, #btn-quests, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#hud, #badge, #stats, #hp, #btn-sound, #btn-guide, #quest-tracker, #btn-quests, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.prestart :is(#hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-sound) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
-  body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash, #btn-quests) { transition-delay: .35s; }
+  body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -553,7 +548,6 @@
     /* 트래커는 조이스틱 위에 한 줄 요약 + 단계 (화면을 덜 가리게) */
     #quest-tracker { bottom: 152px; left: 8px; max-width: 58vw; font-size: 10.5px; padding: 4px 8px; }
     #quest-tracker .qt-name { display: none; }   /* 좁은 화면: 제목 대신 다음 할 일을 보인다 */
-    #btn-quests { right: 96px; bottom: 112px; padding: 7px 10px; }   /* 모바일: 발사 왼쪽·돌진 위 (조이스틱과 떨어지게) */
   }
 
   /* ===== 테마 층 (Stage 11.8, 벤치마크 반영) — 마을 HUD는 밝은 유리 알약, 폰트는 Pretendard =====
@@ -568,11 +562,11 @@
   html, body { font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
   .formula, .rssi-canvas, code { font-family: ui-monospace, "D2Coding", Consolas, monospace; }
   #stats, #hp-text, #hunt .job-bar, #quest-tracker, .job-estimate { font-variant-numeric: tabular-nums; }
-  :is(#hud, #badge, #stats, #quest-tracker, #btn-quests, #btn-sound, #toast) {
+  :is(#hud, #badge, #stats, #quest-tracker, #btn-sound, #toast) {
     background: var(--glass); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow);
     backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
   }
-  :is(#badge, #btn-quests, #quest-tracker) { border-radius: 999px; }
+  :is(#badge, #quest-tracker) { border-radius: 999px; }
   #hud, #stats { border-radius: 14px; }
   #btn-sound { border-radius: 12px; }
   #hud b { color: var(--accent); }
@@ -598,8 +592,6 @@
   #quest-tracker.ready { border-color: #9b7bff; box-shadow: 0 0 0 3px rgba(155, 123, 255, .25), var(--shadow); }
   #quest-tracker.ready .qt-next { color: var(--violet); }
   #quest-tracker:hover, #quest-tracker[aria-expanded="true"] { border-color: #f0b93a; }
-  #btn-quests { color: var(--gold); font-weight: 700; }
-  #btn-quests:active { background: var(--glass-strong); transform: scale(.97); }
   #btn-sound { color: var(--ink); }
   #toast { color: var(--ink); border: 1.5px solid rgba(12, 147, 184, .45); border-radius: 14px; font-weight: 500; }
   #joystick-base { background: rgba(255, 255, 255, .28); border: 1.5px solid rgba(255, 255, 255, .7); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
@@ -699,8 +691,30 @@
   #btn-guide { display: none; }
   @media (max-width: 640px) {
     #btn-guide { display: block; position: fixed; right: 46px; top: 8px; z-index: 11; width: 32px; height: 32px; padding: 0; border-radius: 12px; font-size: 15px; cursor: pointer;
-      background: var(--glass); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+      background: var(--glass); color: var(--accent); font-weight: 900; font-size: 17px; border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
     #hp { width: calc(100vw - 94px); }
+  }
+  /* 맨 아래 레벨·XP 바 (Stage 11.16) — 화면 가로 전체. 위 요소들은 바 높이만큼 올린다 */
+  #xpbar { position: fixed; left: 0; right: 0; bottom: 0; height: 18px; z-index: 19; pointer-events: none;
+    background: rgba(20, 30, 50, .55); backdrop-filter: blur(6px); border-top: 1px solid rgba(255, 255, 255, .35);
+    padding-bottom: env(safe-area-inset-bottom); box-sizing: content-box; }
+  #xpbar .xp-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #8b6bff, #b49bff 60%, #ffd76b); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+  #xpbar .xp-text { position: absolute; inset: 0; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .6); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  #xpbar.gain .xp-fill { animation: xpGlow .9s ease-out; }
+  @keyframes xpGlow { 0% { filter: brightness(1.8); } 100% { filter: none; } }
+  #xpbar.levelup { animation: xpLevel 1.4s ease-out; }
+  @keyframes xpLevel { 0%, 30% { box-shadow: 0 0 22px 6px rgba(255, 215, 107, .9); } 100% { box-shadow: none; } }
+  #joystick-zone { bottom: 30px; }
+  #btn-jump, #btn-dash { bottom: 32px; }
+  #btn-fire { bottom: 110px; }
+  #hp { bottom: 32px; }
+  #chmap { bottom: 64px; }
+  #talk { bottom: 30px; }
+  #info-modal { bottom: 76px; }
+  @media (max-width: 640px) {
+    #hp { bottom: auto; }
+    #quest-tracker { bottom: 166px; }
   }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
@@ -780,7 +794,7 @@
     ⚔️ 전투: <b>F 키 / 발사 버튼 / 몬스터 클릭</b> → ADV 패킷 (훈련장: 마을 남서쪽)<br />
     🌀 던전: <b>북서쪽 포털</b> 클릭 → 37채널 호핑 던전<br />
     🔨 강화: <b>패킷 대장간</b> 클릭 → RF 랩 (장비 강화·스탯 분배)<br />
-    📜 퀘스트: <b>Q 키 / 퀘스트 버튼 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지<br />
+    📜 퀘스트: <b>Q 키 / 왼쪽 트래커</b> → 퀘스트 로그 · 🔮 예측해 보기 · 📖 배지<br />
     ⚡ 돌진: <b>E 키 / 돌진 버튼</b> (Q5 보상) · 🔒 보안의 감옥(북동) · 🪫 지하묘지(남동)<br />
     🔊 소리: <b>M 키 / 우상단 버튼</b> · 휠 줌은 맵 위에서만<br />
     <button type="button" class="tut-replay" data-action="tutorial">📘 설명서·튜토리얼 다시 보기</button>
@@ -788,12 +802,12 @@
 </div>
 
 <button id="btn-sound" type="button" aria-label="소리 켜기/끄기 (M)" aria-pressed="true">🔊</button>
-<button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">❔</button>
+<button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">?</button>
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
 <div id="stats" aria-label="기사 스탯"></div>
+<div id="xpbar" role="progressbar" aria-label="레벨과 경험치"><div class="xp-fill"></div><span class="xp-text"></span></div>
 <div id="quest-tracker" role="button" tabindex="0" aria-label="진행 중인 퀘스트 (눌러서 펼치기)" aria-expanded="false" aria-controls="quest-pop"></div>
 <div id="quest-pop" role="dialog" aria-label="진행 중인 퀘스트" hidden></div>
-<button id="btn-quests" type="button" aria-label="퀘스트 로그">📜 퀘스트 (Q)</button>
 
 <!-- 모바일 & 터치 가상 조이스틱 -->
 <div id="joystick-zone">

@@ -248,7 +248,6 @@ export function initQuestLog(h) {
     if (!pop.hidden && !pop.contains(e.target) && !tracker.contains(e.target)) closeQuestPop();
   }, { capture: true });
   window.addEventListener("resize", () => { if (!pop.hidden) placePop(); });
-  document.getElementById("btn-quests").addEventListener("click", () => openQuestLog());
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closeQuestLog(); });
   // 캡처 단계: 다른 팝업의 Esc 처리보다 먼저 퀘스트 로그를 닫는다
   window.addEventListener("keydown", (e) => {
