@@ -15,13 +15,14 @@ import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
 import { SPAWN_POS, landmark, JOB_AREA, LANDMARKS } from "./core/layout.js";
 import * as prisonUi from "./ui/prison.js";
 import * as cryptUi from "./ui/crypt.js";
-import { QUEST_SKILLS, RSSI_JOB } from "./core/balance.js";
+import { QUEST_SKILLS, RSSI_JOB, COMBAT } from "./core/balance.js";
 import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
 import * as knightView from "./render/knight.js";
 import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera, setAttract, startLanding } from "./render/camera.js";
 import * as splash from "./ui/splash.js";
+import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
 import { lifeRoot, stepLife, lifeState } from "./render/villagers.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
@@ -535,6 +536,13 @@ function startFloor(floor) {
   hud.hideModal();
   hud.setBadge(`⚔️ 호핑 던전 ${floor}층`);
   fx.showToast(`⚔️ ${floor}층 — Wi-Fi 간섭 몬스터 ${b.monsters.length}마리! 바닥의 빨간 원(광역 예고) 밖으로 피하세요`, 4);
+  if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
+}
+function showHopGuide() {
+  setInputEnabled(false);
+  inputLocked = true;
+  clearMoveTarget();
+  openHopGuide(() => { setInputEnabled(true); inputLocked = false; });
 }
 
 /** 관문/포털에서 다음 층 도전 (입장료) */
@@ -634,6 +642,7 @@ dungeonUi.initDungeonPanel({
   getProgress: () => progress,
   onEnter: enterNextFloor,
   onLeave: () => leaveDungeon(false),
+  onHelp: () => showHopGuide(),
   onClose: (mode) => {
     setInputEnabled(true);
     inputLocked = false;
@@ -853,7 +862,9 @@ btnReset.addEventListener("click", () => {
 });
 
 // ---------- 시뮬레이션 한 스텝 ----------
+const fireBtn = document.getElementById("btn-fire");
 function simulate(dt) {
+  if (isHopGuideOpen()) return;   // 던전 설명을 보는 동안 게임은 멈춘다 (Stage 11.12)
   if (job && job.phase !== "done" && !run) {
     const got = stepJob(job, dt, jobRng, motor);
     if (got.length) sfx("beacon"); // 광고 패킷 하나 수신 = 짧은 핑
@@ -886,6 +897,10 @@ function simulate(dt) {
     speed *= QUEST_SKILLS.DASH.speedMul;
   }
   dashBtn.classList.toggle("cooling", dash.cooldown > 0);
+  // 발사 쿨타임: 쏘면 어두워지고 시계 방향으로 걷힌다 (--cd 1 → 0)
+  const fcd = activeBattle().player.fireCooldown / COMBAT.ADV_PACKET.cooldown;
+  fireBtn.classList.toggle("cooling", fcd > 0);
+  fireBtn.style.setProperty("--cd", Math.max(0, fcd).toFixed(3));
   dashBtn.style.setProperty("--cd", (dash.cooldown / QUEST_SKILLS.DASH.cooldown).toFixed(3));
 
   const { moved, landed } = stepMotor(motor, intent, dt, currentWorld(), speed);
@@ -1055,6 +1070,8 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   quality: () => perf.level,
+  hopGuide: { open: showHopGuide, isOpen: isHopGuideOpen, example: hopGuideExample },
+  fireCd: () => getComputedStyle(fireBtn).getPropertyValue("--cd"),
   life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
   chargeCfg: () => chargeCfg(progress),

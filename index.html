@@ -635,6 +635,19 @@
     -webkit-mask: radial-gradient(circle, transparent 61%, #000 63%); mask: radial-gradient(circle, transparent 61%, #000 63%); opacity: 0; transition: opacity .15s; }
   #btn-dash.act.cooling::after { opacity: 1; }
   #btn-dash.act.cooling { opacity: .7; }
+  /* 발사 쿨타임 (Stage 11.12): 어두운 덮개가 시계 방향으로 걷힌다 — 남은 몫(--cd)만 어둡다 */
+  #btn-fire.act { position: fixed; overflow: hidden; }
+  #btn-fire.act::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(transparent calc((1 - var(--cd, 0)) * 360deg), rgba(6, 16, 30, .62) 0); opacity: 0; }
+  #btn-fire.act.cooling::after { opacity: 1; }
+  #btn-fire.act > span { position: relative; z-index: 1; }
+  /* 던전 메커니즘 설명 */
+  .hg-panel { max-width: 720px; }
+  .hg-canvas { width: 100%; height: auto; aspect-ratio: 640 / 300; border-radius: 10px; border: 1px solid #1f3a5f; display: block; }
+  .hg-caption { min-height: 44px; margin: 10px 2px 4px; font-size: 14px; font-weight: 600; color: #ffd76b; line-height: 1.55; }
+  .hg-points { margin: 6px 0 4px; padding-left: 18px; font-size: 12.5px; color: #a4c7e8; line-height: 1.7; }
+  .hg-points b { color: #7dd8ff; }
+  #dungeon-hud .dh-help { background: #3a2456; color: #f0e6ff; border: 1px solid #8a5cc4; border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12px; cursor: pointer; }
   /* 퀘스트 팝오버: 밝은 카드 */
   #quest-pop { background: var(--glass-strong); color: var(--ink); border: 1px solid rgba(240, 185, 58, .6); box-shadow: 0 12px 32px rgba(20, 40, 70, .22); }
   #quest-pop .qp-head { color: var(--gold); }
@@ -777,7 +790,7 @@
 <div id="dungeon" class="overlay" role="dialog" aria-modal="true" aria-label="호핑 던전" hidden>
   <div class="panel" id="dungeon-panel"></div>
 </div>
-<div id="dungeon-hud" hidden><span class="dh-text"></span><button type="button" class="dh-leave">🏃 귀환</button></div>
+<div id="dungeon-hud" hidden><span class="dh-text"></span><button type="button" class="dh-help" aria-label="호핑·간섭 설명 다시 보기">❔</button><button type="button" class="dh-leave">🏃 귀환</button></div>
 <div id="chmap" hidden aria-label="실시간 채널맵 (칸을 눌러 채널맵에서 빼기/넣기)">
   <div class="cm-cells"></div>
   <div class="cm-row"><span class="cm-info"></span><span><button type="button" class="cm-btn cm-reset">↩ 전체 사용</button> <button type="button" class="cm-btn cm-afh"></button></span></div>

@@ -1574,6 +1574,24 @@ await page.waitForFunction(() => window.__PK);
     `주민 ${life.n}명 중 ${life.moved}명 이동 · 날아가는 패킷 ${life.packets}개`);
 }
 
+// ---------- Stage 11.12: 던전 메커니즘 설명 · 발사 쿨타임 표시 ----------
+{
+  const ex = await page.evaluate(() => {
+    const e = (n) => window.__PK.hopGuide.example(n);
+    const before = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(e), after = [23, 24, 25, 26, 27, 28, 29].map(e);
+    return { mixed: before.some((x) => x.inBand) && before.some((x) => !x.inBand), afterClean: after.every((x) => !x.inBand && x.applied), remap: after.some((x) => x.remapped) };
+  });
+  check("던전 설명 예시가 실제 CSA #1 규칙과 같다 — 대역 안/밖이 섞이다가, 채널맵 갱신(instant) 뒤엔 대역 밖으로만(재매핑)",
+    ex.mixed && ex.afterClean && ex.remap, JSON.stringify(ex));
+  await reset();
+  await page.keyboard.press("KeyF");
+  await page.evaluate(() => window.__PK.tick(1 / 60));   // 버튼 표시는 시뮬레이션 한 스텝에서 갱신된다
+  const cd = await page.evaluate(() => ({ cd: Number(window.__PK.fireCd()), cooling: document.getElementById("btn-fire").classList.contains("cooling") }));
+  await page.evaluate(() => window.__PK.tick(1));
+  const cd2 = await page.evaluate(() => ({ cd: Number(window.__PK.fireCd()), cooling: document.getElementById("btn-fire").classList.contains("cooling") }));
+  check("발사하면 버튼이 어두워지고(쿨타임 덮개), 쿨타임이 끝나면 걷힌다", cd.cooling && cd.cd > 0.5 && !cd2.cooling && cd2.cd === 0, `${JSON.stringify(cd)} → ${JSON.stringify(cd2)}`);
+}
+
 // ---------- Stage 11.5: 로딩·타이틀 화면과 착지 연출 (테스트 모드가 아닌 실제 시작) ----------
 {
   const tp = await browser.newPage({ viewport: { width: 1000, height: 700 } });

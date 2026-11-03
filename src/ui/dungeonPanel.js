@@ -198,4 +198,5 @@ export function initDungeonPanel(h) {
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
   window.addEventListener("keydown", (e) => { if (!overlay.hidden && e.key === "Escape") close(); });
   hudBar.querySelector(".dh-leave").addEventListener("click", () => hooks.onLeave());
+  hudBar.querySelector(".dh-help").addEventListener("click", () => hooks.onHelp?.());
 }
