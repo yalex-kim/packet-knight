@@ -165,8 +165,9 @@ export function sfx(name) {
 
 // ---------- BGM 음원 (Stage 12.9: 마을 = 잔잔한 통기타 "Peaceful Days", 던전 = 빠른 8비트 "Battle 1", CC0) ----------
 // 효과음은 계속 합성하고, 배경음악만 음원 파일(src/assets/bgm/*.mp3)을 반복 재생한다.
-// <audio>를 MediaElementSource로 BGM 버스에 이어 음소거·볼륨 설정을 그대로 따르고, 장면이 바뀌면 교차 페이드.
-// 파일은 그 장면에 처음 들어갈 때 불러온다 (첫 화면 로딩을 무겁게 하지 않는다). 테스트 모드는 불러오지 않는다.
+// <audio>로 틀면 모바일이 "미디어 재생"으로 보고 상태표시줄·잠금화면에 음악 알림을 띄운다 (Stage 12.10) →
+// 파일을 받아 Web Audio 버퍼로 풀고(decodeAudioData) AudioBufferSourceNode로 반복한다. 게임 효과음처럼 취급돼 알림이 없다.
+// BGM 버스로 이어 음소거·볼륨을 따르고, 장면이 바뀌면 교차 페이드 + 멈춘 자리 기억. 테스트 모드는 불러오지 않는다.
 const BGM_FILES = {
   village: new URL("../assets/bgm/bgm-village.mp3", import.meta.url).href,
   dungeon: new URL("../assets/bgm/bgm-dungeon.mp3", import.meta.url).href
@@ -174,18 +175,36 @@ const BGM_FILES = {
 let bgmMode = null;
 let bgmEnabled = false;
 const bgmTracks = {};
+const bgmBytes = {};
+/** 파일 받기만 (압축된 채로) — 마을에 있는 동안 던전 곡을 미리 받아 둘 때도 쓴다 */
+const fetchBgm = (mode) => (bgmBytes[mode] ??= fetch(BGM_FILES[mode]).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }));
 function bgmTrack(mode) {
   if (bgmTracks[mode]) return bgmTracks[mode];
-  const el = new Audio();
-  el.src = BGM_FILES[mode];
-  el.loop = true;
-  el.preload = "auto";
   const gain = ctx.createGain();
   gain.gain.value = 0;
-  ctx.createMediaElementSource(el).connect(gain).connect(bgmBus);
-  return (bgmTracks[mode] = { el, gain, stop: 0 });
+  gain.connect(bgmBus);
+  const tr = { gain, buf: null, src: null, startedAt: 0, offset: 0 };
+  fetchBgm(mode).then((bytes) => ctx.decodeAudioData(bytes.slice(0))).then((buf) => { tr.buf = buf; syncBgm(); }).catch(() => { /* 음원이 없으면 조용히 */ });
+  return (bgmTracks[mode] = tr);
 }
-/** 지금 장면의 곡은 페이드 인, 나머지는 페이드 아웃 후 일시정지 */
+function startTrack(tr) {
+  if (tr.src || !tr.buf) return;
+  const src = ctx.createBufferSource();
+  src.buffer = tr.buf;
+  src.loop = true;
+  src.connect(tr.gain);
+  src.start(0, tr.offset % tr.buf.duration);
+  tr.startedAt = ctx.currentTime - tr.offset;
+  tr.src = src;
+}
+function stopTrack(tr) {
+  if (!tr.src) return;
+  tr.offset = (ctx.currentTime - tr.startedAt) % tr.buf.duration;
+  try { tr.src.stop(); } catch { /* 이미 멈춤 */ }
+  tr.src.disconnect();
+  tr.src = null;
+}
+/** 지금 장면의 곡은 페이드 인, 나머지는 페이드 아웃 후 정지 */
 function syncBgm() {
   if (!bgmEnabled || !ctx || ctx.state !== "running") return;
   const now = ctx.currentTime;
@@ -195,13 +214,12 @@ function syncBgm() {
     if (!tr) continue;
     tr.gain.gain.cancelScheduledValues(now);
     tr.gain.gain.setTargetAtTime(on ? 1 : 0, now, on ? 0.5 : 0.25);
-    clearTimeout(tr.stop);
+    clearTimeout(tr.timer);
     if (on) {
-      if (tr.el.paused) tr.el.play().catch(() => {});
-      // 마을에 있는 동안 던전 곡을 미리 받아 둔다 — 첫 입장 때 음악이 늦게 시작하지 않게 (Stage 12.10)
-      if (mode === "village" && !bgmTracks.dungeon) setTimeout(() => { try { bgmTrack("dungeon").el.load(); } catch { /* 무시 */ } }, 5000);
-    }
-    else if (!tr.el.paused) tr.stop = setTimeout(() => { if (bgmMode !== mode || document.hidden) tr.el.pause(); }, 1500);
+      startTrack(tr);
+      // 마을에 있는 동안 던전 곡을 미리 받아 둔다 — 첫 입장 때 음악이 늦게 시작하지 않게
+      if (mode === "village") setTimeout(() => fetchBgm("dungeon").catch(() => {}), 5000);
+    } else if (tr.src) tr.timer = setTimeout(() => { if (bgmMode !== mode || document.hidden) stopTrack(tr); }, 1500);
   }
 }
 
@@ -222,7 +240,7 @@ export function setMuted(m) {
   if (!settings.muted) sfx("select");
 }
 export const toggleMute = () => setMuted(!settings.muted);
-export const audioState = () => ({ ctx: ctx?.state ?? "none", muted: settings.muted, bgm: bgmMode, volume: settings.volume });
+export const audioState = () => ({ ctx: ctx?.state ?? "none", muted: settings.muted, bgm: bgmMode, volume: settings.volume, playing: Object.keys(bgmTracks).filter((m) => bgmTracks[m].src) });
 /** 테스트 훅: 최근 효과음 이름들 (since 이후) */
 export const soundLog = () => [...log];
 export const clearSoundLog = () => { log.length = 0; };
@@ -259,5 +277,5 @@ export function initAudio({ bgm = true } = {}) {
     if (document.hidden) { syncBgm(); ctx.suspend?.().catch(() => {}); }
     else ctx.resume?.().then(() => syncBgm()).catch(() => {});
   });
-  return () => { bgmEnabled = false; for (const tr of Object.values(bgmTracks)) tr.el.pause(); };
+  return () => { bgmEnabled = false; for (const tr of Object.values(bgmTracks)) stopTrack(tr); };
 }
