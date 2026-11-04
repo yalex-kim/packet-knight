@@ -240,6 +240,12 @@ export function setMuted(m) {
   if (!settings.muted) sfx("select");
 }
 export const toggleMute = () => setMuted(!settings.muted);
+/** 볼륨 0~1 (설정 창 슬라이더, Stage 13.1) */
+export function setVolume(v) {
+  settings.volume = Math.min(1, Math.max(0, Number(v) || 0));
+  applyVolume();
+  saveSettings();
+}
 export const audioState = () => ({ ctx: ctx?.state ?? "none", muted: settings.muted, bgm: bgmMode, volume: settings.volume, playing: Object.keys(bgmTracks).filter((m) => bgmTracks[m].src) });
 /** 테스트 훅: 최근 효과음 이름들 (since 이후) */
 export const soundLog = () => [...log];

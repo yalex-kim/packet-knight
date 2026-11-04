@@ -412,12 +412,12 @@
   .crypt-check .ok { color: #7dffb5; } .crypt-check .bad { color: #ff9a8f; }
 
   /* Stage 11: 사운드 버튼 · UI 폴리싱 */
-  #btn-sound {
+  #btn-me {
     position: fixed; right: 14px; top: 14px; z-index: 11; width: 38px; height: 38px; border-radius: 10px;
     background: rgba(6, 16, 30, .85); border: 1px solid #1f3a5f; color: #e2f1ff; font-size: 17px; cursor: pointer;
     backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); padding: 0; line-height: 1;
   }
-  #btn-sound[aria-pressed="false"] { opacity: .6; }
+  #btn-me { padding: 0; }
   #badge { right: 60px; }
   /* 팝업이 열릴 때 살짝 떠오르며 나타난다 */
   .overlay:not([hidden]) { animation: overlayIn .16s ease-out; }
@@ -502,9 +502,9 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-sound, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
-  body.revealing :is(#hp, #stats, #badge, #btn-sound) { transition-delay: .05s; }
+  body.prestart :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.revealing :is(#hp, #stats, #badge, #btn-me) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
   body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
 
@@ -517,7 +517,7 @@
     /* 모바일 상단 (Stage 11.2): 1줄 = HP 바(가로 전체) + 🔊, 2줄 = 스탯 요약(왼쪽) + 상태 배지(오른쪽).
        제목 상자는 숨기고, 스탯은 한 줄로 접어 두었다가 누르면 펼친다 — 화면을 덜 가리게 */
     #hud { display: none; }
-    #btn-sound { right: 8px; top: 8px; width: 32px; height: 32px; font-size: 15px; }
+    #btn-me { right: 8px; top: 8px; width: 32px; height: 32px; font-size: 15px; }
     #hp { bottom: auto; top: 12px; left: 8px; transform: none; width: calc(100vw - 56px); height: 22px; }
     #hp.hurt { animation: none; }
     #stats { top: 44px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; pointer-events: auto; cursor: pointer; max-width: 56vw; }
@@ -562,13 +562,13 @@
   html, body { font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
   .formula, .rssi-canvas, code { font-family: ui-monospace, "D2Coding", Consolas, monospace; }
   #stats, #hp-text, #hunt .job-bar, #quest-tracker, .job-estimate { font-variant-numeric: tabular-nums; }
-  :is(#hud, #badge, #stats, #quest-tracker, #btn-sound, #toast) {
+  :is(#hud, #badge, #stats, #quest-tracker, #btn-me, #toast) {
     background: var(--glass); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow);
     backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
   }
   :is(#badge, #quest-tracker) { border-radius: 999px; }
   #hud, #stats { border-radius: 14px; }
-  #btn-sound { border-radius: 12px; }
+  #btn-me { border-radius: 12px; }
   #hud b { color: var(--accent); }
   #hud .control-desc { color: var(--ink-2); }
   /* 조작 안내는 접어 두고 "❔ 조작법"(H)으로 펼친다 — 12줄 상자가 화면을 가리던 문제 */
@@ -592,7 +592,7 @@
   #quest-tracker.ready { border-color: #9b7bff; box-shadow: 0 0 0 3px rgba(155, 123, 255, .25), var(--shadow); }
   #quest-tracker.ready .qt-next { color: var(--violet); }
   #quest-tracker:hover, #quest-tracker[aria-expanded="true"] { border-color: #f0b93a; }
-  #btn-sound { color: var(--ink); }
+  #btn-me { color: var(--ink); }
   #toast { color: var(--ink); border: 1.5px solid rgba(12, 147, 184, .45); border-radius: 14px; font-weight: 500; }
   #joystick-base { background: rgba(255, 255, 255, .28); border: 1.5px solid rgba(255, 255, 255, .7); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
   /* 행동 버튼 (Stage 11.11): 흰 유리 테두리의 둥근 광택 버튼 — 큰 아이콘 + 작은 라벨, 누르면 쏙 들어간다 */
@@ -717,6 +717,43 @@
     #hp, #talk, #info-modal, #chmap { bottom: auto; }
     #quest-tracker { bottom: 166px; }
   }
+  /* 👤 계정·설정 (Stage 13.1) — 예전 🔊 자리. 로그인 = 이름 첫 글자 + 초록 점, 게스트 = 👤, 음소거면 🔇 */
+  #btn-me { overflow: visible; }
+  #btn-me.on { border: 2px solid #7dffb5; border-radius: 50%; }
+  #btn-me .me-guest { font-size: 17px; }
+  #btn-me .me-mute { position: absolute; left: -6px; bottom: -6px; font-size: 11px; font-style: normal; background: #06101e; border-radius: 50%; padding: 1px; line-height: 1; }
+  .acc-ini { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; font-weight: 900; font-size: 16px;
+    color: #04121f; background: linear-gradient(135deg, #7de3ff, #ffd76b); }
+  .acc-ini.big { width: 42px; height: 42px; flex: none; font-size: 19px; }
+  .acc-ini.off { background: rgba(125, 216, 255, .15); font-size: 20px; }
+  .acc-dot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: #3ccf6e; border: 2px solid #06101e; box-shadow: 0 0 6px #3ccf6e; }
+  #settings-pop { position: fixed; right: 14px; top: 60px; z-index: 30; width: min(310px, calc(100vw - 20px)); padding: 12px; border-radius: 14px;
+    background: rgba(8, 20, 38, .97); border: 1.5px solid #2d5584; color: #e2f1ff; box-shadow: 0 14px 40px rgba(0,0,0,.6); font-size: 13px; animation: panelIn .18s ease-out; }
+  .set-sec { padding: 4px 4px 12px; border-bottom: 1px solid #1b3554; margin-bottom: 10px; }
+  .acc-head { display: flex; align-items: center; gap: 10px; }
+  .acc-head b { display: block; font-size: 15px; }
+  .acc-head span { font-size: 12px; color: #9db4cc; }
+  .acc-sync { margin: 10px 0; color: #b9d3ea; line-height: 1.55; }
+  .acc-row { display: flex; gap: 8px; margin-top: 10px; }
+  .acc-row button, #settings-pop .set-guide { flex: 1; min-height: 34px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700; background: rgba(57, 208, 255, .12); border: 1px solid rgba(57, 208, 255, .45); color: #e2f1ff; }
+  .acc-row .acc-out { background: none; border-color: #3a4d66; color: #9db4cc; }
+  #settings-pop .set-guide { width: 100%; }
+  .acc-g { display: flex; justify-content: center; min-height: 34px; }
+  .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; cursor: pointer; }
+  .set-row small { color: #6f8aa6; }
+  .set-row input[type=checkbox] { appearance: none; width: 40px; height: 22px; border-radius: 999px; background: #2a3a50; position: relative; cursor: pointer; transition: background .15s; flex: none; }
+  .set-row input[type=checkbox]::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #cfe0f0; transition: left .15s; }
+  .set-row input[type=checkbox]:checked { background: #1f9e5c; }
+  .set-row input[type=checkbox]:checked::after { left: 21px; background: #fff; }
+  .set-row input[type=range] { width: 150px; accent-color: #39d0ff; }
+  .pk-account { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 44px; }
+  .pk-acc-on { font-size: 13px; color: #e8f6ff; background: rgba(6, 16, 30, .7); border: 1px solid rgba(125, 255, 181, .5); border-radius: 999px; padding: 6px 14px; }
+  .pk-acc-on b { color: #7dffb5; }
+  .pk-acc-hint { font-size: 11.5px; color: #cfe0f0; max-width: 300px; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  @media (max-width: 640px) {
+    #btn-me .acc-ini { font-size: 14px; }
+    #settings-pop { right: 8px; top: 46px; }
+  }
   /* 🌳 비밀의 나무 — 기사 랭킹 (Stage 13) : 나무껍질·숲 색 */
   #ranking .panel.rk { max-width: 460px; padding: 0; overflow: hidden; display: flex; flex-direction: column;
     background: linear-gradient(180deg, #1d3a24 0%, #14281a 60%, #0f1f14 100%); border: 1.5px solid #6fae5c; color: #e8f3dc;
@@ -743,7 +780,7 @@
   #ranking .rk-logout { margin-left: auto; min-height: 0; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.25); border: 1px solid rgba(143,200,120,.4); color: #cfe6c0; cursor: pointer; }
   .rk-gbtn { width: 100%; display: flex; justify-content: center; margin-top: 4px; min-height: 36px; }
   /* 클라우드/이 기기 진행도 고르기 */
-  #cloud-choose { z-index: 60; }
+  #cloud-choose { z-index: 2000; }
   #cloud-choose .panel { max-width: 380px; text-align: center; }
   #cloud-choose p { color: #9db4cc; margin: 8px 0 12px; }
   #cloud-choose button { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; margin-top: 8px; padding: 12px; border-radius: 12px; cursor: pointer;
@@ -954,6 +991,7 @@
   <div class="pk-title">
     <button type="button" class="pk-start" id="splash-start">▶ 시작하기</button>
     <div class="pk-save" id="splash-save"></div>
+    <div class="pk-account" id="splash-account"></div>
     <div class="pk-links"><a href="https://connbook.yalex-k.com/bluetooth/" target="_blank" rel="noopener">📖 교과서</a><a href="https://home.yalex-k.com/" target="_blank" rel="noopener">🏠 home</a></div>
   </div>
   <div class="pk-hint"><span class="pk-keys">WASD · 클릭으로 이동 &nbsp;·&nbsp; 스페이스 점프 &nbsp;·&nbsp; F 발사 &nbsp;·&nbsp; Q 퀘스트</span><span class="pk-touch">조이스틱으로 이동 &nbsp;·&nbsp; 버튼으로 점프·발사 &nbsp;·&nbsp; 화면을 끌어 시점 회전</span></div>
@@ -992,9 +1030,9 @@
   </div>
 </div>
 
-<button id="btn-sound" type="button" aria-label="소리 켜기/끄기 (M)" aria-pressed="true">🔊</button>
+<button id="btn-me" type="button" aria-label="계정·설정" aria-haspopup="dialog">👤</button>
 <button id="btn-bag" type="button" aria-label="가방 (I)">🎒<span>가방</span></button>
-<button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">?</button>
+<button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">📘</button>
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
 <img id="corner-emblem" src="./src/assets/emblem-v1.webp" alt="Packet Knight" width="491" height="512" />
 <div id="stats" aria-label="기사 스탯"></div>

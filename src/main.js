@@ -27,6 +27,7 @@ import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNex
 import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles, sayNow } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
+import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
 import { weaponById, outfitById } from "./core/shop.js";
@@ -120,20 +121,7 @@ knightView.addKnightTo(scene);
 // ---------- 사운드 (Stage 11) ----------
 audio.initAudio({ bgm: !new URLSearchParams(location.search).has("test") });
 audio.setBgm("village");
-const btnSound = document.getElementById("btn-sound");
-function renderSoundButton() {
-  const m = audio.isMuted();
-  btnSound.textContent = m ? "🔇" : "🔊";
-  btnSound.setAttribute("aria-pressed", String(!m));
-  btnSound.title = m ? "소리 켜기 (M)" : "소리 끄기 (M)";
-}
-btnSound.addEventListener("click", () => { audio.toggleMute(); renderSoundButton(); btnSound.blur(); });
-window.addEventListener("keydown", (e) => {
-  if (e.code !== "KeyM" || e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-  audio.toggleMute();
-  renderSoundButton();
-});
-renderSoundButton();
+initSettings();   // 👤 계정·설정 버튼 (예전 🔊 자리, M 키 음소거 포함) — Stage 13.1
 
 // ---------- 진행도 (localStorage) ----------
 // 사생활 보호 모드 등에서 localStorage 접근 자체가 예외를 던질 수 있다

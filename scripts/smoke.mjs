@@ -1621,24 +1621,36 @@ await page.waitForFunction(() => window.__PK);
     failed.map((c) => `${c.label}: ${c.miss.join("/")} 없음`).join(", ") || `${cases.length}개 상황 모두 소리남`);
   void labLog;
 
-  // ⑥ 음소거: M 키 · 버튼, 설정은 새로고침 후에도 유지
+  // ⑥ 음소거: M 키 · 👤 계정·설정 창의 소리 스위치, 설정은 새로고침 후에도 유지 (Stage 13.1)
   await page.keyboard.press("KeyM");
   const muted = await page.evaluate(() => window.__PK.audio.state().muted);
-  const icon = await page.locator("#btn-sound").textContent();
+  const icon = await page.evaluate(() => ({ mute: Boolean(document.querySelector("#btn-me .me-mute")), guest: Boolean(document.querySelector("#btn-me .me-guest")) }));
   await page.reload();
   await page.waitForFunction(() => window.__PK);
   const keptMute = await page.evaluate(() => window.__PK.audio.state().muted);
-  await page.click("#btn-sound");
-  const unmuted = !(await page.evaluate(() => window.__PK.audio.state().muted));
-  check("M 키·🔊 버튼으로 음소거하고, 설정이 새로고침 후에도 유지된다", muted && icon === "🔇" && keptMute && unmuted);
+  const set = await page.evaluate(() => {
+    document.getElementById("btn-me").click();
+    const pop = document.getElementById("settings-pop");
+    const r = { open: !pop.hidden, guest: /게스트/.test(pop.querySelector(".set-acc").textContent), guide: Boolean(pop.querySelector('[data-action="tutorial"]')) };
+    const sw = pop.querySelector(".set-mute"); r.swOff = !sw.checked; sw.click();
+    const vol = pop.querySelector(".set-vol"); vol.value = "40"; vol.dispatchEvent(new Event("input"));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return { ...r, closed: pop.hidden };
+  });
+  const after = await page.evaluate(() => window.__PK.audio.state());
+  await page.evaluate(() => window.__PK.audio.state());
+  check("M 키·👤 계정·설정 창의 소리 스위치로 음소거하고(버튼에 🔇 표시), 볼륨 조절, 설정은 새로고침 후에도 유지 · 로그인 전에는 게스트",
+    muted && icon.mute && icon.guest && keptMute && set.open && set.guest && set.guide && set.swOff && !after.muted && Math.abs(after.volume - 0.4) < 1e-9 && set.closed,
+    JSON.stringify({ icon, set, vol: after.volume }));
+  await page.evaluate(() => { const v = document.querySelector("#settings-pop .set-vol"); v.value = "70"; v.dispatchEvent(new Event("input")); });
 
-  // ⑦ 모바일 폭: 사운드 버튼이 배지·스탯과 겹치지 않는다
+  // ⑦ 모바일 폭: 계정·설정 버튼·📘 버튼이 배지·스탯과 겹치지 않는다
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const bx = await page.evaluate(() => Object.fromEntries(["btn-sound", "btn-guide", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
+  const bx = await page.evaluate(() => Object.fromEntries(["btn-me", "btn-guide", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
-  const ov = ["badge", "stats", "hud", "hp", "btn-guide"].filter((k) => hit(bx["btn-sound"], bx[k])).concat(["badge", "stats", "hp"].filter((k) => hit(bx["btn-guide"], bx[k])).map((k) => `❔×${k}`));
-  check("모바일 폭에서 사운드 버튼이 다른 HUD와 겹치지 않는다", ov.length === 0, ov.join(", ") || "겹침 없음");
+  const ov = ["badge", "stats", "hud", "hp", "btn-guide"].filter((k) => hit(bx["btn-me"], bx[k])).concat(["badge", "stats", "hp"].filter((k) => hit(bx["btn-guide"], bx[k])).map((k) => `📘×${k}`));
+  check("모바일 폭에서 계정·설정 버튼이 다른 HUD와 겹치지 않는다", ov.length === 0, ov.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 

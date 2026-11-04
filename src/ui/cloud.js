@@ -47,19 +47,30 @@ export async function initCloud(h) {
   } catch { return; }   // 서버 없음 (로컬 정적 서버)
   if (!clientId) return;
   enabled = true;
+  renderAccount();
   document.addEventListener("visibilitychange", () => { if (document.hidden) flush(true); });
   window.addEventListener("pagehide", () => flush(true));
   try {
     const me = await api("me");
-    if (me.user) { user = me.user; lastSavedAt = me.savedAt; await reconcile(me.save); }
+    if (me.user) { user = me.user; lastSavedAt = me.savedAt; renderAccount(); await reconcile(me.save); }
   } catch { /* 오프라인 — 다음 저장 때 다시 */ }
+  renderAccount();
+  if (!user) promptLogin();   // 시작 화면에서 바로 One Tap (전에 허락한 계정이면 저절로)
   const msg = sessionStorage.getItem("pk.cloudMsg");
-  if (msg) { sessionStorage.removeItem("pk.cloudMsg"); setTimeout(() => hooks.toast(msg, 4), 2500); }
+  if (msg) { sessionStorage.removeItem("pk.cloudMsg"); toastLater(msg, 4); }
+}
+
+/** 시작 화면이 걷힌 뒤에 보이도록 안내를 미룬다 */
+function toastLater(msg, sec) {
+  const go = () => (document.body.classList.contains("prestart") ? setTimeout(go, 800) : setTimeout(() => hooks.toast(msg, sec), 1200));
+  go();
 }
 
 /** 시작 버튼을 누른 뒤 — 로그인 안 했으면 One Tap (한 번 허락한 계정이면 저절로) */
+let prompted = false;
 export function promptLogin() {
-  if (!enabled || user) return;
+  if (!enabled || user || prompted) return;
+  prompted = true;
   loadGsi().then((g) => g.accounts.id.prompt()).catch(() => {});
 }
 
@@ -91,6 +102,7 @@ async function onCredential(resp) {
   try {
     const r = await api("login", { method: "POST", body: JSON.stringify({ credential: resp.credential }) });
     user = r.user; lastSavedAt = r.savedAt;
+    renderAccount();
     hooks.sfx?.("coin");
     hooks.toast(`☁️ ${user.name} 님, 로그인했어요 — 진행도가 클라우드에 저장돼요`, 4);
     await reconcile(r.save);
@@ -104,7 +116,13 @@ async function onCredential(resp) {
 async function reconcile(cloud) {
   const local = hooks.getProgress();
   // 비어 있거나 이 버전이 못 읽는 클라우드 세이브는 이 기기 것으로 덮는다
-  if (!cloud || !isValidSave(cloud)) { dirty = true; await flush(); return; }
+  if (!cloud || !isValidSave(cloud)) {
+    // 처음 로그인한 기존 사용자: 이 기기 진행도를 그대로 클라우드로 옮긴다
+    dirty = true;
+    await flush();
+    if (!isFresh(local) && lastSavedAt) toastLater(`📦 이 기기 진행도(${summary(local)})를 클라우드로 옮겼어요 — 이제 다른 기기에서도 이어서 할 수 있어요`, 5);
+    return;
+  }
   if (JSON.stringify(cloud) === JSON.stringify(local)) return;
   if (isFresh(local) && !isFresh(cloud)) { adopt(cloud); return; }
   if (ahead(cloud, local)) {
@@ -159,8 +177,9 @@ async function flush(leaving = false) {
   try {
     const r = await api("save", { method: "PUT", body, keepalive: leaving && body.length < 60000 });
     lastSavedAt = r.savedAt;
+    renderAccount();
   } catch (e) {
-    if (e.status === 401) { user = null; return; }   // 세션 만료 → 다음에 다시 로그인
+    if (e.status === 401) { user = null; renderAccount(); return; }   // 세션 만료 → 다음에 다시 로그인
     dirty = true;
   }
 }
@@ -170,6 +189,7 @@ async function logout() {
   try { await api("logout", { method: "POST" }); } catch { /* 무시 */ }
   window.google?.accounts?.id?.disableAutoSelect?.();
   user = null;
+  renderAccount();
   hooks.toast("☁️ 로그아웃했어요 — 이 기기에는 계속 저장돼요", 3);
   refreshRanking();
 }
@@ -243,5 +263,53 @@ async function refreshRanking() {
     foot.innerHTML = total;
   }
 }
+
+// ---------- 로그인 상태 표시 (Stage 13.1): 화면 오른쪽 위 계정 버튼 + 시작 화면 ----------
+const listeners = [];
+/** 로그인 상태가 바뀔 때 (설정 버튼 아이콘 갱신 — settings.js) */
+export const onCloudChange = (f) => { listeners.push(f); };
+const ago = (t) => {
+  if (!t) return "아직 저장 전";
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? "방금 저장됨" : m < 60 ? `${m}분 전 저장` : `${Math.round(m / 60)}시간 전 저장`;
+};
+function googleButton(el, opts = {}) {
+  if (!el) return;
+  loadGsi().then((g) => g.accounts.id.renderButton(el, { theme: "filled_black", size: "large", shape: "pill", text: "signin_with", locale: "ko", ...opts })).catch(() => {});
+}
+let accEl = null;
+function renderAccount() {
+  // 시작 화면
+  const sp = document.getElementById("splash-account");
+  if (sp && enabled) {
+    if (user) sp.innerHTML = `<span class="pk-acc-on">☁️ <b>${esc(user.name)}</b> 님으로 로그인됨 · 클라우드 저장 중</span>`;
+    else if (!sp.querySelector(".pk-gbtn")) {
+      sp.innerHTML = `<div class="pk-gbtn"></div><span class="pk-acc-hint">로그인하면 이 기기 진행도를 클라우드로 옮겨, 다른 기기에서도 이어 할 수 있어요</span>`;
+      googleButton(sp.querySelector(".pk-gbtn"));
+    }
+  }
+  if (accEl?.isConnected) fillAccount(accEl);
+  for (const f of listeners) f(accountInfo());
+}
+/** 설정 창의 계정 칸을 채운다 */
+export function fillAccount(el) {
+  accEl = el;
+  if (!enabled) {
+    el.innerHTML = `<div class="acc-head"><span class="acc-ini big off">👤</span><div><b>게스트</b><span>이 브라우저에만 저장 중</span></div></div>`;
+    return;
+  }
+  if (user) {
+    el.innerHTML = `<div class="acc-head"><span class="acc-ini big">${esc([...user.name][0])}</span><div><b>${esc(user.name)}</b><span>구글 계정으로 로그인됨 · ☁️ ${dirty ? "저장 대기 중…" : ago(lastSavedAt)}</span></div></div>
+      <div class="acc-row"><button type="button" class="acc-save">☁️ 지금 저장</button><button type="button" class="acc-out">로그아웃</button></div>`;
+    el.querySelector(".acc-save").addEventListener("click", async () => { dirty = true; await flush(); hooks.toast("☁️ 클라우드에 저장했어요", 2); });
+    el.querySelector(".acc-out").addEventListener("click", logout);
+  } else {
+    el.innerHTML = `<div class="acc-head"><span class="acc-ini big off">👤</span><div><b>게스트</b><span>이 브라우저에만 저장 중</span></div></div>
+      <p class="acc-sync">구글로 로그인하면 지금 진행도를 클라우드로 옮기고, 다른 기기에서도 이어서 할 수 있어요. 비밀의 나무 랭킹에도 이름이 새겨져요.</p>
+      <div class="acc-g"></div>`;
+    googleButton(el.querySelector(".acc-g"), { size: "medium" });
+  }
+}
+export const accountInfo = () => ({ enabled, name: user?.name ?? null });
 
 export const cloudState = () => ({ enabled, user, dirty, lastSavedAt });
