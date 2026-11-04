@@ -99,11 +99,29 @@ const SFX = {
   land: (t) => noise(t, { dur: 0.1, f: 300, to: 120, q: 0.8, gain: 0.16, type: "lowpass" }),
   dash: (t) => { noise(t, { dur: 0.2, f: 600, to: 4000, q: 1.5, gain: 0.18 }); tone(t, { f: 440, to: 1320, dur: 0.18, type: "sawtooth", gain: 0.05 }); },
   // 전투
-  // 발사 — 무기마다 (Stage 12.6). fire = 검: 휙 베는 바람 + 하강 처프
-  fire: (t) => { noise(t, { dur: 0.16, f: 900, to: 3200, q: 1.2, gain: 0.12 }); tone(t, { f: 1500, to: 420, dur: 0.12, type: "square", gain: 0.05 }); },
-  fire_dagger: (t) => { tone(t, { f: 2400, to: 1200, dur: 0.05, type: "square", gain: 0.05 }); noise(t, { dur: 0.05, f: 5000, q: 2, gain: 0.08 }); },       // 짧고 높은 "칙"
-  fire_bow: (t) => { tone(t, { f: 180, to: 140, dur: 0.18, type: "triangle", gain: 0.12 }); tone(t, { f: 360, to: 300, dur: 0.12, type: "sine", gain: 0.05 }); noise(t + 0.03, { dur: 0.22, f: 2500, to: 600, q: 1, gain: 0.07 }); },  // 시위 퉁 + 바람
-  fire_fan: (t) => arp(t, [1568, 2093, 2637], 0.035, { dur: 0.12, type: "sine", gain: 0.05 }),                                                               // 세 갈래 반짝
+  // 발사 — 무기별 타격감 고도화 (Stage 13.9)
+  fire: (t) => {
+    noise(t, { dur: 0.12, f: 3200, to: 600, q: 1.5, gain: 0.18 });
+    tone(t, { f: 180, to: 60, dur: 0.14, type: "sine", gain: 0.15 });
+    tone(t + 0.02, { f: 880, to: 1760, dur: 0.08, type: "triangle", gain: 0.07 });
+  }, // ADV 패킷 검: 베는 풍절음 + 단일 반송파 신호음
+  fire_dagger: (t) => {
+    noise(t, { dur: 0.045, f: 4500, to: 1600, q: 2, gain: 0.12 });
+    tone(t, { f: 2000, to: 900, dur: 0.04, type: "triangle", gain: 0.06 });
+    noise(t + 0.045, { dur: 0.05, f: 5500, to: 2000, q: 2.2, gain: 0.14 });
+    tone(t + 0.045, { f: 2400, to: 1100, dur: 0.045, type: "triangle", gain: 0.07 });
+  }, // 2M PHY 쌍단검: 0.045초 간격의 쾌속 2단 베기
+  fire_bow: (t) => {
+    tone(t, { f: 340, to: 80, dur: 0.12, type: "triangle", gain: 0.2 });
+    noise(t, { dur: 0.06, f: 1200, to: 300, q: 1.8, gain: 0.15, type: "lowpass" });
+    tone(t + 0.02, { f: 320, to: 1960, dur: 0.22, type: "sine", gain: 0.12 });
+    noise(t + 0.04, { dur: 0.18, f: 2800, to: 900, q: 1.2, gain: 0.08 });
+  }, // Coded S=8 장궁: 시위 탄성음 + 뻗어나가는 롱레인지 레이저
+  fire_fan: (t) => {
+    noise(t, { dur: 0.15, f: 1800, to: 4200, q: 1.2, gain: 0.12 });
+    arp(t + 0.01, [1046, 1568, 2093], 0.03, { dur: 0.14, type: "sine", gain: 0.08 });
+    tone(t + 0.04, { f: 2637, to: 1319, dur: 0.1, type: "triangle", gain: 0.05 });
+  }, // 확장 광고 부채: 펼쳐지는 풍절음 + 3방향 확산 신호파
   hit: (t) => { tone(t, { f: 260, to: 160, dur: 0.07, type: "triangle", gain: 0.16 }); noise(t, { dur: 0.04, f: 2500, gain: 0.08 }); },
   crit: (t) => { SFX.hit(t); arp(t + 0.02, [1319, 1760], 0.04, { dur: 0.08, type: "square", gain: 0.05 }); },
   kill: (t) => arp(t, [523, 659, 784, 1047], 0.06, { dur: 0.12, type: "triangle", gain: 0.1 }),
@@ -114,17 +132,41 @@ const SFX = {
   packetLost: (t) => { noise(t, { dur: 0.12, f: 3000, q: 4, gain: 0.12 }); noise(t + 0.06, { dur: 0.08, f: 1800, q: 6, gain: 0.08 }); },
   outOfBand: (t) => tone(t, { f: 2093, dur: 0.06, type: "sine", gain: 0.04 }),
   windup: (t) => tone(t, { f: 220, to: 330, dur: 0.25, type: "triangle", gain: 0.05 }),
-  // 몬스터별 공격 예고·공격음 (Stage 12.8) — windup_<type> = 기를 모으는 소리, atk_<type> = 공격이 터지는 소리
+  // 몬스터별 공격 예고·공격음 (Stage 13.9) — windup_<type> = 기를 모으는 소리, atk_<type> = 공격이 터지는 소리
   windup_trainingBot: (t) => arp(t, [523, 784], 0.08, { dur: 0.1, type: "square", gain: 0.04 }),                                   // 삐-삐 (훈련 봇)
-  atk_trainingBot: (t) => { noise(t, { dur: 0.06, f: 700, q: 1, gain: 0.1 }); tone(t, { f: 330, to: 220, dur: 0.08, type: "square", gain: 0.05 }); },
+  atk_trainingBot: (t) => {
+    noise(t, { dur: 0.04, f: 1600, to: 400, q: 1.5, gain: 0.14 });
+    noise(t + 0.03, { dur: 0.05, f: 800, to: 200, q: 1, gain: 0.16, type: "lowpass" });
+    tone(t + 0.02, { f: 440, to: 160, dur: 0.1, type: "sine", gain: 0.1 });
+  }, // 피스톤 2단 철컥 + 뾱 펀치
   windup_wifiInterferer: (t) => { noise(t, { dur: 0.45, f: 400, to: 3000, q: 3, gain: 0.07 }); tone(t, { f: 120, to: 240, dur: 0.45, type: "sawtooth", gain: 0.03 }); }, // 정전기 차오름
-  atk_wifiInterferer: (t) => { noise(t, { dur: 0.35, f: 2400, to: 300, q: 0.7, gain: 0.16 }); tone(t, { f: 90, to: 45, dur: 0.3, type: "sawtooth", gain: 0.08 }); },     // 광역 지지직 폭발
+  atk_wifiInterferer: (t) => {
+    noise(t, { dur: 0.28, f: 3800, to: 400, q: 0.8, gain: 0.22 });
+    noise(t + 0.06, { dur: 0.2, f: 2200, to: 200, q: 1.2, gain: 0.18 });
+    tone(t, { f: 90, to: 35, dur: 0.35, type: "sawtooth", gain: 0.14 });
+    tone(t, { f: 60, to: 30, dur: 0.4, type: "sine", gain: 0.2 });
+  }, // 20MHz 광역 OFDM 스파크 방전 & 묵직한 서브우퍼
   windup_advFlooder: (t) => arp(t, [1760, 2093, 1760, 2349], 0.045, { dur: 0.04, type: "square", gain: 0.035 }),                    // 다다닥 처프
-  atk_advFlooder: (t) => arp(t, [2637, 2349, 2093, 1760, 1568], 0.03, { dur: 0.035, type: "square", gain: 0.045 }),               // 광고 폭주 연타
+  atk_advFlooder: (t) => {
+    [1975, 1760, 1568, 1319].forEach((f, i) => {
+      const dt = i * 0.028;
+      tone(t + dt, { f, to: f * 0.7, dur: 0.04, type: "square", gain: 0.07 });
+      noise(t + dt, { dur: 0.025, f: 4000, to: 1200, q: 2, gain: 0.1 });
+    });
+  }, // 20ms 간격 4연발 기관총 처프
   windup_microwave: (t) => { tone(t, { f: 60, dur: 0.6, type: "sawtooth", gain: 0.06, attack: 0.15 }); tone(t, { f: 120, dur: 0.6, type: "square", gain: 0.025, attack: 0.15 }); }, // 웅— (마그네트론)
-  atk_microwave: (t) => { noise(t, { dur: 0.3, f: 500, to: 150, q: 0.9, gain: 0.18, type: "lowpass" }); tone(t, { f: 70, to: 40, dur: 0.3, type: "sawtooth", gain: 0.09 }); tone(t + 0.22, { f: 1568, dur: 0.5, type: "sine", gain: 0.06 }); }, // 쾅 + 땡!
+  atk_microwave: (t) => {
+    noise(t, { dur: 0.32, f: 600, to: 100, q: 0.8, gain: 0.25, type: "lowpass" });
+    tone(t, { f: 80, to: 30, dur: 0.35, type: "sawtooth", gain: 0.14 });
+    noise(t + 0.04, { dur: 0.16, f: 2450, q: 4, gain: 0.12 });
+    tone(t + 0.2, { f: 1568, dur: 0.45, type: "sine", gain: 0.09, attack: 0.002 });
+  }, // 2.45GHz 마그네트론 고주파 파동 + 콰앙 + 끝에 울리는 '땡!'
   windup_sniffer: (t) => tone(t, { f: 400, to: 3200, dur: 0.75, type: "sine", gain: 0.04, attack: 0.4 }),                          // 레이저 충전
-  atk_sniffer: (t) => { tone(t, { f: 3200, to: 500, dur: 0.16, type: "square", gain: 0.06 }); noise(t, { dur: 0.1, f: 6000, q: 3, gain: 0.08 }); }, // 지잉— 사격
+  atk_sniffer: (t) => {
+    tone(t, { f: 3600, to: 440, dur: 0.12, type: "square", gain: 0.1 });
+    noise(t, { dur: 0.08, f: 5500, to: 1800, q: 2.5, gain: 0.12 });
+    tone(t + 0.05, { f: 988, to: 494, dur: 0.08, type: "sawtooth", gain: 0.06 });
+  }, // 날카로운 관통 탄환 + 도청 글리치
   ko: (t) => tone(t, { f: 440, to: 90, dur: 0.7, type: "sawtooth", gain: 0.12 }),
   // 시작 연출 "두둥" (Stage 13.6) — 엠블럼이 가운데서 두 번 고동칠 때 맞춰 낮은 북 두 번 + 반짝
   dudung: (t) => {
