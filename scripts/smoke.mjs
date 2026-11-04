@@ -2046,6 +2046,16 @@ await page.waitForFunction(() => window.__PK);
     if (r.afterCooldown) P.tip.talk(P.tip.state().villagerId), document.querySelector("#talk .talk-close").click();
     return r;
   });
+  // 📖 교과서에서 온 링크 (Stage 13.16): ?quest=Q7 → 그 퀘스트를 퀘스트 로그로
+  const dl = await page.evaluate(() => {
+    const P = window.__PK;
+    const ok = P.deepLink("Q7"), bad = P.deepLink("Q99");
+    const el = document.getElementById("quests");
+    const r = { ok, bad, open: el && !el.hidden, title: el?.querySelector(".q-detail h3")?.textContent ?? "" };
+    el?.querySelector(".close")?.click();
+    return r;
+  });
+  check("교과서 링크(?quest=Q7): 그 퀘스트를 퀘스트 로그로 연다 (없는 퀘스트는 무시)", dl.ok && !dl.bad && dl.open && /Q7/.test(dl.title), JSON.stringify(dl));
   check("💡 주민 이야기: 층 클리어 → 관련 장(호핑·공존·연결) 주민 머리 위 💡(한 번에 하나), 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래 정답 🪙+2, 들은 뒤 2분 쿨다운",
     ["hopping", "coexistence", "connection"].includes(sc.st.chapter) && sc.marker === sc.st.villagerId && sc.oneAtATime && sc.full.startsWith("💡") && sc.markerGone && sc.qbtn && sc.gain === 2 && sc.cooldown && sc.afterCooldown
       && shopTip.card.chapter === "audio" && qaTopics.includes("audio"),

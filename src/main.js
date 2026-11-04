@@ -1122,6 +1122,18 @@ function adaptQuality(rawDt) {
   }
 }
 
+// ---------- 📖 교과서에서 온 링크 (Stage 13.16): ?quest=Q7 → 그 퀘스트를 퀘스트 로그로 보여 준다 ----------
+const DEEP_QUEST = (() => { const id = new URLSearchParams(location.search).get("quest"); return id && questById(id) ? id : null; })();
+/** @param {boolean} [quiet] 처음 온 사람(설명서가 먼저 뜬다)이면 안내만 하고 로그는 열지 않는다 */
+function openDeepLink(id, quiet = false) {
+  const q = questById(id);
+  if (!q) return false;
+  const done = Boolean(progress.quests.done[q.id]), active = progress.quests.active === q.id;
+  fx.showToast(`📖 교과서에서 왔어요 — ${q.code} 「${q.title}」 ${done ? "(이미 완료!)" : active ? "· 지금 진행 중" : "· 퀘스트 로그에서 단계를 확인해 보세요"}`, 5);
+  if (!quiet) questLog.openQuestLog(q.id);
+  return true;
+}
+
 // ---------- 💡 주민이 들려주는 스펙 이야기 (Stage 13.14): 이벤트 → 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래 ----------
 /** 학습 보상 🪙 (💡 맞혀 보기·알바 2배) */
 function grantLearnReward(n) {
@@ -1203,6 +1215,7 @@ if (!TEST_MODE) {
       setTimeout(() => document.body.classList.remove("revealing"), 2200 + lag);
       if (!tutorialSeen()) setTimeout(showTutorial, 2300 + lag);   // 처음 온 사람: 설명서 → UI 투어 (Stage 11.13)
       setTimeout(promptLogin, tutorialSeen() ? 2600 : 600);   // 구글 One Tap — 전에 허락했으면 저절로 로그인 (Stage 13)
+      if (DEEP_QUEST) setTimeout(() => openDeepLink(DEEP_QUEST, !tutorialSeen()), 2500 + lag);   // 교과서에서 온 링크 (Stage 13.16)
     }
   })));
 }
@@ -1226,6 +1239,7 @@ window.__PK = {
   library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, lastChapterUrl },
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
+  deepLink: (id) => openDeepLink(id),
   tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },
   quests: {
     open: (id) => questLog.openQuestLog(id),
