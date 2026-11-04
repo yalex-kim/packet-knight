@@ -742,7 +742,9 @@ const billboard = new THREE.Group();
   billboard.add(frame);
   const canvas = document.createElement("canvas");
   canvas.width = BOARD_W; canvas.height = BOARD_H;
-  const ctx = canvas.getContext("2d");
+  // 큰 캔버스는 GPU 가속 캔버스가 되는데, 모바일 크롬은 앱을 내리거나 메모리가 부족하면 그 내용을 버린다 →
+  // 그 뒤 텍스처를 다시 올리면 광고판이 까맣게 나온다 (Stage 12.10). willReadFrequently = CPU 캔버스라 버려지지 않는다.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   drawBoard(ctx);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -762,6 +764,10 @@ const billboard = new THREE.Group();
   const redraw = () => { drawBoard(ctx); tex.needsUpdate = true; };
   mark.addEventListener("load", redraw);
   document.fonts?.ready?.then(redraw);
+  // 그래도 내용이 사라졌을 때를 대비해: 캔버스 복구·탭 복귀·WebGL 복구 때 다시 그린다
+  canvas.addEventListener("contextrestored", redraw);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) redraw(); });
+  window.addEventListener("webglcontextrestored", redraw, true);
   billboard.rotation.y = BILLBOARD.facing;
 }
 placeLandmark(billboard, "billboard");
