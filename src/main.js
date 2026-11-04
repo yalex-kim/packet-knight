@@ -26,7 +26,7 @@ import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./u
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
 import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles, sayNow, sayText, setTipVillager, tipVillager } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
-import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
+import { openBoard, isBoardOpen } from "./ui/board.js";
 import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
 import { drawOne } from "./core/specCards.js";
@@ -206,13 +206,13 @@ function regionLabel() {
 
 /** 랜드마크 안내 모달을 띄우고 그 앞으로 걸어간다 — 건물 클릭과 퀘스트 "📍 길 안내"가 같이 쓴다 */
 function goToLandmark(info) {
-  if (info === landmark("billboard").info) {   // 광고판: 히어로 디자인 개발자 카드 (Stage 11.19)
+  if (info === landmark("billboard").info) {   // 광고판 → 📮 마을 게시판: 공지·이벤트 + 의견·제안 (Stage 13.15)
     hud.hideModal();
     clearMoveTarget();
     setInputEnabled(false);
     inputLocked = true;
     sfx("open");
-    openDevCard(() => { setInputEnabled(true); inputLocked = false; });
+    openBoard(() => { setInputEnabled(true); inputLocked = false; });
     return;
   }
   hud.showModal(modalInfo(info));
@@ -1248,7 +1248,7 @@ window.__PK = {
   crypt: { open: cryptUi.openCrypt, isOpen: cryptUi.isCryptOpen, state: cryptUi.cryptState },
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
-  devCard: { open: () => goToLandmark(landmark("billboard").info), isOpen: isDevCardOpen },
+  board: { open: () => goToLandmark(landmark("billboard").info), isOpen: isBoardOpen },
   ranking: { open: (board) => openSecretTree(board), isOpen: isRankingOpen, close: closeRanking, cloud: cloudState, tree: () => ({ x: world.secretTree.position.x, z: world.secretTree.position.z }) },
   inventory: { open: openInventory, close: closeInventory, isOpen: isInventoryOpen },
   shop: { open: openShop, close: closeShop, isOpen: isShopOpen, state: () => structuredClone(progress.shop) },

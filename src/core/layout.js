@@ -199,19 +199,19 @@ LANDMARKS.push({
   }
 });
 
-/** 개발자 광고판 (Stage 11.18) — 도서관 왼쪽 앞, 대각선으로 훈련장·광장을 바라본다. 내용은 home.yalex-k.com (y.AI.ex) 기준 */
+/** 📮 마을 게시판 (Stage 11.18 광고판 → 13.15 게시판) — 도서관 왼쪽 앞, 대각선으로 훈련장·광장을 바라본다. 내용은 home.yalex-k.com (y.AI.ex) 기준 */
 export const BILLBOARD = Object.freeze({ x: -12.6, z: 4.6, width: 3.2, facing: Math.PI / 4 });   // 도서관 왼쪽 앞, 나무 하나를 치우고 대각선(남동쪽 — 훈련장·광장 쪽)으로 (사용자 지정)
 LANDMARKS.push({
   id: "billboard",
   pos: { x: BILLBOARD.x, y: S, z: BILLBOARD.z },
   info: {
-    title: "📋 개발자 광고판 — y.AI.ex",
-    sub: "[Yalex의 바이브코딩 아티팩트]",
-    desc: "이 게임을 만든 Yalex의 작업실 홈입니다. 말로 설계하고 AI와 짝 코딩으로 굳힌 아티팩트들 — 블루투스 교과서 ConnectivityBook, 이 게임 Packet Knight, 바벨 투자 콘솔 Barbell Fund, 한국사 영상 에이전트 K-History Studio — 이 거기 모여 있어요.",
-    loreLabel: "🛠️ 만드는 방식: ",
-    lore: "① 말로 설계 — 코드보다 문장을 먼저 ② AI와 짝 코딩 — Claude Code와 함께, 결정은 사람이 ③ 돌려서 확인 — 테스트·스모크·팩트체크 ④ 바로 내보내기 — git push 하면 배포.",
+    title: "📮 마을 게시판",
+    sub: "[공지·이벤트 · 의견·제안]",
+    desc: "마을의 새 소식과 이벤트가 붙는 게시판이에요. 버그, 불편한 점, 바라는 것 — 무엇이든 의견을 남기면 개발자에게 전해져요.",
+    loreLabel: "📮 ",
+    lore: "공지는 core/notices.js, 의견은 서버에 저장돼 개발자만 읽어요.",
     link: "https://home.yalex-k.com/",
-    linkLabel: "🏠 home.yalex-k.com 열기",
+    linkLabel: "🏠 만든 사람 · home.yalex-k.com",
     walkPos: { x: BILLBOARD.x + Math.sin(BILLBOARD.facing) * 1.8, y: S, z: BILLBOARD.z + Math.cos(BILLBOARD.facing) * 1.8 }
   }
 });

@@ -510,9 +510,11 @@ page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
 // 저장소 루트를 정적 서버처럼 제공 (index.html + src/*.js 모듈)
 const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json", ".webp": "image/webp", ".mp3": "audio/mpeg" };
+const fbPosts = [];   // 📮 게시판 의견 (가짜 API가 받은 것)
 await page.route((url) => url.origin === ORIGIN, (r) => {
   const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
   // 클라우드 API (Stage 13) — 랭킹만 가짜로 (Pages Functions·D1 은 배포본에서만)
+  if (rel === "api/feedback" && r.request().method() === "POST") { fbPosts.push(JSON.parse(r.request().postData() ?? "{}")); return r.fulfill({ contentType: "application/json", body: "{\"ok\":true}" }); }
   if (rel === "api/ranking" && new URL(r.request().url()).searchParams.get("board") === "job") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
     board: "job", top: [{ name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv", jobBest: 560, jobRuns: 12 }, { name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded", jobBest: 300, jobRuns: 4 }], me: null, total: 2 }) });
   if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ board: "level",
@@ -1826,14 +1828,28 @@ await page.waitForFunction(() => window.__PK);
   const blocked = posts.every((c) => Col.isBlocked(c.x, c.z, 2.0));
   const front = bb.info.walkPos, frontFree = !Col.isBlocked(front.x, front.z, 2.0);
   await reset();
-  const dc = await page.evaluate(() => {
-    window.__PK.devCard.open();
-    const el = document.getElementById("devcard");
-    const p = el.querySelector(".panel"), t = el.querySelector(".dc-title").getBoundingClientRect(), h = el.querySelector(".dc-home").getBoundingClientRect();
-    const r = { open: window.__PK.devCard.isOpen(), items: el.querySelectorAll(".dc-item").length, home: el.querySelector(".dc-home")?.getAttribute("href"), title: el.querySelector(".dc-title")?.textContent,
-      noScroll: p.scrollHeight <= p.clientHeight + 1, beside: Boolean(el.querySelector(".dc-side .dc-ring") && el.querySelector(".dc-side .dc-home")) && h.width > 0 };
+  // 📮 마을 게시판 (Stage 13.15): 공지·이벤트 + 의견 보내기(가짜 API에 실제로 POST) + 만든 사람은 작게
+  const dc = await page.evaluate(async () => {
+    window.__PK.board.open();
+    const el = document.getElementById("board");
+    const r = { open: window.__PK.board.isOpen(), notes: el.querySelectorAll(".bd-note").length, cats: el.querySelectorAll(".bd-cats button").length,
+      credit: el.querySelector(".bd-credit")?.getAttribute("href"), creditSmall: parseFloat(getComputedStyle(el.querySelector(".bd-credit")).fontSize) <= 13,
+      adminHidden: el.querySelector(".bd-admin").hidden };
+    el.querySelector('.bd-cats [data-cat="bug"]').click();
+    const ta = el.querySelector(".bd-text");
+    ta.value = "던전 3층 전자레인지가 너무 세요";
+    ta.dispatchEvent(new Event("input"));
+    r.count = el.querySelector(".bd-count").textContent;
+    // 입력 중 키가 게임으로 새지 않는다 (M = 음소거)
+    const muted0 = window.__PK.audio.state().muted;
+    ta.dispatchEvent(new KeyboardEvent("keydown", { key: "m", code: "KeyM", bubbles: true }));
+    r.keyIsolated = window.__PK.audio.state().muted === muted0;
+    el.querySelector(".bd-send").click();
+    for (let i = 0; i < 40 && !/고마워요|보낼 수 없/.test(el.querySelector(".bd-status").textContent); i++) await new Promise((res) => setTimeout(res, 50));
+    r.status = el.querySelector(".bd-status").textContent;
+    r.cleared = ta.value === "";
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    return { ...r, closed: !window.__PK.devCard.isOpen() };
+    return { ...r, closed: !window.__PK.board.isOpen(), sent: window.__fbSent ?? null };
   });
   // 🌳 비밀의 나무 → 랭킹 (Stage 13)
   const rk = await page.evaluate(async () => {
@@ -1883,9 +1899,10 @@ await page.waitForFunction(() => window.__PK);
       && rk.who3 === "민지" && rk.items3.join() === "메시 숲지기,확장 광고 부채" && rk.reopen
       && rk.job.tab === "job" && rk.job.first === "민지" && rk.job.score === "560점" && /S등급/.test(rk.job.sub) && /알바한 기사 2명/.test(rk.job.total),
     JSON.stringify(rk));
-  check("광고판을 누르면 home 히어로 한 장만(스크롤 없음) 뜨고, 아바타 옆에 홈페이지 링크, Esc로 닫힌다",
-    dc.open && dc.items === 0 && dc.noScroll && dc.beside && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));
-  check("개발자 광고판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",
+  check("📮 광고판 = 마을 게시판: 공지·이벤트 목록, 의견(종류 4가지·글자 수·입력 중 키는 게임으로 안 샘) 보내기 → 서버에 전달, 만든 사람은 맨 아래 작게, 관리자 칸은 숨김, Esc로 닫힌다",
+    dc.open && dc.notes >= 3 && dc.cats === 4 && dc.credit === "https://home.yalex-k.com/" && dc.creditSmall && dc.adminHidden && dc.count === `${[..."던전 3층 전자레인지가 너무 세요"].length}/500` && dc.keyIsolated
+      && /고마워요/.test(dc.status) && dc.cleared && dc.closed && fbPosts.length === 1 && fbPosts[0].category === "bug" && /전자레인지/.test(fbPosts[0].body), JSON.stringify({ ...dc, fbPosts }));
+  check("마을 게시판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",
     bb.info.link === "https://home.yalex-k.com/" && /home/.test(bb.info.linkLabel) && posts.length === 2 && blocked && frontFree,
     `기둥 ${posts.length}개 · 정면 (${front.x.toFixed(1)}, ${front.z.toFixed(1)})`);
 }

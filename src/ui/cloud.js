@@ -361,7 +361,7 @@ export function fillAccount(el) {
     googleButton(el.querySelector(".acc-g"), { size: "medium" });
   }
 }
-export const accountInfo = () => ({ enabled, name: user?.name ?? null, picture: user?.picture ?? null });
+export const accountInfo = () => ({ enabled, name: user?.name ?? null, picture: user?.picture ?? null, admin: Boolean(user?.admin) });
 /** 프로필 사진(있으면) 또는 이름 첫 글자 — 사진이 안 열리면 첫 글자로 */
 export function avatarHtml(cls = "") {
   if (!user) return "";

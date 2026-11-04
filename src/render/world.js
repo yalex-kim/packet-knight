@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { WORLD } from "../core/config.js";
 import { forEachCell, groundHeightAt, surfaceTypeAt, cellHeight } from "../core/terrain.js";
 import { landmark, TREE_POSITIONS, LAMP_POSITIONS, FOUNTAIN_RIM_HEIGHT, BILLBOARD } from "../core/layout.js";
+import { NOTICES, activeEvent } from "../core/notices.js";
 
 /** 월드 전체를 담는 루트 그룹 */
 export const root = new THREE.Group();
@@ -724,72 +725,47 @@ const outfitShop = new THREE.Group();
 }
 placeLandmark(outfitShop, "outfitShop");
 
-// ----- 📋 개발자 광고판 (Stage 11.18) — home.yalex-k.com (y.AI.ex) 내용을 판에 그린다 -----
+// ----- 📮 마을 게시판 (Stage 11.18 광고판 → 13.15) — 판에 새 소식 세 줄 + 의견 받기 안내 + 작은 만든 사람 표시 -----
 const BOARD_W = 1024, BOARD_H = 620;
-// home.yalex-k.com 맨 위(히어로) 모습: 남색 점 격자 배경, 고리 속 아바타, y.AI.ex 머리, ls artifacts/, 빛나는 제목
 const mark = new Image();
-mark.src = "./src/assets/yalex-mark-v1.webp";   // home.yalex-k.com assets/mark-512.webp
+mark.src = "./src/assets/yalex-mark-v1.webp";
 function drawBoard(ctx) {
   const F = '"Pretendard Variable", Pretendard, system-ui, sans-serif';
   const M = 'ui-monospace, "JetBrains Mono", "D2Coding", Consolas, monospace';
-  const bg = ctx.createRadialGradient(240, 330, 40, 420, 310, 760);
-  bg.addColorStop(0, "#123a5c"); bg.addColorStop(0.55, "#0a2038"); bg.addColorStop(1, "#06121f");
+  const bg = ctx.createLinearGradient(0, 0, 0, BOARD_H);
+  bg.addColorStop(0, "#123a5c"); bg.addColorStop(1, "#071a2c");
   ctx.fillStyle = bg; ctx.fillRect(0, 0, BOARD_W, BOARD_H);
-  ctx.fillStyle = "rgba(125, 216, 255, .12)";                         // 점 격자
+  ctx.fillStyle = "rgba(125, 216, 255, .10)";
   for (let x = 24; x < BOARD_W; x += 34) for (let y = 24; y < BOARD_H; y += 34) ctx.fillRect(x, y, 2, 2);
   ctx.textBaseline = "middle";
-  // 머리: 작은 마크 + y.AI.ex + vibe-coding artifacts · online
-  if (mark.complete && mark.naturalWidth) ctx.drawImage(mark, 34, 26, 58, 58);
-  ctx.font = `900 34px ${F}`;
-  ctx.fillStyle = "#ffffff"; ctx.fillText("y.", 106, 46);
-  let x = 106 + ctx.measureText("y.").width;
-  ctx.fillStyle = "#39d0ff"; ctx.fillText("AI", x, 46); x += ctx.measureText("AI").width;
-  ctx.fillStyle = "#ffffff"; ctx.fillText(".ex", x, 46);
-  ctx.font = `500 20px ${M}`; ctx.fillStyle = "#6f8aa6"; ctx.fillText("vibe-coding artifacts", 106, 78);
-  ctx.strokeStyle = "rgba(57, 208, 255, .35)"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.roundRect(BOARD_W - 168, 32, 134, 44, 22); ctx.stroke();
-  ctx.fillStyle = "#3ccf6e"; ctx.beginPath(); ctx.arc(BOARD_W - 144, 54, 7, 0, Math.PI * 2); ctx.fill();
-  ctx.font = `500 22px ${M}`; ctx.fillStyle = "#cfe8ff"; ctx.fillText("online", BOARD_W - 126, 55);
-  // 왼쪽: 고리 속 아바타
-  const cx = 228, cy = 352, R = 150;
-  ctx.setLineDash([4, 6]); ctx.strokeStyle = "rgba(125, 216, 255, .35)"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(cx, cy, R + 52, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-  ctx.shadowColor = "#39d0ff"; ctx.shadowBlur = 24;
-  ctx.strokeStyle = "#39d0ff"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, R + 24, 0, Math.PI * 2); ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = "rgba(57, 208, 255, .45)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R + 36, -0.6, 2.2); ctx.stroke();
-  if (mark.complete && mark.naturalWidth) {
-    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R + 8, 0, Math.PI * 2); ctx.clip();
-    ctx.drawImage(mark, cx - R - 8, cy - R - 8, (R + 8) * 2, (R + 8) * 2); ctx.restore();
-  }
-  for (const [dx, dy, r, c] of [[-120, -170, 7, "#3ccf6e"], [-212, 20, 11, "#39d0ff"], [200, 128, 7, "#7de3ff"]]) {
-    ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.shadowBlur = 0;
-  // 오른쪽: ls artifacts/ + 빛나는 제목 + 설명
-  const X = 462;
-  ctx.font = `500 24px ${M}`; ctx.fillStyle = "#7fb6dd"; ctx.fillText("~/Yalex $ ls artifacts/", X, 168);
-  ctx.font = `900 64px ${F}`; ctx.fillStyle = "#f2f8ff"; ctx.fillText("Yalex의", X, 236);
-  ctx.shadowColor = "rgba(57, 208, 255, .85)"; ctx.shadowBlur = 22; ctx.fillStyle = "#4fd8f5";
-  ctx.fillText("바이브코딩", X, 310); ctx.fillText("아티팩트", X, 384);
-  ctx.shadowBlur = 0;
-  // 설명: 굵은 낱말이 섞인 세 줄
-  const lines = [
-    [["만들고 싶은 걸 ", 0], ["말로 설계", 1], ["하고, ", 0]],
-    [["AI와 짝 코딩", 1], ["으로 굳혔습니다.", 0]],
-    [["여기 있는 건 그렇게 나온 결과물이고,", 0]],
-    [["지금도 계속 고쳐지며 돌아갑니다.", 0]]
-  ];
-  lines.forEach((parts, i) => {
-    let lx = X;
-    for (const [t, b] of parts) {
-      ctx.font = `${b ? 800 : 500} 25px ${F}`;
-      ctx.fillStyle = b ? "#ffffff" : "#9db4cc";
-      ctx.fillText(t, lx, 448 + i * 36); lx += ctx.measureText(t).width;
-    }
+  // 머리: 📮 마을 게시판
+  ctx.fillStyle = "rgba(255, 215, 107, .14)"; ctx.fillRect(0, 0, BOARD_W, 108);
+  ctx.font = `900 56px ${F}`; ctx.fillStyle = "#ffe39a"; ctx.fillText("📮 마을 게시판", 40, 58);
+  ctx.font = `600 24px ${F}`; ctx.fillStyle = "#cfe8ff"; ctx.textAlign = "right"; ctx.fillText("새 소식 · 이벤트 · 의견 받아요", BOARD_W - 40, 60); ctx.textAlign = "left";
+  // 왼쪽: 📢 새 소식 세 줄 (이벤트는 금색)
+  const ev = activeEvent();
+  const list = (ev ? [ev, ...NOTICES.filter((n) => n !== ev)] : NOTICES).slice(0, 3);
+  ctx.font = `800 30px ${F}`; ctx.fillStyle = "#7fd8ff"; ctx.fillText("📢 새 소식", 40, 150);
+  list.forEach((n, i) => {
+    const y = 210 + i * 92;
+    ctx.fillStyle = n.tag === "event" ? "rgba(255, 215, 107, .22)" : "rgba(8, 26, 44, .75)";
+    ctx.beginPath(); ctx.roundRect(36, y - 36, 600, 76, 16); ctx.fill();
+    ctx.strokeStyle = n.tag === "event" ? "#ffd76b" : "rgba(57, 208, 255, .35)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.font = `800 26px ${F}`; ctx.fillStyle = "#ffffff";
+    let t = n.title; while (ctx.measureText(t).width > 560 && t.length > 4) t = t.slice(0, -2) + "…";
+    ctx.fillText(t, 58, y + 2);
   });
-  ctx.font = `700 21px ${M}`; ctx.fillStyle = "#39d0ff"; ctx.textAlign = "right";
-  ctx.fillText("home.yalex-k.com ↗", BOARD_W - 34, BOARD_H - 30); ctx.textAlign = "left";
+  // 오른쪽: 의견 받기 카드
+  ctx.fillStyle = "rgba(57, 208, 255, .12)"; ctx.beginPath(); ctx.roundRect(668, 132, 320, 300, 22); ctx.fill();
+  ctx.strokeStyle = "rgba(57, 208, 255, .6)"; ctx.lineWidth = 3; ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.font = `64px ${F}`; ctx.fillText("💬", 828, 200);
+  ctx.font = `900 34px ${F}`; ctx.fillStyle = "#ffffff"; ctx.fillText("의견 · 제안을", 828, 272); ctx.fillText("남겨 주세요!", 828, 316);
+  ctx.font = `600 22px ${F}`; ctx.fillStyle = "#a9c7e2"; ctx.fillText("버그 · 아이디어 · 칭찬", 828, 370); ctx.fillText("눌러서 게시판 열기", 828, 402);
+  ctx.textAlign = "left";
+  // 아래 작게: 만든 사람
+  if (mark.complete && mark.naturalWidth) ctx.drawImage(mark, BOARD_W - 300, BOARD_H - 62, 36, 36);
+  ctx.font = `600 20px ${M}`; ctx.fillStyle = "#7fa6c6"; ctx.fillText("made by y.AI.ex", BOARD_W - 254, BOARD_H - 44);
 }
 const billboard = new THREE.Group();
 {

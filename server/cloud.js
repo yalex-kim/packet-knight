@@ -21,6 +21,9 @@ export async function currentUser(request, env) {
   return row ? { id: row.id, name: row.name, picture: row.picture ?? null, token: m[1] } : null;
 }
 
+/** 관리자 = Pages 비밀값 ADMIN_SUBS(쉼표로 구분한 구글 sub)에 든 계정 (Stage 13.15 게시판 의견 읽기) */
+export const isAdmin = (u, env) => Boolean(u && String(env.ADMIN_SUBS ?? "").split(",").map((x) => x.trim()).filter(Boolean).includes(u.id));
+
 export async function newSession(env, userId) {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const token = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
