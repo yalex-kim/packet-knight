@@ -87,7 +87,7 @@ function showIntro() {
       el("li", { textContent: `🗺️ 측정기 미니맵: 한 자리에서 패킷 ${c.PROBE_MIN}개 이상 모으면 그 자리를 중심으로 "추정 거리 원"이 그려진다. 두세 자리의 원이 겹치는 곳이 비콘이다(삼변측량).` }),
       el("li", { textContent: "여기다 싶으면 📍 여기다! (B 키·Enter·버튼). 내 자리와 실제 비콘 사이 거리로 판정한다." }),
       el("li", { textContent: `판정: ${c.TIERS.map((t) => `${t.label} ≤${t.maxErr} m ${tierPts(t.points)}`).join(" · ")} · ${c.MISS.label} ${tierPts(c.MISS.points)}` }),
-      el("li", { textContent: "보수는 60초 동안 모은 점수의 등급으로 정해진다 — 맨 위 보수표 참고. 찾는 동안 측정기 위에 "지금 등급 → 🪙"이 보인다." })
+      el("li", { textContent: "보수는 60초 동안 모은 점수의 등급으로 정해진다 — 맨 위 보수표 참고. 찾는 동안 측정기 위에 「지금 등급 → 🪙」이 보인다." })
     ),
     el("p", { class: "muted", textContent: `🪙 보유 CR2032 ${p.cr2032}개 · 최고 기록 ${p.job.bestScore ?? "-"}점 · 그만두면(✖ 또는 Esc) 보수가 없습니다.` }),
     chargeLine(),
