@@ -438,6 +438,7 @@ function performFire(target = null) {
   if (shot) { clearMoveTarget(); sfx(wpn.blade.kind === "sword" ? "fire" : `fire_${wpn.blade.kind}`); knightView.playAttack(wpn.blade.kind); }   // 무기마다 다른 공격 동작 (Stage 12.6)
 }
 
+let blockingExplained = false;
 const ATTACK_RESOLVE = new Set(["playerHit", "dodge", "outOfBand", "shieldBlock"]);
 function handleBattleEvents(events) {
   let dirty = false;
@@ -480,7 +481,11 @@ function handleBattleEvents(events) {
         dirty = true;
         break;
       case "playerHit":
-        fx.floatText(motor.x, motor.y + 0.9, motor.z, `-${e.amount}`, "hurt");
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, e.blocking ? `📵 근접 블로킹 -${e.amount}` : `-${e.amount}`, "hurt");
+        if (e.blocking && !blockingExplained) {   // 처음 한 번만 왜 맞았는지 (Stage 13.11)
+          blockingExplained = true;
+          fx.showToast("📵 근접 블로킹 — 채널을 바꿔도 전자레인지 바로 옆에선 센 잡음이 수신기를 포화시켜요. 2 m 밖으로 떨어지면 대역 밖 채널은 안전!", 5);
+        }
         sfx("hurt");
         break;
       case "dodge":

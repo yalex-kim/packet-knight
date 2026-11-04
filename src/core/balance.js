@@ -184,6 +184,8 @@ export const MONSTERS = Object.freeze({
     hp: 230, atk: 42, sec: 4,
     speed: 1.7, aggro: 16, leash: 30,
     attackRange: 3.6, aoe: true, windup: 1.2, cooldown: 2.2,
+    // 근접 블로킹 (Stage 13.11): 대역 밖 채널이어도 이 거리 안이면 센 잡음이 수신기 앞단을 포화 — 공격력의 mul 만큼 들어온다
+    blocking: Object.freeze({ range: 2.0, mul: 0.4 }),
     respawn: Infinity,
     xp: 40,
     drops: Object.freeze([{ item: "cr2032", count: 1, chance: 0.6 }]),

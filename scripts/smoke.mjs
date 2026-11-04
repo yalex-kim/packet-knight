@@ -479,6 +479,21 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 근접 블로킹 (Stage 13.11): 대역 밖 채널(interference.playerHit=false)이어도 전자레인지 2 m 안이면 40% 피해, 3 m면 0
+  const mwStrike = (dist) => {
+    const b = B.createBattle([[0, 0]], "microwave");
+    B.syncPlayerHp(b, 300);
+    const mon = b.monsters[0];
+    mon.state = "windup"; mon.t = 0.0001;
+    const player = { x: mon.x, y: mon.y, z: mon.z + dist };
+    const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 300, tx: 10, rx: 0, sec: 0, hop: 6.4 }, rng: () => 0.99, interference: { playerHit: () => false, packetLost: () => false } });
+    const hit = ev.find((e) => e.type === "playerHit");
+    return { types: ev.map((e) => e.type).join(), amount: hit?.amount ?? 0, blocking: Boolean(hit?.blocking) };
+  };
+  const atk = (await import(pathToFileURL(path.join(ROOT, "src/core/balance.js")).href)).MONSTERS.microwave.atk;
+  const near = mwStrike(1.5), far = mwStrike(3.0);
+  check("전자레인지 근접 블로킹: 대역 밖 채널이어도 2 m 안이면 공격력 40% 피해(📵), 3 m면 대역 밖 → 피해 0",
+    near.blocking && near.amount === Math.round(atk * 0.4) && far.types.includes("outOfBand") && far.amount === 0, JSON.stringify({ near, far }));
   const plain = strike({ rng: () => 0.99 });
   const dashed = strike({ rng: () => 0.99, invulnerable: true });
   const shielded = strike({ rng: () => 0, shieldBlock: 0.2 });
