@@ -134,14 +134,65 @@ function stepPackets(dt) {
 }
 
 /** 말풍선 스프라이트를 이 대사로 새로 만든다 (긴 대사는 두 줄로 접지 않고 한 줄 — 머리 위라 짧게 보인다) */
+/** 말풍선 스프라이트 (Stage 12.7): 흰 둥근 풍선 + 아래 꼬리, 진한 글씨, 최대 3줄로 줄바꿈 */
+function makeBubble(text) {
+  const font = "600 34px 'Pretendard Variable', Pretendard, system-ui, 'Noto Sans KR', sans-serif";
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  ctx.font = font;
+  const maxW = 520;
+  // 낱말 단위 줄바꿈 (한국어는 공백 기준), 너무 길면 3줄째에서 …
+  const words = text.split(" "), lines = [];
+  let cur = "";
+  for (const w of words) {
+    const t = cur ? `${cur} ${w}` : w;
+    if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > 3) { lines.length = 3; lines[2] = lines[2].replace(/.{0,2}$/, "…"); }
+  const padX = 26, padY = 20, lh = 44, tail = 22;
+  const w = Math.ceil(Math.max(...lines.map((l) => ctx.measureText(l).width))) + padX * 2;
+  const h = lines.length * lh + padY * 2;
+  c.width = w + 8; c.height = h + tail + 8;
+  ctx.font = font;
+  ctx.fillStyle = "rgba(20, 40, 70, .25)";                         // 그림자
+  ctx.beginPath(); ctx.roundRect(6, 8, w, h, 22); ctx.fill();
+  ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#1d2733"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.roundRect(2, 2, w, h, 22); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w / 2 - 16, h); ctx.lineTo(w / 2, h + tail); ctx.lineTo(w / 2 + 16, h); ctx.closePath(); ctx.fill();   // 꼬리
+  ctx.beginPath(); ctx.moveTo(w / 2 - 16, h + 1); ctx.lineTo(w / 2, h + tail); ctx.lineTo(w / 2 + 16, h + 1); ctx.stroke();
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(w / 2 - 15, h - 3, 30, 6);  // 꼬리와 풍선 이음새 지우기
+  ctx.fillStyle = "#1d2733"; ctx.textBaseline = "middle";
+  lines.forEach((l, i) => ctx.fillText(l, 2 + padX, 2 + padY + lh * i + lh / 2));
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // 화면 크기 고정(거리와 상관없이 읽힌다): sizeAttenuation false — 크기는 화면 높이에 대한 비율
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, sizeAttenuation: false }));
+  const worldH = 0.00052 * c.height * (innerHeight < innerWidth ? 1 : 0.8);
+  sprite.scale.set(worldH * c.width / c.height, worldH, 1);
+  sprite.center.set(0.5, 0);                                         // 꼬리 끝이 머리 위에 오게
+  sprite.renderOrder = 12;
+  sprite.raycast = () => {};
+  sprite.userData.baseScale = sprite.scale.clone();
+  sprite.userData.born = performance.now();
+  return sprite;
+}
 function say(n, line) {
   if (n.speech) { n.root.remove(n.speech); n.speech.material.map.dispose(); n.speech.material.dispose(); }
-  const text = line.text.length > 34 ? `💬 ${line.text.slice(0, 33)}…` : `💬 ${line.text}`;
-  n.speech = makeSign(text, 1.5);
-  n.speech.scale.multiplyScalar(0.55);
-  n.speech.position.y = 1.72;
+  n.speech = makeBubble(line.text);
+  n.speech.position.y = 1.5;
   n.root.add(n.speech);
   n.lastLine = line.text;
+}
+/** 말풍선 등장 애니메이션 (톡 튀어나온다) */
+function popBubbles() {
+  for (const n of villagers) {
+    const s = n.speech;
+    if (!s?.visible) continue;
+    const k = Math.min(1, (performance.now() - s.userData.born) / 220);
+    const e = k < 1 ? 1 + Math.sin(k * Math.PI) * 0.12 : 1;
+    s.scale.copy(s.userData.baseScale).multiplyScalar(Math.max(0.05, k) * e);
+  }
 }
 // 말풍선: 기사 8 m 안의 주민 하나가 6~10초마다 4초 동안 (대사는 villagerLines.js에서 무작위)
 let speechTimer = 3, speaking = null, speechLeft = 0;
@@ -158,7 +209,16 @@ function stepSpeech(dt, knight) {
   if (!near.length) return;
   speaking = near[Math.floor(Math.random() * near.length)];
   say(speaking, pickLine(speaking.v.topics, Math.random, speaking.lastLine));
-  speechLeft = 4;
+  speechLeft = 5.5;   // 말풍선은 문장 전체라 조금 더 오래
+}
+
+/** 테스트·스크린샷 훅: 이 주민이 지금 한마디 */
+export function sayNow(id) {
+  const n = villagers.find((v) => v.v.id === id);
+  if (!n) return null;
+  if (speaking && speaking !== n) speaking.speech.visible = false;
+  speaking = n; say(n, pickLine(n.v.topics, Math.random, n.lastLine)); speechLeft = 5.5;
+  return n.lastLine;
 }
 
 /** 클릭 대상 — 주민 루트 그룹들 (userData.villager = VILLAGERS 항목) */
@@ -176,6 +236,7 @@ export function stepLife(dt, time, knight) {
   stepVillagers(dt, time);
   stepPackets(dt);
   stepSpeech(dt, knight);
+  popBubbles();
 }
 /** 주민 충돌 원 (Stage 11.17) — 기사는 이 원 밖으로 밀려난다 */
 export const VILLAGER_RADIUS = 0.3;

@@ -24,7 +24,7 @@ import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelativ
 import * as splash from "./ui/splash.js";
 import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
-import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles } from "./render/villagers.js";
+import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles, sayNow } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -1174,6 +1174,7 @@ window.__PK = {
   fireCd: () => getComputedStyle(fireBtn).getPropertyValue("--cd"),
   life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
   villagerCircles,
+  sayNow,
   audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
   chargeCfg: () => chargeCfg(progress),
   dungeon: {

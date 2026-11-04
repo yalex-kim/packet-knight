@@ -937,7 +937,8 @@
     if (/[?&]test\b/.test(location.search)) { sp.remove(); document.body.classList.remove("prestart"); return; }
     var fail = window.__pkFail = function () { if (!sp.classList.contains("ready")) { sp.classList.add("failed"); document.getElementById("splash-status").textContent = "⚠️ 연결 실패"; } };
     window.addEventListener("error", function (e) { if (!e.filename || /\/src\//.test(e.filename) || /module|import|export/i.test(String(e.message))) fail(); });
-    window.__pkSplashTimer = setTimeout(fail, 20000);
+    // 20초가 지나면 '느린 연결' 안내만 (실패로 단정하지 않는다 — 느린 폰에서 실제로는 불러오는 중이었다), 60초면 실패
+    window.__pkSplashTimer = setTimeout(function () { if (!sp.classList.contains("ready")) document.getElementById("splash-status").textContent = "🐢 연결이 느려요 — 계속 불러오는 중…"; window.__pkSplashTimer = setTimeout(fail, 40000); }, 20000);
   })();
 </script>
 <div id="app"></div>
