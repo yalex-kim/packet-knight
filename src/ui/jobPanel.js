@@ -1,7 +1,8 @@
 // 알바 UI — 비콘 찾기 (안내 모달 → 60초 동안 걸어 다니며 보는 측정기 창 #hunt → 결과 모달). 게임 로직은 core/rssiJob.js
 // 매 시뮬레이션 스텝마다 updateJob(job)로 그린다. 캔버스: 최근 5초의 RSSI 샘플(점)과 지금 자리의 누적 평균(선)
 
-import { RSSI_JOB } from "../core/balance.js";
+import { RSSI_JOB, JOB_DOUBLE } from "../core/balance.js";
+import { askQuestion } from "./specCard.js";
 import { averageRssi, distanceFromRssi, gradeSession } from "../core/rssiJob.js";
 import { chapterUrl } from "../core/book.js";
 
@@ -238,6 +239,7 @@ export function showResult(r, paid, history) {
     el("div", { class: "result-big", textContent: `등급 ${r.grade} · ${r.score}점${paid.newBest ? " 🏆 최고 기록!" : ""}` }),
     el("div", { class: "job-paid", textContent: `🪙 CR2032 +${paid.earned}개` }),
     el("p", { class: "reward", textContent: `보유 ${paid.balance}개` }),
+    doubleBox(paid),
     rewardTable(r.grade),
     el("p", { textContent: `찾은 비콘 ${r.rounds}개 · ${tiers}` }),
     el("p", { class: "npc", textContent: `신고한 자리에서 평균 패킷 ${r.avgN.toFixed(1)}개를 보고 있었네. 패킷 N개를 평균하면 흔들림이 σ/√N 으로 줄어 약 ${sigmaAvg} dB가 되지. 걸으면서 본 숫자 하나는 거리를 두 배쯤 틀리게 말한다네 — 멈춰서 재고, 여러 자리를 겹쳐 보는 게 비콘 찾기의 요령일세.` }),
@@ -248,6 +250,26 @@ export function showResult(r, paid, history) {
       startButton("🔁 한 번 더 (60초)")
     )
   );
+}
+
+/** 🎓 2배 받기 (Stage 13.12): 진행한 퀘스트의 장에서 한 문제 — 맞히면 보수만큼 더. 한 정산에 한 번 */
+function doubleBox(paid) {
+  const box = el("div", { class: "job-double" });
+  if (!paid.earned || !hooks.drawDoubleQuestion) return box;
+  const extra = paid.earned * (JOB_DOUBLE.MULT - 1);
+  const btn = el("button", { type: "button", class: "btn-double", textContent: `🎓 ${JOB_DOUBLE.MULT}배 받기 — 진행한 퀘스트 문제를 맞히면 🪙 +${extra}` });
+  btn.addEventListener("click", () => {
+    const q = hooks.drawDoubleQuestion();
+    askQuestion(box, q, (ok) => {
+      if (ok) {
+        const bal = hooks.onDouble(extra);
+        box.append(el("div", { class: "job-paid", textContent: `🎉 ${JOB_DOUBLE.MULT}배! 🪙 +${extra} 더 — 보유 ${bal}개` }));
+        overlay.querySelector(".reward") && (overlay.querySelector(".reward").textContent = `보유 ${bal}개`);
+      } else box.append(el("p", { class: "muted", textContent: "기본 보수는 그대로 받았어요. 다음 정산에서 다시 도전!" }));
+    });
+  });
+  box.append(btn);
+  return box;
 }
 
 // ---------- 열기 / 닫기 ----------

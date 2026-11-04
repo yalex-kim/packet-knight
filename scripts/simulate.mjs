@@ -159,6 +159,7 @@ function simulateEconomy(bots, strategies) {
         strategy: s.id, name: s.name, quiz,
         income: r1(mean(income)),
         incomeBySource: { job: r1(mean(runs.map((r) => r.income.job))), training: r1(mean(runs.map((r) => r.income.training))), dungeon: r1(mean(runs.map((r) => r.income.dungeon))) },
+        learnIncome: r1(mean(runs.map((r) => r.income.learn ?? 0))),   // 학습 보상 = 상점 예산 (수지와 따로, Stage 13.12)
         spend: { upgrade: r1(mean(runs.map((r) => r.spend.upgrade))), fee: r1(mean(runs.map((r) => r.spend.fee))), penalty: r1(mean(runs.map((r) => r.spend.penalty))) },
         available: r1(mean(runs.map((r) => r.income.job + r.income.training + r.income.dungeon - r.spend.fee - r.spend.penalty))),
         surplusVsTarget: pct(mean(runs.map((r) => r.income.job + r.income.training + r.income.dungeon - r.spend.fee - r.spend.penalty)) / target.total - 1),
@@ -287,6 +288,7 @@ if (args.json) {
     console.log(`  ${r.name.padEnd(17)} ${r.quiz ? " O " : " X "}  ${String(r.income).padStart(5)}  ${src.padEnd(18)}  ${String(r.available).padStart(8)}  ${(r.surplusVsTarget >= 0 ? "+" : "") + r.surplusVsTarget + "%"}`.padEnd(88)
       + `${String(r.upgradesSucceeded).padStart(6)}  ${String(r.dungeonAttempts).padStart(7)}  ${(r.dungeonClearPct + "%").padStart(7)}  ${(Number.isNaN(r.firstClearMin) ? "-" : r.firstClearMin + "분").padStart(7)}  ${String(r.kosBeforeFirstClear).padStart(6)}  ${String(r.floorsCleared).padStart(10)}`);
   }
+  console.log("  학습 보상(📡 스펙 카드 맞혀 보기 + 🎓 알바 2배, 옷·무기 상점 예산 — 수지와 따로): " + e.rows.map((r) => `${r.name.split(" ")[0]}${r.quiz ? "O" : "X"} ${r.learnIncome}`).join(" · "));
   if (report.quizContribution) {
     console.log("\n■ 퀴즈 보너스 기여도 (회피 전투, 같은 장비, 기대 클리어 소요 시간 — 보너스 없음 = AFH 수동, 있음 = AFH 스킬)");
     for (const q of report.quizContribution) {

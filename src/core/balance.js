@@ -291,3 +291,16 @@ export const floorAtkScale = (floor) => 1 + DUNGEON.FLOOR_ATK_SCALE * (floor - 1
  * (수급 − 목표 소모) / 목표 소모 가 +5%~+15%면 합격.
  */
 export const ECONOMY = Object.freeze({ HOUR: 3600, LOOPS: 4, TARGET_UPGRADES: 8, SURPLUS_MIN: 0.05, SURPLUS_MAX: 0.15 });
+
+/**
+ * 📡 스펙 한 장 (Stage 13.12) — 플레이 중 정해진 시간마다 사양 한 조각 카드 + 🎯 맞혀 보기
+ * INTERVAL_SEC 마다(처음은 FIRST_SEC 뒤), SHOW_SEC 동안, SKIP_AFTER_SEC 뒤 건너뛰기. 맞히면 QUIZ_REWARD
+ */
+export const SPEC_CARD = Object.freeze({ FIRST_SEC: 300, INTERVAL_SEC: 480, SHOW_SEC: 10, SKIP_AFTER_SEC: 3, QUIZ_REWARD: 2 });
+/** 🎓 알바 2배 받기 (Stage 13.12) — 진행한 퀘스트의 장에서 한 문제, 맞히면 보수 × MULT */
+export const JOB_DOUBLE = Object.freeze({ MULT: 2 });
+/**
+ * 학습 보상(스펙 카드 맞혀 보기·알바 2배)은 옷·무기 상점 예산 — §8.3 CR2032 수지(강화 기준)와 따로 센다.
+ * 시뮬레이션 가정: 중간 플레이어 정답률 ACCURACY, 문제 하나에 QUIZ_SEC 초
+ */
+export const LEARN_REWARD_SIM = Object.freeze({ ACCURACY: 0.6, QUIZ_SEC: 10 });

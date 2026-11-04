@@ -12,7 +12,7 @@ import {
 import { emptyGear, tryUpgrade, expectedCostTo } from "../../src/core/gear.js";
 import { effectiveStats } from "../../src/core/progress.js";
 import { levelFromXp } from "../../src/core/combat.js";
-import { STAT_POINTS_PER_LEVEL, STAT_CAPS, STAT_POINT_GAIN } from "../../src/core/balance.js";
+import { STAT_POINTS_PER_LEVEL, STAT_CAPS, STAT_POINT_GAIN, SPEC_CARD, JOB_DOUBLE, LEARN_REWARD_SIM } from "../../src/core/balance.js";
 import { rssiSession } from "./rssi.mjs";
 import { fullCharges, useCharge } from "../../src/core/jobCharges.js";
 import { trainingSession, dungeonFloor } from "./combat.mjs";
@@ -105,7 +105,8 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
   const rng = pools.rng;
   const st = {
     cr: 0, gear: emptyGear(), courses: 0, xp: 0, level: 1, alloc: { hp: 0, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, allocTurn: 0,
-    income: { job: 0, training: 0, dungeon: 0 }, spend: { fee: 0, upgrade: 0, penalty: 0 },
+    // learn = 학습 보상(상점 예산, Stage 13.12) — st.cr(강화 자금)에 넣지 않는다
+    income: { job: 0, training: 0, dungeon: 0, learn: 0 }, spend: { fee: 0, upgrade: 0, penalty: 0 },
     upgrades: { tries: 0, success: 0 }, dungeon: { floor: 1, attempts: 0, clears: 0, kos: 0, kosBeforeFirstClear: 0, firstClearAt: null, clearTimes: [], rollbacks: 0, rollbacksPerClear: [] , floorRollbacks: 0 },
     timeline: [],
     // 퀘스트 (Stage 9): 게임과 같은 core/quests.js로 판정 — p는 퀘스트 판정에 필요한 진행도 그림자
@@ -122,6 +123,8 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     charges = next;
     const r = pick(pools.rssi[strategy.rssiN], rng);
     st.cr += r.reward; st.income.job += r.reward;
+    // 🎓 2배 받기: 진행한 퀘스트의 장에서 한 문제 — 맞히면 보수만큼 더 (상점 예산)
+    if (rng() < LEARN_REWARD_SIM.ACCURACY) st.income.learn += r.reward * (JOB_DOUBLE.MULT - 1);
     questEvent(st.quest.qs, { type: "job", grade: r.grade });
     return true;
   }
@@ -191,9 +194,15 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     if (quiz && st.courses < LIBRARY_COURSES.length) { st.quest.p.cleared[LIBRARY_COURSES[st.courses].chapter] = true; st.courses++; t += TIME.COURSE; quest(); }
     const extraJobs = !quiz ? Math.floor(TIME.COURSE / TIME.JOB_SESSION) : 0;
     // ② 알바 (측정기 배터리가 남아 있는 만큼)
+    // 📡 스펙 한 장: 1시간에 (3600 − 처음) / 간격 + 1 장 → 루프마다 나눠 보고 맞혀 본다 (시간이 든다)
+    const cards = Math.round(((ECONOMY.HOUR - SPEC_CARD.FIRST_SEC) / SPEC_CARD.INTERVAL_SEC + 1) / ECONOMY.LOOPS);
+    for (let k = 0; k < cards; k++) {
+      t += SPEC_CARD.SHOW_SEC + LEARN_REWARD_SIM.QUIZ_SEC;
+      if (rng() < LEARN_REWARD_SIM.ACCURACY) st.income.learn += SPEC_CARD.QUIZ_REWARD;
+    }
     for (let j = 0; j < strategy.jobs + extraJobs; j++) {
       if (!doJob(loop * loopLen + t)) break;
-      t += TIME.JOB_SESSION;
+      t += TIME.JOB_SESSION + LEARN_REWARD_SIM.QUIZ_SEC;
       quest();
     }
     // 훈련장

@@ -28,6 +28,9 @@ import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerC
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
 import { initSettings, isSettingsOpen } from "./ui/settings.js";
+import { initSpecCard, showSpecCard, isSpecCardOpen, loadSeen as specSeen } from "./ui/specCard.js";
+import { pickCard, questChapters, drawOne } from "./core/specCards.js";
+import { SPEC_CARD } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
 import { weaponById, outfitById } from "./core/shop.js";
@@ -814,6 +817,8 @@ function onJobDone() {
 
 jobPanel.initJobPanel({
   getProgress: () => progress,
+  drawDoubleQuestion: () => drawOne(questChapters(progress.quests)),   // 🎓 2배 받기: 진행한 퀘스트의 장에서 (Stage 13.12)
+  onDouble: (n) => grantLearnReward(n),
   getCharges: () => jobChargesAt(progress, now()),
   getRechargeSec: () => chargeCfg(progress).RECHARGE_SEC,
   onStart: () => {
@@ -1100,6 +1105,35 @@ function adaptQuality(rawDt) {
   }
 }
 
+// ---------- 📡 스펙 한 장 (Stage 13.12): 정해진 시간마다, 틈이 날 때 ----------
+let specT = 0, specNext = SPEC_CARD.FIRST_SEC;
+/** 학습 보상 🪙 (스펙 카드 맞혀 보기·알바 2배) */
+function grantLearnReward(n) {
+  progress.cr2032 += n;
+  persist();
+  hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  sfx("coin");
+  return progress.cr2032;
+}
+const specCanShow = () => !inputLocked && !job && !(run && run.phase === "combat") && !isTalkOpen() && !isSettingsOpen()
+  && !document.querySelector(".overlay:not([hidden])") && document.getElementById("info-modal")?.style.display !== "block" && !document.getElementById("splash");
+function specClock(dt) {
+  if (document.hidden || isSpecCardOpen()) return;
+  specT += dt;
+  if (specT < specNext || !specCanShow()) return;   // 전투 중·다른 창이 떠 있으면 미뤘다가 틈이 나면
+  specT = 0;
+  specNext = SPEC_CARD.INTERVAL_SEC;
+  openSpecCard();
+}
+function openSpecCard() { showSpecCard(pickCard(specSeen())); }
+initSpecCard({
+  drawQuestion: (chapter) => drawOne([chapter]),
+  onReward: (n) => grantLearnReward(n),
+  onOpen: () => { clearMoveTarget(); setInputEnabled(false); inputLocked = true; },
+  onClose: () => { setInputEnabled(true); inputLocked = false; },
+  sfx
+});
+
 function animate() {
   requestAnimationFrame(animate);
   const raw = clock.getDelta();
@@ -1108,6 +1142,7 @@ function animate() {
   adaptQuality(raw);
 
   simulate(dt);
+  specClock(dt);
   const t = clock.elapsedTime;
   renderFrame(t, dt);
   world.animateWorld(t);
@@ -1176,6 +1211,7 @@ window.__PK = {
   library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, lastChapterUrl },
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
+  spec: { open: () => openSpecCard(), isOpen: isSpecCardOpen, canShow: () => specCanShow(), clock: (dt) => { specClock(dt); return { t: specT, next: specNext }; } },
   quests: {
     open: (id) => questLog.openQuestLog(id),
     close: questLog.closeQuestLog,

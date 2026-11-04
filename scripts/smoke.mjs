@@ -882,6 +882,22 @@ await reset();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("packetKnight.save")));
   check("CR2032 잔액이 localStorage에 저장된다", saved.v >= 2 && saved.cr2032 === result.reward && saved.job.runs === 1);
 
+  // 🎓 2배 받기 (Stage 13.12): 정산 화면 버튼 → 진행한 퀘스트의 장 문제 1개, 틀리면 기본 보수 그대로 (한 번만)
+  const dbl = await page.evaluate(() => {
+    const btn = document.querySelector("#job .btn-double");
+    const r = { btn: Boolean(btn), label: btn?.textContent ?? "" };
+    btn?.click();
+    const box = document.querySelector("#job .job-double"), q = box?.__q;
+    r.q = Boolean(q && q.options.length >= 2); r.chapter = q?.chapter;
+    const wrong = [...box.querySelectorAll(".sq-opt")].find((b, i) => i !== q.answer);
+    wrong.click();
+    r.again = [...box.querySelectorAll(".sq-opt")].every((b) => b.disabled);
+    r.cr = window.__PK.progress().cr2032;
+    return r;
+  });
+  check("🎓 알바 2배 받기: 정산 화면 버튼 → 진행한 퀘스트의 장 문제, 틀리면 기본 보수 그대로·다시 못 고름",
+    dbl.btn && /2배 받기/.test(dbl.label) && dbl.q && ["intro", "radio"].includes(dbl.chapter) && dbl.again && dbl.cr === result.reward, JSON.stringify(dbl));
+
   // 두 번째 판은 도중에 그만두면 보수 없음
   await page.locator("#job-panel .lib-btn.primary").click(); // 한 번 더
   await tick(3000);
@@ -1954,6 +1970,35 @@ await page.waitForFunction(() => window.__PK);
   check("시작을 누르면 타이틀이 걷히고 카메라가 하늘(줌 46)에서 기사 쪽으로 내려앉으며 HUD가 나타난다",
     z0 > 40 && z1 < z0, `줌 ${z0.toFixed(1)} → ${z1.toFixed(1)}`);
   await tp.close();
+}
+
+// ---------- 📡 스펙 한 장 + 🎯 맞혀 보기 (Stage 13.12) ----------
+{
+  const C = await import(pathToFileURL(path.join(ROOT, "src/core/specCards.js")).href);
+  const qc = C.questChapters({ done: { Q0: "x", Q1: "y" }, active: "Q2" });
+  check("스펙 카드는 교과서 핵심 정리 75장 · 진행한 퀘스트의 장 = 완료 + 진행 중 (없으면 intro)",
+    C.SPEC_CARDS.length === 75 && qc.join() === "intro,radio,phy" && C.questChapters({ done: {}, active: null }).join() === "intro" && C.pickCard(new Set(C.SPEC_CARDS.slice(1).map((c) => c.id))).id === C.SPEC_CARDS[0].id,
+    `${C.SPEC_CARDS.length}장 · ${qc.join()}`);
+  const sc = await page.evaluate(async () => {
+    const P = window.__PK;
+    const cr0 = P.progress().cr2032;
+    const can = P.spec.canShow();
+    P.spec.open();
+    const el = document.getElementById("spec-card");
+    const r = { can, open: P.spec.isOpen(), text: el.querySelector(".spc-text")?.textContent.length > 10, book: /connbook|bluetooth/.test(el.querySelector(".spc-book")?.href ?? ""),
+      skipLocked: el.querySelector(".spc-skip").disabled };
+    el.querySelector(".spc-quiz").click();
+    const box = el.querySelector(".spc-body"), q = box.__q;
+    box.querySelectorAll(".sq-opt")[q.answer].click();
+    r.right = box.querySelector(".sq-opt.right") !== null;
+    r.gain = P.progress().cr2032 - cr0;
+    el.querySelector(".spc-close").click();
+    r.closed = !P.spec.isOpen();
+    // 시간: 처음 카드는 FIRST_SEC 뒤, 그 뒤 INTERVAL_SEC 마다 (전투·창이 없을 때)
+    return r;
+  });
+  check("📡 스펙 한 장: 사양 한 조각 + 📖 교과서 링크, 처음 3초는 건너뛰기 잠김, 🎯 맞혀 보기 정답이면 🪙 +2, 닫힌다",
+    sc.open && sc.text && sc.book && sc.skipLocked && sc.right && sc.gain === 2 && sc.closed, JSON.stringify(sc));
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));
