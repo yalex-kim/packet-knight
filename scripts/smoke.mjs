@@ -1662,8 +1662,9 @@ await page.waitForFunction(() => window.__PK);
     return r;
   });
   check("🎒 가방은 👤 설정 창 안 — 설명서 버튼 오른쪽 반쪽, 누르면 설정 창이 닫히고 가방이 열린다 (떠 있는 가방 버튼 없음)", !bagIn.floating && bagIn.same && bagIn.inv === true && bagIn.popClosed, JSON.stringify(bagIn));
+  layout.statsOneLine = await page.evaluate(() => { const e = document.querySelector("#stats .st-sum") ?? document.getElementById("stats"); return e.getBoundingClientRect().height < parseFloat(getComputedStyle(e).lineHeight || "16") * 1.6 + 10; });
   check("모바일: 큰 엠블럼이 위 두 줄(HP·스탯)을 차지하고, HP·스탯은 같은 들여쓰기 · 계정 버튼·배지와 겹치지 않음 · 📘 버튼은 설정 창 안으로",
-    ov.length === 0 && layout.indent[0] === layout.indent[1] && layout.indent[0] > em.right && layout.spans && !layout.guide, `${ov.join(", ") || "겹침 없음"} · ${JSON.stringify(layout)}`);
+    ov.length === 0 && layout.indent[0] === layout.indent[1] && layout.indent[0] > em.right && layout.spans && !layout.guide && layout.statsOneLine, `${ov.join(", ") || "겹침 없음"} · ${JSON.stringify(layout)}`);
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
