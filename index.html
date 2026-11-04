@@ -502,8 +502,8 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #btn-guide, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.prestart :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#btn-bag, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-me) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
   body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
@@ -687,13 +687,6 @@
     .talk-face { width: 76px; height: 76px; border-radius: 12px; }
     .talk-text { font-size: 13.5px; min-height: 40px; }
   }
-  /* 모바일 ❔ (설명서·튜토리얼 다시 보기) — 데스크톱은 조작법 상자 안에 있다 */
-  #btn-guide { display: none; }
-  @media (max-width: 640px) {
-    #btn-guide { display: block; position: fixed; right: 46px; top: 8px; z-index: 11; width: 32px; height: 32px; padding: 0; border-radius: 12px; font-size: 15px; cursor: pointer;
-      background: var(--glass); color: var(--accent); font-weight: 900; font-size: 17px; border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
-    #hp { width: calc(100vw - 94px); }
-  }
   /* 맨 아래 레벨·XP 바 (Stage 11.16) — 화면 가로 전체. 위 요소들은 바 높이만큼 올린다 */
   #xpbar { position: fixed; left: 0; right: 0; bottom: 0; height: 18px; z-index: 19; pointer-events: none;
     background: rgba(20, 30, 50, .55); backdrop-filter: blur(6px); border-top: 1px solid rgba(255, 255, 255, .35);
@@ -853,11 +846,14 @@
     .dc-online { display: none; }
     .dc-top .dc-close { margin-left: auto; }   /* online이 숨으면 닫기를 오른쪽 끝으로 (안쪽에 남던 문제) */
   }
-  /* 왼쪽 위 엠블럼 (Stage 11.21) — 모바일에서도 늘 보이게. 데스크톱은 조작법 상자 머리에 있다 */
+  /* 왼쪽 위 엠블럼 (Stage 11.21, 13.4) — 모바일에서 크게, 위 두 줄(HP·스탯)을 차지한다. HP·스탯은 엠블럼 오른쪽에 같은 들여쓰기로.
+     데스크톱은 조작법 상자 머리에 있다. 설명서 버튼(📘)은 👤 설정 창 안으로 옮겼다 */
   #corner-emblem { display: none; }
   @media (max-width: 640px) {
-    #corner-emblem { display: block; position: fixed; left: 6px; top: 4px; z-index: 11; width: 36px; height: auto; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
-    #hp { left: 48px; width: calc(100vw - 134px); }
+    #corner-emblem { display: block; position: fixed; left: 6px; top: 4px; z-index: 11; width: 70px; height: auto; pointer-events: none; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .4)); }
+    #hp { left: 82px; width: calc(100vw - 130px); }
+    #stats { left: 82px; max-width: calc(56vw - 76px); }
+    #badge { max-width: calc(44vw - 24px); }
   }
   /* 던전 브리핑 (Stage 12.3) */
   .dg-brief-title { margin: 6px 0 8px; font-size: 14px; color: #ffd76b; }
@@ -901,7 +897,7 @@
   .shop-buy .lib-btn:disabled { opacity: .5; }
   @media (max-width: 640px) { .shop-grid { grid-template-columns: 1fr; } }
   /* 가방 (Stage 12.4) */
-  #btn-bag { position: fixed; right: 100px; bottom: 120px; z-index: 20; display: flex; align-items: center; gap: 4px; padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  #btn-bag { position: fixed; left: 14px; bottom: 204px; z-index: 20;   /* 퀘스트 트래커 바로 위, 왼쪽 맞춤 (Stage 13.4) */ display: flex; align-items: center; gap: 4px; padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
     background: var(--glass); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
   #btn-bag:active { transform: scale(.96); }
   .inv-panel { max-width: 760px; }
@@ -952,7 +948,7 @@
   .inv-mon.unseen img, .inv-mon.unseen .inv-mon-emoji { filter: brightness(0) opacity(.5); }
   .shop-item-ico { width: 56px; height: 56px; border-radius: 10px; flex: none; }
   @media (max-width: 640px) {
-    #btn-bag { right: 96px; bottom: 120px; padding: 6px 10px; }
+    #btn-bag { left: 8px; bottom: 198px; padding: 6px 10px; }
     .inv-equip { grid-template-columns: 1fr; }
     .inv-preview { justify-self: center; width: 180px; height: 210px; }
   }
@@ -1047,7 +1043,6 @@
 
 <button id="btn-me" type="button" aria-label="계정·설정" aria-haspopup="dialog">👤</button>
 <button id="btn-bag" type="button" aria-label="가방 (I)">🎒<span>가방</span></button>
-<button id="btn-guide" type="button" data-action="tutorial" aria-label="설명서·튜토리얼 다시 보기">📘</button>
 <div id="badge">🛡️ GATT 빌리지 광장 · 평지</div>
 <img id="corner-emblem" src="./src/assets/emblem-v1.webp" alt="Packet Knight" width="491" height="512" />
 <div id="stats" aria-label="기사 스탯"></div>

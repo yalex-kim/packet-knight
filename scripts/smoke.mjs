@@ -1644,13 +1644,22 @@ await page.waitForFunction(() => window.__PK);
     JSON.stringify({ icon, set, vol: after.volume }));
   await page.evaluate(() => { const v = document.querySelector("#settings-pop .set-vol"); v.value = "70"; v.dispatchEvent(new Event("input")); });
 
-  // ⑦ 모바일 폭: 계정·설정 버튼·📘 버튼이 배지·스탯과 겹치지 않는다
+  // ⑦ 모바일 폭: 큰 엠블럼이 위 두 줄을 차지하고, HP·스탯은 그 오른쪽에 같은 들여쓰기 · 계정 버튼·배지와 겹치지 않는다 (Stage 13.4)
   await page.setViewportSize({ width: 390, height: 780 });
   await tick(50);
-  const bx = await page.evaluate(() => Object.fromEntries(["btn-me", "btn-guide", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
-  const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
-  const ov = ["badge", "stats", "hud", "hp", "btn-guide"].filter((k) => hit(bx["btn-me"], bx[k])).concat(["badge", "stats", "hp"].filter((k) => hit(bx["btn-guide"], bx[k])).map((k) => `📘×${k}`));
-  check("모바일 폭에서 계정·설정 버튼이 다른 HUD와 겹치지 않는다", ov.length === 0, ov.join(", ") || "겹침 없음");
+  const bx = await page.evaluate(() => Object.fromEntries(["btn-me", "corner-emblem", "badge", "stats", "hud", "hp"].map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
+  const hit = (x, y) => x.width > 0 && y.width > 0 && x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
+  const ov = ["badge", "stats", "hud", "hp"].filter((k) => hit(bx["btn-me"], bx[k])).concat(["hp", "stats", "badge"].filter((k) => hit(bx["corner-emblem"], bx[k])).map((k) => `엠블럼×${k}`)).concat(hit(bx.stats, bx.badge) ? ["스탯×배지"] : []);
+  const em = bx["corner-emblem"];
+  const layout = { emblemH: Math.round(em.height), indent: [Math.round(bx.hp.left), Math.round(bx.stats.left)], spans: em.bottom >= bx.stats.top + bx.stats.height / 2, guide: await page.evaluate(() => Boolean(document.getElementById("btn-guide"))) };
+  const bagAt = async () => page.evaluate(() => { const b = document.getElementById("btn-bag").getBoundingClientRect(), q = document.getElementById("quest-tracker").getBoundingClientRect(); return { gap: Math.round(q.top - b.bottom), dx: Math.round(b.left - q.left) }; });
+  const bagM = await bagAt();
+  await page.setViewportSize({ width: 1000, height: 700 }); await tick(10);
+  const bagD = await bagAt();
+  await page.setViewportSize({ width: 390, height: 780 }); await tick(10);
+  check("🎒 가방 버튼은 퀘스트 트래커 바로 위, 왼쪽 맞춤 (모바일·데스크톱)", [bagM, bagD].every((b) => b.gap >= 2 && b.gap <= 16 && Math.abs(b.dx) <= 1), JSON.stringify({ bagM, bagD }));
+  check("모바일: 큰 엠블럼이 위 두 줄(HP·스탯)을 차지하고, HP·스탯은 같은 들여쓰기 · 계정 버튼·배지와 겹치지 않음 · 📘 버튼은 설정 창 안으로",
+    ov.length === 0 && layout.indent[0] === layout.indent[1] && layout.indent[0] > em.right && layout.spans && !layout.guide, `${ov.join(", ") || "겹침 없음"} · ${JSON.stringify(layout)}`);
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
