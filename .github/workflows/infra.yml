@@ -2,6 +2,11 @@
 name: Infra
 on:
   workflow_dispatch:
+    inputs:
+      set_admin:
+        description: "게시판 관리자(ADMIN_SUBS)를 가장 먼저 가입한 계정으로 설정"
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -25,3 +30,10 @@ jobs:
           printf 'name = "packetknight-infra"\ncompatibility_date = "2026-10-01"\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "packetknight"\ndatabase_id = "%s"\nmigrations_dir = "migrations"\n' "$ID" > wrangler.infra.toml
       - name: Apply migrations
         run: $W d1 migrations apply packetknight --remote -c wrangler.infra.toml
+      - name: Set board admin (first user)
+        if: ${{ inputs.set_admin }}
+        run: |
+          ID=$($W d1 execute packetknight --remote -c wrangler.infra.toml --json --command "SELECT id FROM users ORDER BY created_at LIMIT 1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s);process.stdout.write(String(r[0].results[0].id))})')
+          echo "::add-mask::$ID"
+          printf '%s' "$ID" | $W pages secret put ADMIN_SUBS --project-name packetknight
+          echo "ADMIN_SUBS set (value masked)"
