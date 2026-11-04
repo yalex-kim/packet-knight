@@ -340,8 +340,78 @@ function makeBar(g, height) {
   return { bar, fg };
 }
 
-/** 처치 연출: 퍼지는 고리 */
+// ---------- 타격감 (Stage 13.18): 넉백·팝, 파편, 전리품 구슬, 레벨 업 빛기둥 ----------
+const punches = new Map();   // monsterId → { dx, dz, t }
+/** 맞은 몬스터가 살짝 밀리며 부풀었다 돌아온다 (보이는 것만 — 판정 위치는 그대로) */
+export function punch(id, fromX, fromZ, m, crit = false) {
+  const dx = m.x - fromX, dz = m.z - fromZ, d = Math.hypot(dx, dz) || 1;
+  punches.set(id, { dx: dx / d, dz: dz / d, t: 0, crit });
+}
+const shards = [];
+const shardGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+const orbs = [];
+const orbGeo = new THREE.SphereGeometry(0.09, 8, 6);
+let lootTarget = null;
+/** 전리품 구슬이 날아갈 곳 (기사) */
+export const setLootTarget = (t) => { lootTarget = t; };
+/** 처치 지점에서 구슬 n개가 튀어 올랐다 기사에게 빨려 들어간다 */
+export function lootFly(x, y, z, n = 4, color = 0xffd76b) {
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(orbGeo, new THREE.MeshBasicMaterial({ color, transparent: true }));
+    const a = (i / n) * Math.PI * 2 + Math.random();
+    m.position.set(x, y + 0.6, z);
+    battleRoot.add(m);
+    orbs.push({ mesh: m, t: -i * 0.05, vx: Math.cos(a) * 2.2, vz: Math.sin(a) * 2.2, vy: 3.5 + Math.random() * 1.5, from: m.position.clone() });
+  }
+}
+const pillars = [];
+/** 레벨 업 빛기둥 */
+export function pillarAt(x, y, z) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 6, 20, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  mesh.position.set(x, y + 3, z);
+  battleRoot.add(mesh);
+  pillars.push({ mesh, t: 0 });
+}
+function stepJuice(dt) {
+  for (let i = shards.length - 1; i >= 0; i--) {
+    const s = shards[i]; s.t += dt;
+    s.mesh.position.x += s.vx * dt; s.mesh.position.z += s.vz * dt; s.mesh.position.y += s.vy * dt; s.vy -= 9.8 * dt;
+    s.mesh.rotation.x += dt * 9; s.mesh.rotation.y += dt * 7;
+    s.mesh.material.opacity = Math.max(0, 1 - s.t / 0.7);
+    if (s.t > 0.7) { battleRoot.remove(s.mesh); s.mesh.material.dispose(); shards.splice(i, 1); }
+  }
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i]; o.t += dt;
+    if (o.t < 0) continue;
+    if (o.t < 0.35 || !lootTarget) {           // 튀어 오르기
+      o.mesh.position.x += o.vx * dt; o.mesh.position.z += o.vz * dt; o.mesh.position.y += o.vy * dt; o.vy -= 12 * dt;
+    } else {                                   // 기사에게 빨려 들어가기
+      const k = Math.min(1, (o.t - 0.35) / 0.35);
+      const tx = lootTarget.x, ty = lootTarget.y + 0.9, tz = lootTarget.z;
+      o.mesh.position.lerp(new THREE.Vector3(tx, ty, tz), k * k);
+    }
+    if (o.t > 0.75) { battleRoot.remove(o.mesh); o.mesh.material.dispose(); orbs.splice(i, 1); }
+  }
+  for (let i = pillars.length - 1; i >= 0; i--) {
+    const p = pillars[i]; p.t += dt;
+    const k = p.t / 1.1;
+    p.mesh.material.opacity = 0.55 * Math.sin(Math.min(1, k) * Math.PI);
+    p.mesh.scale.set(1 + k * 0.4, 1, 1 + k * 0.4);
+    p.mesh.rotation.y += dt * 2;
+    if (k >= 1) { battleRoot.remove(p.mesh); p.mesh.material.dispose(); p.mesh.geometry.dispose(); pillars.splice(i, 1); }
+  }
+}
+
+/** 처치 연출: 퍼지는 고리 + 복셀 파편 */
 export function burstAt(x, y, z, color = 0x7dd8ff) {
+  for (let i = 0; i < 9; i++) {
+    const m = new THREE.Mesh(shardGeo, new THREE.MeshBasicMaterial({ color: i % 3 ? color : 0xffffff, transparent: true }));
+    const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 2.5;
+    m.position.set(x, y + 0.5, z);
+    battleRoot.add(m);
+    shards.push({ mesh: m, t: 0, vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, vy: 2 + Math.random() * 3 });
+  }
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(0.25, 0.45, 24),
     new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
@@ -388,6 +458,14 @@ export function syncBattle(battle, camera, t, dt) {
     }
     g.position.set(m.x, m.y, m.z);
     g.rotation.y = m.rotY;
+    const pu = punches.get(m.id);
+    if (pu) {   // 넉백(보이는 것만) + 부풀었다 돌아오기
+      pu.t += dt;
+      const k = Math.max(0, 1 - pu.t / 0.22), push = Math.sin(Math.min(1, pu.t / 0.22) * Math.PI) * (pu.crit ? 0.35 : 0.2);
+      g.position.x += pu.dx * push; g.position.z += pu.dz * push;
+      g.scale.setScalar(1 + k * (pu.crit ? 0.22 : 0.12));
+      if (pu.t > 0.22) { punches.delete(m.id); g.scale.setScalar(1); }
+    }
 
     // LED: 평소엔 광고(비콘)·트래픽(Wi-Fi)처럼 깜빡, 공격 예고(windup) 중엔 빨갛게 → 피할 타이밍
     const { eyeMat, legs, arms, antennas, wave } = g.userData;
@@ -488,6 +566,7 @@ export function syncBattle(battle, camera, t, dt) {
   for (const [id, mesh] of dropMeshes) if (!liveDrops.has(id)) { battleRoot.remove(mesh); dropMeshes.delete(id); }
 
   // 처치 고리
+  stepJuice(dt);
   for (let i = bursts.length - 1; i >= 0; i--) {
     const b = bursts[i];
     b.t += dt;

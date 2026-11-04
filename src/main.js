@@ -20,7 +20,7 @@ import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
 import * as knightView from "./render/knight.js";
-import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera, setAttract, startLanding } from "./render/camera.js";
+import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelative, updateCamera, resizeCamera, setAttract, startLanding, shake } from "./render/camera.js";
 import * as splash from "./ui/splash.js";
 import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
@@ -456,6 +456,8 @@ function handleBattleEvents(events) {
         if (hasBand(m) && !m.revealed) m.revealed = true; // 스캔 = 대역 판명
         fx.floatText(m.x, m.y + 0.6, m.z, `${e.amount}${e.crit ? "!" : ""}`, e.crit ? "crit" : "");
         sfx(e.crit ? "crit" : "hit");
+        battleView.punch(m.id, motor.x, motor.z, m, e.crit);   // 타격감 (Stage 13.18)
+        if (e.crit) { shake(0.18, 0.16); hitStop(0.05); }
         questProgress({ type: "hit", monsterType: m.type });
         if (e.firstScan && recordScan(progress, m.type)) {
           const def = MONSTERS[m.type];
@@ -467,12 +469,14 @@ function handleBattleEvents(events) {
       case "kill": {
         const m = e.monster;
         battleView.burstAt(m.x, m.y, m.z);
+        battleView.lootFly(m.x, m.y, m.z, 3, 0x7de3ff);   // XP 구슬이 기사에게
+        shake(0.14, 0.18); hitStop(0.07);
         sfx("kill");
         const { level, leveledUp } = applyKill(progress, m.type, e.xp);
         questEvent(progress.quests, { type: "kill", monsterType: m.type });
         fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
         changed.push("xp");
-        if (leveledUp) { sfx("levelUp"); tipEvent("levelUp"); }
+        if (leveledUp) { sfx("levelUp"); tipEvent("levelUp"); battleView.pillarAt(motor.x, motor.y, motor.z); }
         if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
         dirty = true;
         break;
@@ -480,12 +484,14 @@ function handleBattleEvents(events) {
       case "pickup":
         applyPickup(progress, e.item, e.count);
         fx.floatText(motor.x, motor.y + 0.8, motor.z, `🪙 CR2032 +${e.count}`, "loot");
+        if (Number.isFinite(e.drop?.x)) battleView.lootFly(e.drop.x, e.drop.y ?? motor.y, e.drop.z, Math.min(6, 2 + e.count), 0xffd76b);
         sfx("pickup");
         changed.push("cr2032");
         dirty = true;
         break;
       case "playerHit":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, e.blocking ? `📵 근접 블로킹 -${e.amount}` : `-${e.amount}`, "hurt");
+        shake(0.22, 0.22); hurtFlash();
         if (e.blocking && !blockingExplained) {   // 처음 한 번만 왜 맞았는지 (Stage 13.11)
           blockingExplained = true;
           fx.showToast("📵 근접 블로킹 — 채널을 바꿔도 전자레인지 바로 옆에선 센 잡음이 수신기를 포화시켜요. 2 m 밖으로 떨어지면 대역 밖 채널은 안전!", 5);
@@ -1088,7 +1094,17 @@ function projectToScreen(x, y, z) {
   return { x: (projVec.x + 1) / 2 * window.innerWidth, y: (1 - projVec.y) / 2 * window.innerHeight, behind: projVec.z > 1 };
 }
 
+// ---------- 타격감 (Stage 13.18): 히트 스톱, 피격 번쩍임, 체력 낮으면 붉은 가장자리 ----------
+let hitStopT = 0;
+/** 아주 짧게 시간을 멈칫 (실시간 루프만 — 테스트의 고정 스텝에는 영향 없음) */
+function hitStop(sec) { hitStopT = Math.max(hitStopT, sec); }
+const vignette = (() => { const d = document.createElement("div"); d.id = "vignette"; d.setAttribute("aria-hidden", "true"); document.body.append(d); return d; })();
+function hurtFlash() { vignette.classList.remove("hit"); void vignette.offsetWidth; vignette.classList.add("hit"); }
+battleView.setLootTarget(motor);
+
 function renderFrame(t, dt) {
+  const hpR = battle.player.hp / battle.player.maxHp;
+  vignette.style.setProperty("--low", String(Math.max(0, Math.min(1, (0.35 - hpR) / 0.35))));
   if (!hud.openModalTitle()) world.highlightSign(null);
   battleView.syncBattle(activeBattle(), camera, t, dt);
   dungeonView.syncDungeon(run, t);
@@ -1165,8 +1181,9 @@ let tipClockOffset = 0;   // 테스트용 시계 앞당기기
 function animate() {
   requestAnimationFrame(animate);
   const raw = clock.getDelta();
-  const dt = Math.min(raw, 0.05);
+  let dt = Math.min(raw, 0.05);
   if (TEST_MODE) return;
+  if (hitStopT > 0) { hitStopT -= raw; dt *= 0.08; }
   adaptQuality(raw);
 
   simulate(dt);

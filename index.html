@@ -840,6 +840,12 @@
     background: rgba(57, 208, 255, .1); border: 1.5px solid rgba(57, 208, 255, .45); color: #e2f1ff; font-size: 15px; }
   #cloud-choose button span { font-size: 12.5px; color: #9db4cc; }
   #cloud-choose button:hover, #cloud-choose button:focus-visible { background: rgba(57, 208, 255, .22); outline: none; }
+  /* 타격감 (Stage 13.18): 피격 때 붉게 번쩍, 체력 35% 아래면 가장자리가 점점 붉게 */
+  #vignette { position: fixed; inset: 0; z-index: 9; pointer-events: none; --low: 0;
+    box-shadow: inset 0 0 calc(40px + 80px * var(--low)) calc(10px * var(--low)) rgba(220, 30, 40, calc(.55 * var(--low))); transition: box-shadow .3s; }
+  #vignette.hit { animation: hurtFlash .35s ease-out; }
+  @keyframes hurtFlash { 0% { background: rgba(255, 40, 40, .22); } 100% { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { #vignette.hit { animation: none; } }
   /* 폴리싱 점검 (Stage 13.17) — 자동 점검(모든 창 × 360·412·1280px)에서 나온 작은 터치 영역·작은 글자 손보기 */
   .talk-close, #info-modal .modal-close { min-width: 34px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
   .talk-close:hover, #info-modal .modal-close:hover { background: rgba(0, 0, 0, .06); }

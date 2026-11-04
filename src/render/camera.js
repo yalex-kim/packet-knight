@@ -70,6 +70,18 @@ export function updateCamera(target, dt) {
     target.z + Math.cos(orbit.yaw) * hDist
   );
   camera.lookAt(target.x, focusY + 1.0, target.z);
+  if (shakeT > 0) {   // 화면 흔들림 (Stage 13.18) — 크리티컬·피격·처치
+    shakeT = Math.max(0, shakeT - dt);
+    const a = shakeAmp * (shakeT / shakeDur);
+    camera.position.x += (Math.random() - 0.5) * a; camera.position.y += (Math.random() - 0.5) * a; camera.position.z += (Math.random() - 0.5) * a;
+  }
+}
+let shakeT = 0, shakeDur = 0.2, shakeAmp = 0;
+/** 화면을 잠깐 흔든다 (amp: 월드 단위, 동작 줄이기 설정이면 무시) */
+export function shake(amp = 0.25, dur = 0.2) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (amp < shakeAmp * (shakeT / shakeDur)) return;
+  shakeAmp = amp; shakeDur = dur; shakeT = dur;
 }
 
 export function resizeCamera() {
