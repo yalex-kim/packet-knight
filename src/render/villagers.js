@@ -221,6 +221,44 @@ export function sayNow(id) {
   return n.lastLine;
 }
 
+/** 이 주민이 정해진 말을 한다 (💡 이야기 알림 등, Stage 13.14) */
+export function sayText(id, text) {
+  const n = villagers.find((v) => v.v.id === id);
+  if (!n) return;
+  if (speaking && speaking !== n) speaking.speech.visible = false;
+  speaking = n; say(n, { text }); speechLeft = 5.5;
+}
+
+// ---------- 💡 이야기가 있는 주민 표시 (Stage 13.14) ----------
+const tipMark = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  const g = x.createRadialGradient(64, 64, 8, 64, 64, 62);
+  g.addColorStop(0, "rgba(255, 236, 150, .95)"); g.addColorStop(0.55, "rgba(255, 214, 90, .55)"); g.addColorStop(1, "rgba(255, 214, 90, 0)");
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  x.font = "72px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+  x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillText("💡", 64, 70);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  s.scale.set(0.7, 0.7, 1);
+  s.renderOrder = 11;
+  s.visible = false;
+  s.raycast = () => {};
+  return s;
+})();
+let tipOwner = null;
+/** 💡를 이 주민 머리 위에 (null이면 지운다) */
+export function setTipVillager(id) {
+  tipOwner?.root.remove(tipMark);
+  tipOwner = id ? villagers.find((v) => v.v.id === id) ?? null : null;
+  tipMark.visible = Boolean(tipOwner);
+  if (tipOwner) tipOwner.root.add(tipMark);
+}
+export const tipVillager = () => tipOwner?.v.id ?? null;
+
 /** 클릭 대상 — 주민 루트 그룹들 (userData.villager = VILLAGERS 항목) */
 export const villagerTargets = villagers.map((n) => { n.root.userData.villager = n.v; return n.root; });
 /** 클릭한 주민: 걸음을 멈추고 기사를 바라본다 (대사창이 닫힐 때까지) */
@@ -233,6 +271,7 @@ export function holdVillager(id, knight) {
 
 /** @param {{ x: number, z: number }} [knight] 기사 위치 (말풍선 거리 판정) */
 export function stepLife(dt, time, knight) {
+  if (tipMark.visible) { tipMark.position.y = 1.75 + Math.sin(time * 3) * 0.08; tipMark.material.rotation = Math.sin(time * 2) * 0.12; }
   stepVillagers(dt, time);
   stepPackets(dt);
   stepSpeech(dt, knight);

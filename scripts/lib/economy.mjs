@@ -12,7 +12,7 @@ import {
 import { emptyGear, tryUpgrade, expectedCostTo } from "../../src/core/gear.js";
 import { effectiveStats } from "../../src/core/progress.js";
 import { levelFromXp } from "../../src/core/combat.js";
-import { STAT_POINTS_PER_LEVEL, STAT_CAPS, STAT_POINT_GAIN, SPEC_CARD, JOB_DOUBLE, LEARN_REWARD_SIM } from "../../src/core/balance.js";
+import { STAT_POINTS_PER_LEVEL, STAT_CAPS, STAT_POINT_GAIN, VILLAGER_TIP, JOB_DOUBLE, LEARN_REWARD_SIM } from "../../src/core/balance.js";
 import { rssiSession } from "./rssi.mjs";
 import { fullCharges, useCharge } from "../../src/core/jobCharges.js";
 import { trainingSession, dungeonFloor } from "./combat.mjs";
@@ -194,11 +194,11 @@ export function playHour(strategy, pools, { quiz = true } = {}) {
     if (quiz && st.courses < LIBRARY_COURSES.length) { st.quest.p.cleared[LIBRARY_COURSES[st.courses].chapter] = true; st.courses++; t += TIME.COURSE; quest(); }
     const extraJobs = !quiz ? Math.floor(TIME.COURSE / TIME.JOB_SESSION) : 0;
     // ② 알바 (측정기 배터리가 남아 있는 만큼)
-    // 📡 스펙 한 장: 1시간에 (3600 − 처음) / 간격 + 1 장 → 루프마다 나눠 보고 맞혀 본다 (시간이 든다)
-    const cards = Math.round(((ECONOMY.HOUR - SPEC_CARD.FIRST_SEC) / SPEC_CARD.INTERVAL_SEC + 1) / ECONOMY.LOOPS);
-    for (let k = 0; k < cards; k++) {
-      t += SPEC_CARD.SHOW_SEC + LEARN_REWARD_SIM.QUIZ_SEC;
-      if (rng() < LEARN_REWARD_SIM.ACCURACY) st.income.learn += SPEC_CARD.QUIZ_REWARD;
+    // 💡 주민 이야기 (Stage 13.14): 이벤트로 뜬 💡를 1시간에 약 TIPS_PER_HOUR번 찾아가 듣고 맞혀 본다 (걸어가는 시간 포함)
+    const tips = Math.round(LEARN_REWARD_SIM.TIPS_PER_HOUR / ECONOMY.LOOPS);
+    for (let k = 0; k < tips; k++) {
+      t += LEARN_REWARD_SIM.TIP_SEC;
+      if (rng() < LEARN_REWARD_SIM.ACCURACY) st.income.learn += VILLAGER_TIP.QUIZ_REWARD;
     }
     for (let j = 0; j < strategy.jobs + extraJobs; j++) {
       if (!doJob(loop * loopLen + t)) break;

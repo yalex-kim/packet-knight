@@ -4,8 +4,9 @@
 import { pickLine } from "../core/villagerLines.js";
 import { CHAPTERS } from "../core/chapters.data.js";
 import { chapterUrl } from "../core/book.js";
+import { askQuestion } from "./specCard.js";
 
-let box, hooks, current = null, typing = 0, lastText = null;
+let box, hooks, current = null, typing = 0, lastText = null, tip = null;
 
 function build() {
   box = document.createElement("div");
@@ -19,7 +20,9 @@ function build() {
       <div class="talk-head"><b class="talk-name"></b><span class="talk-role"></span>
         <button type="button" class="talk-close" aria-label="닫기">×</button></div>
       <p class="talk-text" aria-live="polite"></p>
+      <div class="talk-quiz" hidden></div>
       <div class="talk-actions">
+        <button type="button" class="talk-btn talk-tipq" hidden></button>
         <button type="button" class="talk-btn talk-more">💬 다른 이야기</button>
         <a class="talk-btn talk-book" target="_blank" rel="noopener"></a>
       </div>
@@ -27,6 +30,7 @@ function build() {
   document.body.append(box);
   box.querySelector(".talk-close").addEventListener("click", closeTalk);
   box.querySelector(".talk-more").addEventListener("click", () => speak());
+  box.querySelector(".talk-tipq").addEventListener("click", startTipQuiz);
   box.querySelector(".talk-text").addEventListener("click", finishTyping);
   box.querySelector(".talk-book").addEventListener("click", () => hooks.onChapterOpen?.(box.querySelector(".talk-book").dataset.chapter));
   window.addEventListener("keydown", (e) => {
@@ -45,9 +49,28 @@ function finishTyping() {
   box.querySelector(".talk-text").textContent = box.dataset.full;
 }
 
-/** 다음 대사 — 한 글자씩 써 내려간다 */
+/** 💡 이야기의 🎯 맞혀 볼래 (Stage 13.14) — 그 장 문제 하나, 맞히면 보상 */
+function startTipQuiz() {
+  if (!tip) return;
+  finishTyping();
+  const t = tip;
+  tip = null;
+  box.querySelector(".talk-tipq").hidden = true;
+  const qbox = box.querySelector(".talk-quiz");
+  qbox.hidden = false;
+  box.querySelector(".talk-text").hidden = true;
+  askQuestion(qbox, { ...t.question, chapter: t.card.chapter }, (ok) => t.onAnswer(ok));
+}
+
+/** 다음 대사 — 한 글자씩 써 내려간다. 💡 이야기가 있으면 그것부터 */
 function speak() {
-  const line = pickLine(current.topics, Math.random, lastText);
+  box.querySelector(".talk-quiz").hidden = true;
+  box.querySelector(".talk-text").hidden = false;
+  const tipNow = tip && !tip.told;
+  if (tipNow) tip.told = true;
+  box.querySelector(".talk-tipq").hidden = !tipNow;
+  const line = tipNow ? { chapter: tip.card.chapter, text: `💡 그거 알아? ${tip.card.text}` } : pickLine(current.topics, Math.random, lastText);
+  if (!tipNow) tip = null;   // 다른 이야기로 넘어가면 맞혀 보기 기회는 지나간다
   lastText = line.text;
   const ch = CHAPTERS.find((c) => c.id === line.chapter);
   const book = box.querySelector(".talk-book");
@@ -71,10 +94,15 @@ function speak() {
 /** @param {{ onOpen?: (v: any) => void, onClose?: () => void, onChapterOpen?: (id: string) => void, onLine?: (line: any) => void }} h */
 export function initTalk(h) { hooks = h; }
 
-/** @param {{ id: string, name: string, role: string, face: string, topics: string[] }} villager */
-export function openTalk(villager) {
+/**
+ * @param {{ id: string, name: string, role: string, face: string, topics: string[] }} villager
+ * @param {{ card: { chapter: string, text: string }, question: any, reward: number, onAnswer: (ok: boolean) => void } | null} [tipInfo] 💡 이야기 (Stage 13.14)
+ */
+export function openTalk(villager, tipInfo = null) {
   if (!box) build();
   current = villager;
+  tip = tipInfo && { ...tipInfo, told: false };
+  if (tip) box.querySelector(".talk-tipq").textContent = `🎯 맞혀 볼래? 🪙 +${tip.reward}`;
   lastText = null;
   box.querySelector(".talk-face").src = `./src/assets/faces/face-${villager.face}-v1.webp`;
   box.querySelector(".talk-name").textContent = villager.name;
@@ -92,5 +120,5 @@ export function closeTalk() {
   hooks.onClose?.();
 }
 export const isTalkOpen = () => Boolean(box && !box.hidden);
-export const talkState = () => ({ open: isTalkOpen(), name: current?.name ?? null, text: box?.dataset.full ?? null, face: box?.querySelector(".talk-face")?.getAttribute("src") ?? null, book: box?.querySelector(".talk-book")?.getAttribute("href") ?? null });
+export const talkState = () => ({ open: isTalkOpen(), name: current?.name ?? null, text: box?.dataset.full ?? null, tipQuiz: Boolean(box && !box.querySelector(".talk-tipq").hidden), face: box?.querySelector(".talk-face")?.getAttribute("src") ?? null, book: box?.querySelector(".talk-book")?.getAttribute("href") ?? null });
 export const talkMore = () => speak();

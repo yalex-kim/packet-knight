@@ -1994,26 +1994,45 @@ await page.waitForFunction(() => window.__PK);
   check("스펙 카드는 교과서 핵심 정리 75장 · 진행한 퀘스트의 장 = 완료 + 진행 중 (없으면 intro)",
     C.SPEC_CARDS.length === 75 && qc.join() === "intro,radio,phy" && C.questChapters({ done: {}, active: null }).join() === "intro" && C.pickCard(new Set(C.SPEC_CARDS.slice(1).map((c) => c.id))).id === C.SPEC_CARDS[0].id,
     `${C.SPEC_CARDS.length}장 · ${qc.join()}`);
+  // 💡 주민 이야기 (Stage 13.14): 이벤트 → 관련 장 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래(🪙+2) → 쿨다운
+  const T = await import(pathToFileURL(path.join(ROOT, "src/core/villagerTips.js")).href);
+  const L = await import(pathToFileURL(path.join(ROOT, "src/core/layout.js")).href);
+  const shopTip = T.makeTip("shop", T.itemChapters("auracast"));
+  const qaTopics = L.VILLAGERS.find((v) => v.id === shopTip.villagerId).topics;
   const sc = await page.evaluate(async () => {
     const P = window.__PK;
+    P.tip.skipCooldown();
     const cr0 = P.progress().cr2032;
-    const can = P.spec.canShow();
-    P.spec.open();
-    const el = document.getElementById("spec-card");
-    const r = { can, open: P.spec.isOpen(), text: el.querySelector(".spc-text")?.textContent.length > 10, book: /connbook|bluetooth/.test(el.querySelector(".spc-book")?.href ?? ""),
-      skipLocked: el.querySelector(".spc-skip").disabled };
-    el.querySelector(".spc-quiz").click();
-    const box = el.querySelector(".spc-body"), q = box.__q;
-    box.querySelectorAll(".sq-opt")[q.answer].click();
-    r.right = box.querySelector(".sq-opt.right") !== null;
+    P.tip.event("floorClear");
+    const st = P.tip.state();
+    const r = { st, marker: P.tip.marker() };
+    P.tip.event("levelUp");
+    r.oneAtATime = P.tip.state().villagerId === st.villagerId && P.tip.state().event === "floorClear";
+    P.tip.talk(st.villagerId);
+    const T = P.talk ? null : null; void T;
+    const box = document.getElementById("talk");
+    r.text = box.querySelector(".talk-text").textContent.length > 0 || box.dataset.full?.startsWith("💡");
+    r.full = box.dataset.full ?? "";
+    r.markerGone = P.tip.marker() === null && P.tip.state() === null;
+    const qbtn = box.querySelector(".talk-tipq");
+    r.qbtn = !qbtn.hidden && /맞혀 볼래/.test(qbtn.textContent);
+    qbtn.click();
+    const qb = box.querySelector(".talk-quiz"), q = qb.__q;
+    qb.querySelectorAll(".sq-opt")[q.answer].click();
     r.gain = P.progress().cr2032 - cr0;
-    el.querySelector(".spc-close").click();
-    r.closed = !P.spec.isOpen();
-    // 시간: 처음 카드는 FIRST_SEC 뒤, 그 뒤 INTERVAL_SEC 마다 (전투·창이 없을 때)
+    box.querySelector(".talk-close").click();
+    P.tip.event("levelUp");
+    r.cooldown = P.tip.state() === null;
+    P.tip.skipCooldown();
+    P.tip.event("levelUp");
+    r.afterCooldown = P.tip.state() !== null;
+    if (r.afterCooldown) P.tip.talk(P.tip.state().villagerId), document.querySelector("#talk .talk-close").click();
     return r;
   });
-  check("📡 스펙 한 장: 사양 한 조각 + 📖 교과서 링크, 처음 3초는 건너뛰기 잠김, 🎯 맞혀 보기 정답이면 🪙 +2, 닫힌다",
-    sc.open && sc.text && sc.book && sc.skipLocked && sc.right && sc.gain === 2 && sc.closed, JSON.stringify(sc));
+  check("💡 주민 이야기: 층 클리어 → 관련 장(호핑·공존·연결) 주민 머리 위 💡(한 번에 하나), 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래 정답 🪙+2, 들은 뒤 2분 쿨다운",
+    ["hopping", "coexistence", "connection"].includes(sc.st.chapter) && sc.marker === sc.st.villagerId && sc.oneAtATime && sc.full.startsWith("💡") && sc.markerGone && sc.qbtn && sc.gain === 2 && sc.cooldown && sc.afterCooldown
+      && shopTip.card.chapter === "audio" && qaTopics.includes("audio"),
+    JSON.stringify({ ...sc, full: sc.full.slice(0, 30), shop: shopTip.villagerId }));
 }
 
 check("콘솔/페이지 에러가 없다", errors.length === 0, errors.join(" | "));

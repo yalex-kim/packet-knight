@@ -26,7 +26,7 @@ function build() {
     if (act === "buy") {
       const r = buy(p, kind, id);
       note = r.ok ? { ok: true, text: "구매 완료 — 바로 장착했어요!" } : { ok: false, text: r.reason === "funds" ? "🪙 CR2032가 모자라요. 등대 알바·던전에서 모아 오세요." : "이미 가지고 있어요." };
-      if (r.ok) hooks.onChange(kind);
+      if (r.ok) { hooks.onChange(kind); hooks.onBuy?.(kind, id); }
     } else if (act === "equip") {
       equip(p, kind, id);
       note = { ok: true, text: "장착했어요." };

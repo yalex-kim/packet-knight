@@ -24,13 +24,14 @@ import { camera, orbit, rotateOrbit, setOrbitDistance, resetOrbit, cameraRelativ
 import * as splash from "./ui/splash.js";
 import { openHopGuide, isHopGuideOpen, hopGuideSeen, hopGuideExample } from "./ui/hopGuide.js";
 import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNext } from "./ui/tutorial.js";
-import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles, sayNow } from "./render/villagers.js";
+import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles, sayNow, sayText, setTipVillager, tipVillager } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
 import { initSettings, isSettingsOpen } from "./ui/settings.js";
-import { initSpecCard, showSpecCard, isSpecCardOpen, loadSeen as specSeen } from "./ui/specCard.js";
-import { pickCard, drawOne } from "./core/specCards.js";
-import { SPEC_CARD } from "./core/balance.js";
+import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
+import { drawOne } from "./core/specCards.js";
+import { makeTip, itemChapters } from "./core/villagerTips.js";
+import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
 import { weaponById, outfitById } from "./core/shop.js";
@@ -471,7 +472,7 @@ function handleBattleEvents(events) {
         questEvent(progress.quests, { type: "kill", monsterType: m.type });
         fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
         changed.push("xp");
-        if (leveledUp) sfx("levelUp");
+        if (leveledUp) { sfx("levelUp"); tipEvent("levelUp"); }
         if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
         dirty = true;
         break;
@@ -611,6 +612,7 @@ function applyLooks() {
 initShop({
   getProgress: () => progress,
   onChange: () => { persist(); applyLooks(); hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]); sfx("coin"); },
+  onBuy: (kind, id) => tipEvent("shop", itemChapters(id)),   // 💡 산 물건과 관련된 이야기 (Stage 13.14)
   onOpenChange: (open) => { setInputEnabled(!open); inputLocked = open; if (open) { clearMoveTarget(); hud.hideModal(); } }
 });
 applyLooks();
@@ -624,6 +626,16 @@ initInventory({
 function talkTo(v) {
   hud.hideModal();
   clearMoveTarget();
+  if (tip && tip.villagerId === v.id) {   // 💡 이야기 (Stage 13.14) — 들으면 💡는 사라지고 쿨다운
+    const t = tip;
+    tip = null;
+    tipReadyAt = tipClock() + VILLAGER_TIP.COOLDOWN_SEC;
+    setTipVillager(null);
+    markSpecSeen(t.card.id);
+    openTalk(v, { card: t.card, question: drawOne([t.card.chapter]), reward: VILLAGER_TIP.QUIZ_REWARD,
+      onAnswer: (ok) => { if (ok) grantLearnReward(VILLAGER_TIP.QUIZ_REWARD); sfx(ok ? "correct" : "wrong"); } });
+    return;
+  }
   openTalk(v);
 }
 initTalk({
@@ -676,6 +688,9 @@ function leaveDungeon(ko = false) {
   if (dungeonUi.isDungeonPanelOpen()) dungeonUi.closeDungeonPanel();
   dungeonUi.updateHud(null);
   hud.setBadge("⚔️ 던전 관문 · 마을로 귀환");
+  if (ko) tipEvent("ko");
+  tipEvent("returnVillage");
+  showTip();   // 던전 안에서 생긴 💡는 마을에 돌아와서 보인다
 }
 
 function openDungeonEntry() {
@@ -721,6 +736,7 @@ function onCombatCleared() {
 
 /** 롤백 선택: 체크포인트에서 재연결 */
 function rollbackToCheckpoint() {
+  tipEvent("ko");
   if (!run) return;
   run.rollbacks += 1;
   progress.dungeon.rollbacks = (progress.dungeon.rollbacks ?? 0) + 1;
@@ -770,6 +786,7 @@ dungeonUi.initDungeonPanel({
       run.observing = false;
       applyFloorClear(progress, run.floor, result.stars);
       persist();
+      tipEvent("floorClear");
       fx.showToast(`🌀 ${run.floor}층 클리어! 남쪽 포털로 다음 층에 갈 수 있습니다`, 4);
     }
     dungeonUi.showTestResult(result, run);
@@ -1105,9 +1122,8 @@ function adaptQuality(rawDt) {
   }
 }
 
-// ---------- 📡 스펙 한 장 (Stage 13.12): 정해진 시간마다, 틈이 날 때 ----------
-let specT = 0, specNext = SPEC_CARD.FIRST_SEC;
-/** 학습 보상 🪙 (스펙 카드 맞혀 보기·알바 2배) */
+// ---------- 💡 주민이 들려주는 스펙 이야기 (Stage 13.14): 이벤트 → 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래 ----------
+/** 학습 보상 🪙 (💡 맞혀 보기·알바 2배) */
 function grantLearnReward(n) {
   progress.cr2032 += n;
   persist();
@@ -1115,24 +1131,24 @@ function grantLearnReward(n) {
   sfx("coin");
   return progress.cr2032;
 }
-const specCanShow = () => !inputLocked && !job && !(run && run.phase === "combat") && !isTalkOpen() && !isSettingsOpen()
-  && !document.querySelector(".overlay:not([hidden])") && document.getElementById("info-modal")?.style.display !== "block" && !document.getElementById("splash");
-function specClock(dt) {
-  if (document.hidden || isSpecCardOpen()) return;
-  specT += dt;
-  if (specT < specNext || !specCanShow()) return;   // 전투 중·다른 창이 떠 있으면 미뤘다가 틈이 나면
-  specT = 0;
-  specNext = SPEC_CARD.INTERVAL_SEC;
-  openSpecCard();
+let tip = null;              // { villagerId, card, event }
+let tipReadyAt = 0;          // 쿨다운 (clock.elapsedTime 기준 초)
+const villagerName = (id) => VILLAGERS.find((v) => v.id === id)?.name ?? "주민";
+/** 이벤트가 생기면 💡 하나 (이미 있거나 쿨다운이면 무시) */
+function tipEvent(event, extra = []) {
+  if (tip || tipClock() < tipReadyAt) return;
+  tip = makeTip(event, extra, specSeen());
+  showTip();
 }
-function openSpecCard() { showSpecCard(pickCard(specSeen())); }
-initSpecCard({
-  drawQuestion: (chapter) => drawOne([chapter]),
-  onReward: (n) => grantLearnReward(n),
-  onOpen: () => { clearMoveTarget(); setInputEnabled(false); inputLocked = true; },
-  onClose: () => { setInputEnabled(true); inputLocked = false; },
-  sfx
-});
+/** 마을에 있으면 💡를 띄우고 그 주민이 한 번 외친다 (던전 안이면 돌아와서) */
+function showTip() {
+  if (!tip || run) return;
+  setTipVillager(tip.villagerId);
+  sayText(tip.villagerId, "잠깐! 재밌는 거 알려 줄게 💡");
+  hud.setBadge(`💡 ${villagerName(tip.villagerId)}에게 새 이야기가 있어요`);
+}
+const tipClock = () => clock.elapsedTime + tipClockOffset;
+let tipClockOffset = 0;   // 테스트용 시계 앞당기기
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1142,7 +1158,6 @@ function animate() {
   adaptQuality(raw);
 
   simulate(dt);
-  specClock(dt);
   const t = clock.elapsedTime;
   renderFrame(t, dt);
   world.animateWorld(t);
@@ -1211,7 +1226,7 @@ window.__PK = {
   library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, lastChapterUrl },
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
-  spec: { open: () => openSpecCard(), isOpen: isSpecCardOpen, canShow: () => specCanShow(), clock: (dt) => { specClock(dt); return { t: specT, next: specNext }; } },
+  tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },
   quests: {
     open: (id) => questLog.openQuestLog(id),
     close: questLog.closeQuestLog,

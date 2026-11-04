@@ -293,14 +293,14 @@ export const floorAtkScale = (floor) => 1 + DUNGEON.FLOOR_ATK_SCALE * (floor - 1
 export const ECONOMY = Object.freeze({ HOUR: 3600, LOOPS: 4, TARGET_UPGRADES: 8, SURPLUS_MIN: 0.05, SURPLUS_MAX: 0.15 });
 
 /**
- * 📡 스펙 한 장 (Stage 13.12) — 플레이 중 정해진 시간마다 사양 한 조각 카드 + 🎯 맞혀 보기
- * INTERVAL_SEC 마다(처음은 FIRST_SEC 뒤), SHOW_SEC 동안, SKIP_AFTER_SEC 뒤 건너뛰기. 맞히면 QUIZ_REWARD
+ * 💡 주민이 들려주는 스펙 이야기 (Stage 13.14, 13.12의 시간마다 카드를 대신) — 이벤트로 주민 머리 위에 💡,
+ * 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래. 하나를 들은 뒤 COOLDOWN_SEC 안에는 새 💡가 뜨지 않는다. 맞히면 QUIZ_REWARD
  */
-export const SPEC_CARD = Object.freeze({ FIRST_SEC: 300, INTERVAL_SEC: 480, SHOW_SEC: 10, SKIP_AFTER_SEC: 3, QUIZ_REWARD: 2 });
+export const VILLAGER_TIP = Object.freeze({ COOLDOWN_SEC: 120, QUIZ_REWARD: 2 });
 /** 🎓 알바 2배 받기 (Stage 13.12) — 진행한 퀘스트의 장에서 한 문제, 맞히면 보수 × MULT */
 export const JOB_DOUBLE = Object.freeze({ MULT: 2 });
 /**
- * 학습 보상(스펙 카드 맞혀 보기·알바 2배)은 옷·무기 상점 예산 — §8.3 CR2032 수지(강화 기준)와 따로 센다.
+ * 학습 보상(💡 주민 맞혀 보기·알바 2배)은 옷·무기 상점 예산 — §8.3 CR2032 수지(강화 기준)와 따로 센다.
  * 시뮬레이션 가정: 중간 플레이어 정답률 ACCURACY, 문제 하나에 QUIZ_SEC 초
  */
-export const LEARN_REWARD_SIM = Object.freeze({ ACCURACY: 0.6, QUIZ_SEC: 10 });
+export const LEARN_REWARD_SIM = Object.freeze({ ACCURACY: 0.6, QUIZ_SEC: 10, TIPS_PER_HOUR: 6, TIP_SEC: 25 });   // 💡: 1시간에 약 6번(이벤트·쿨다운·찾아가기), 걸어가 듣고 맞히는 데 25초
