@@ -196,7 +196,11 @@ function syncBgm() {
     tr.gain.gain.cancelScheduledValues(now);
     tr.gain.gain.setTargetAtTime(on ? 1 : 0, now, on ? 0.5 : 0.25);
     clearTimeout(tr.stop);
-    if (on) { if (tr.el.paused) tr.el.play().catch(() => {}); }
+    if (on) {
+      if (tr.el.paused) tr.el.play().catch(() => {});
+      // 마을에 있는 동안 던전 곡을 미리 받아 둔다 — 첫 입장 때 음악이 늦게 시작하지 않게 (Stage 12.10)
+      if (mode === "village" && !bgmTracks.dungeon) setTimeout(() => { try { bgmTrack("dungeon").el.load(); } catch { /* 무시 */ } }, 5000);
+    }
     else if (!tr.el.paused) tr.stop = setTimeout(() => { if (bgmMode !== mode || document.hidden) tr.el.pause(); }, 1500);
   }
 }

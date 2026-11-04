@@ -718,7 +718,7 @@
     #quest-tracker { bottom: 166px; }
   }
   /* 개발자 카드 (Stage 11.19) — home.yalex-k.com 히어로 디자인 */
-  #devcard .panel.dc { max-width: 760px; padding: 0 0 18px; background: radial-gradient(120% 70% at 20% 10%, #123a5c 0%, #0a2038 45%, #06121f 100%); border: 1px solid rgba(57, 208, 255, .35); color: #cfe0f0;
+  #devcard .panel.dc { max-width: 760px; padding: 0 0 18px; overflow: hidden; background: radial-gradient(120% 70% at 20% 10%, #123a5c 0%, #0a2038 45%, #06121f 100%); border: 1px solid rgba(57, 208, 255, .35); color: #cfe0f0;
     background-image: radial-gradient(rgba(125, 216, 255, .12) 1px, transparent 1.5px), radial-gradient(120% 70% at 20% 10%, #123a5c 0%, #0a2038 45%, #06121f 100%); background-size: 26px 26px, auto; font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif; }
   .dc .dc-mono { font-family: ui-monospace, "JetBrains Mono", "D2Coding", Consolas, monospace; }
   .dc-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: rgba(6, 18, 31, .82); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(57, 208, 255, .15); }
@@ -740,36 +740,31 @@
   .dc-ring .d2 { width: 14px; height: 14px; left: -26px; top: 110px; background: #39d0ff; box-shadow: 0 0 12px #39d0ff; }
   .dc-ring .d3 { width: 9px; height: 9px; right: -16px; bottom: 26px; background: #7de3ff; box-shadow: 0 0 10px #7de3ff; }
   .dc-prompt { color: #7fb6dd; font-size: 14px; margin: 14px 22px 8px; }
+  .dc-copy { flex: 1 1 auto; min-width: 0; }
   .dc-copy .dc-prompt { margin: 0 0 8px; }
   #devcard .dc-title { margin: 0; font-size: clamp(32px, 7vw, 46px); line-height: 1.12; font-weight: 900; color: #f2f8ff; letter-spacing: -.02em; }
   #devcard .dc-title span { color: #4fd8f5; text-shadow: 0 0 18px rgba(57, 208, 255, .75); }
   .dc-lede { margin: 12px 0 0; font-size: 15px; line-height: 1.7; color: #9db4cc; }
   .dc-lede b { color: #fff; }
-  .dc-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 22px; }
-  .dc-item { background: rgba(8, 26, 44, .75); border: 1px solid rgba(57, 208, 255, .16); border-radius: 14px; padding: 12px 14px; }
-  .dc-item.here { border-color: rgba(57, 208, 255, .6); box-shadow: 0 0 16px rgba(57, 208, 255, .2); }
-  .dc-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .dc-item-head .dc-mono { font-size: 11px; color: #6f8aa6; }
-  .dc-item-head b { color: #fff; font-size: 15px; }
-  .dc-kind { font-size: 11px; color: #7fb6dd; }
-  .dc-tag { margin-left: auto; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; background: rgba(143, 160, 180, .2); color: #a9b8c8; }
-  .dc-tag.live { background: rgba(60, 207, 110, .18); color: #7dffb5; }
-  .dc-item p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: #9db4cc; }
-  .dc-vibe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 22px; }
-  .dc-vibe div { background: rgba(8, 26, 44, .6); border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(57, 208, 255, .12); }
-  .dc-vibe .dc-mono { font-size: 10.5px; color: #39d0ff; }
-  .dc-vibe b { display: block; color: #fff; font-size: 14px; margin-top: 2px; }
-  .dc-vibe p { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: #9db4cc; }
-  .dc-note { margin: 14px 22px 0; font-size: 13px; color: #cfe0f0; background: rgba(57, 208, 255, .08); border-left: 3px solid #39d0ff; border-radius: 6px; padding: 8px 12px; }
-  .dc-actions { margin: 14px 22px 0; display: flex; justify-content: flex-end; }
-  .dc-home { text-decoration: none; font-weight: 800; color: #04121f; background: linear-gradient(100deg, #39d0ff, #7de3ff 55%, #ffd76b); border-radius: 999px; padding: 10px 18px; font-size: 14px; }
+  .dc-titlerow { display: flex; align-items: center; gap: 14px; }
+  .dc-titlerow .dc-title { flex: 1 1 auto; }
+  /* 홈페이지 링크 — 제목 오른쪽 빈자리 (Stage 12.10) */
+  #devcard .dc-home { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #e9f7ff; text-align: center;
+    padding: 14px 16px; border-radius: 18px; background: rgba(8, 26, 44, .7); border: 1.5px solid rgba(57, 208, 255, .55);
+    box-shadow: 0 0 18px rgba(57, 208, 255, .28), inset 0 0 14px rgba(57, 208, 255, .12); transition: transform .15s, box-shadow .15s; }
+  #devcard .dc-home:hover, #devcard .dc-home:focus-visible { transform: translateY(-2px); box-shadow: 0 0 26px rgba(57, 208, 255, .55), inset 0 0 14px rgba(57, 208, 255, .2); outline: none; }
+  .dc-home-ico { font-size: 30px; line-height: 1; filter: drop-shadow(0 0 8px rgba(57, 208, 255, .7)); }
+  .dc-home b { font-size: 16px; color: #fff; }
+  .dc-home .dc-mono { font-size: 11px; color: #4fd8f5; }
   @media (max-width: 640px) {
     .dc-hero { flex-direction: column; text-align: left; align-items: flex-start; gap: 18px; padding: 22px 18px 6px; }
     .dc-ring { width: 150px; height: 150px; align-self: center; margin: 14px 0; }
-    .dc-list, .dc-vibe { grid-template-columns: 1fr; margin: 0 16px; }
-    .dc-vibe { grid-template-columns: 1fr 1fr; }
-    .dc-prompt { margin-left: 16px; }
-    .dc-note, .dc-actions { margin-left: 16px; margin-right: 16px; }
+    /* 스크롤 없이 한 화면에 — 낮은 화면에서는 아바타·제목을 줄인다 */
+    .dc-ring { width: min(150px, 20dvh); height: min(150px, 20dvh); }
+    #devcard .dc-title { font-size: clamp(26px, min(9vw, 5.2dvh), 40px); }
+    .dc-titlerow, .dc-copy { width: 100%; }
+    #devcard .dc-home { padding: 12px 12px; }
+    .dc-lede { font-size: 14px; line-height: 1.6; }
     .dc-online { display: none; }
     .dc-top .dc-close { margin-left: auto; }   /* online이 숨으면 닫기를 오른쪽 끝으로 (안쪽에 남던 문제) */
   }

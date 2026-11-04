@@ -1733,12 +1733,14 @@ await page.waitForFunction(() => window.__PK);
   const dc = await page.evaluate(() => {
     window.__PK.devCard.open();
     const el = document.getElementById("devcard");
-    const r = { open: window.__PK.devCard.isOpen(), items: el.querySelectorAll(".dc-item").length, home: el.querySelector(".dc-home")?.getAttribute("href"), title: el.querySelector(".dc-title")?.textContent };
+    const p = el.querySelector(".panel"), t = el.querySelector(".dc-title").getBoundingClientRect(), h = el.querySelector(".dc-home").getBoundingClientRect();
+    const r = { open: window.__PK.devCard.isOpen(), items: el.querySelectorAll(".dc-item").length, home: el.querySelector(".dc-home")?.getAttribute("href"), title: el.querySelector(".dc-title")?.textContent,
+      noScroll: p.scrollHeight <= p.clientHeight + 1, beside: h.left >= t.left + 40 && h.top < t.bottom && h.bottom > t.top };
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     return { ...r, closed: !window.__PK.devCard.isOpen() };
   });
-  check("광고판을 누르면 home 히어로 디자인의 개발자 카드(아티팩트 4개·홈 링크)가 뜨고 Esc로 닫힌다",
-    dc.open && dc.items === 4 && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));
+  check("광고판을 누르면 home 히어로 한 장만(스크롤 없음) 뜨고, 제목 옆에 홈페이지 링크, Esc로 닫힌다",
+    dc.open && dc.items === 0 && dc.noScroll && dc.beside && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));
   check("개발자 광고판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",
     bb.info.link === "https://home.yalex-k.com/" && /home/.test(bb.info.linkLabel) && posts.length === 2 && blocked && frontFree,
     `기둥 ${posts.length}개 · 정면 (${front.x.toFixed(1)}, ${front.z.toFixed(1)})`);
