@@ -107,7 +107,9 @@ export function openModalTitle() {
  * @param {string[]} [changed]
  */
 export function renderStats(stats, { skillSlots, cr2032, xp, statPoints }, changed = []) {
-  const cells = Object.entries(STAT_META).map(([k, m]) => {
+  // 상태창 순서 (Stage 13.9): CI 를 SEC 옆에, PWR 를 맨 끝으로
+  const ORDER = ["hp", "tx", "rx", "hop", "sec", "ci", "pwr"];
+  const cells = ORDER.map((k) => [k, STAT_META[k]]).map(([k, m]) => {
     const div = document.createElement("div");
     div.className = `stat${changed.includes(k) ? " up" : ""}`;
     div.dataset.stat = k;
