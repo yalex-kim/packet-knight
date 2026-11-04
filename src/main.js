@@ -328,13 +328,13 @@ function handleTap(clientX, clientY) {
   hud.hideModal();
 }
 
-function openSecretTree() {
+function openSecretTree(board = "level") {
   hud.hideModal();
   clearMoveTarget();
   setInputEnabled(false);
   inputLocked = true;
   sfx("questReady");
-  openRanking(() => { setInputEnabled(true); inputLocked = false; });
+  openRanking(() => { setInputEnabled(true); inputLocked = false; }, board);
 }
 
 /** 던전 바닥 탭: 바닥 평면(floorY)과 광선의 교점으로 이동 */
@@ -924,6 +924,7 @@ hud.setModalHandlers({
   action: (id) => {
     if (id === "library") openLibrary();
     else if (id === "job") openJob();
+    else if (id === "jobRank") openSecretTree("job");
     else if (id === "dungeon") openDungeonEntry();
     else if (id === "rflab") openRfLab();
     else if (id === "prison") { hud.hideModal(); prisonUi.openPrison(); }
@@ -1169,6 +1170,7 @@ window.__PK = {
   saveStatus: () => ({ load: loaded.status, lastSaveOk }),
   library: { open: openLibrary, isOpen: isLibraryOpen, answerKey: currentAnswerKey, lastChapterUrl },
   signs: () => world.signs.map((s) => s.userData.signText),
+  openLandmark: (id) => goToLandmark(landmark(id).info),
   quests: {
     open: (id) => questLog.openQuestLog(id),
     close: questLog.closeQuestLog,
@@ -1191,7 +1193,7 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   devCard: { open: () => goToLandmark(landmark("billboard").info), isOpen: isDevCardOpen },
-  ranking: { open: () => openSecretTree(), isOpen: isRankingOpen, close: closeRanking, cloud: cloudState, tree: () => ({ x: world.secretTree.position.x, z: world.secretTree.position.z }) },
+  ranking: { open: (board) => openSecretTree(board), isOpen: isRankingOpen, close: closeRanking, cloud: cloudState, tree: () => ({ x: world.secretTree.position.x, z: world.secretTree.position.z }) },
   inventory: { open: openInventory, close: closeInventory, isOpen: isInventoryOpen },
   shop: { open: openShop, close: closeShop, isOpen: isShopOpen, state: () => structuredClone(progress.shop) },
   setView: (yaw, distance) => { orbit.yaw = yaw; if (distance) setOrbitDistance(distance); },   // 스크린샷·테스트용 카메라 방향

@@ -9,6 +9,7 @@
 import { levelFromXp } from "../core/combat.js";
 import { isValidSave } from "../core/progress.js";
 import { weaponById, outfitById } from "../core/shop.js";
+import { gradeSession } from "../core/rssiJob.js";
 import { startPreview, stopPreview } from "../render/knightPreview.js";
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
@@ -211,6 +212,10 @@ function buildRanking() {
   overlay.innerHTML = `<div class="panel rk">
     <div class="rk-head"><span class="rk-tree">🍎</span><div><b>비밀의 사과나무</b><span>나무껍질에 새겨진 기사들의 이름</span></div>
       <button type="button" class="rk-close" aria-label="닫기">×</button></div>
+    <div class="rk-tabs" role="tablist">
+      <button type="button" role="tab" data-board="level">⭐ 레벨</button>
+      <button type="button" role="tab" data-board="job">📡 비콘 알바</button>
+    </div>
     <div class="rk-stage" hidden>
       <canvas class="rk-knight" width="160" height="190" aria-hidden="true"></canvas>
       <div class="rk-who"></div>
@@ -220,13 +225,17 @@ function buildRanking() {
   </div>`;
   document.body.append(overlay);
   overlay.querySelector(".rk-close").addEventListener("click", closeRanking);
+  overlay.querySelectorAll(".rk-tabs button").forEach((b) => b.addEventListener("click", () => { if (board !== b.dataset.board) { board = b.dataset.board; refreshRanking(); } }));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closeRanking(); });
   window.addEventListener("keydown", (e) => { if (!overlay.hidden && e.key === "Escape") { e.stopPropagation(); closeRanking(); } }, { capture: true });
 }
 
-export function openRanking(close = () => {}) {
+let board = "level";
+/** @param {"level"|"job"} which 처음 보일 판 (등대 안내 박스의 🍎 알바 랭킹 = job) */
+export function openRanking(close = () => {}, which = "level") {
   if (!overlay) buildRanking();
   onRankClose = close;
+  board = which === "job" ? "job" : "level";
   overlay.hidden = false;
   refreshRanking();
 }
@@ -244,10 +253,12 @@ export const isRankingOpen = () => Boolean(overlay && !overlay.hidden);
 async function refreshRanking() {
   if (!overlay) return;
   const body = overlay.querySelector(".rk-body"), foot = overlay.querySelector(".rk-foot");
+  const asked = board;
+  overlay.querySelectorAll(".rk-tabs button").forEach((b) => { const on = b.dataset.board === board; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
   body.innerHTML = `<p class="rk-msg">나무껍질을 읽는 중…</p>`;
   foot.innerHTML = "";
   let data;
-  try { data = await api("ranking"); } catch {
+  try { data = await api(`ranking?board=${board}`); if (asked !== board) return; } catch {
     body.innerHTML = `<p class="rk-msg">지금은 나무가 조용해요. (랭킹 서버에 닿지 않음)</p>`;
     return;
   }
@@ -257,17 +268,21 @@ async function refreshRanking() {
   const myIdx = data.me ? data.me.rank - 1 : -1;
   if (data.me && myIdx >= data.top.length) entries.push({ ...data.me, idx: myIdx, extra: true });
   const isMe = (e) => data.me && e.idx === myIdx;
+  const isJob = data.board === "job";
+  const grade = (e) => gradeSession(e.jobBest ?? 0, 1).grade;
+  const mainScore = (e) => (isJob ? `${e.jobBest ?? 0}점` : `Lv ${levelFromXp(e.xp).level}`);
+  const subScore = (e) => (isJob ? `📡 ${grade(e)}등급 · 알바 ${e.jobRuns ?? 0}번 · Lv ${levelFromXp(e.xp).level}` : `⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}`);
   const row = (e) => {
     const medal = ["🥇", "🥈", "🥉"][e.idx] ?? `${e.idx + 1}`;
     const g = gear(e);
     return `<li class="${isMe(e) ? "me" : ""}" data-i="${entries.indexOf(e)}" tabindex="0"><span class="rk-no">${medal}</span><b class="rk-name">${esc(e.name)}</b>
       <span class="rk-gear"><img src="${itemImg(g.outfit.id)}" alt="${esc(g.outfit.name)}" title="${esc(g.outfit.name)}" /><img src="${itemImg(g.weapon.id)}" alt="${esc(g.weapon.name)}" title="${esc(g.weapon.name)}" /></span>
-      <span class="rk-lv">Lv ${levelFromXp(e.xp).level}</span><span class="rk-sub">⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span></li>`;
+      <span class="rk-lv">${mainScore(e)}</span><span class="rk-sub">${subScore(e)}</span></li>`;
   };
   const top = entries.filter((e) => !e.extra), extra = entries.filter((e) => e.extra);
   body.innerHTML = top.length
     ? `<ol class="rk-list">${top.map(row).join("")}</ol>${extra.length ? `<ol class="rk-list rk-mine">${extra.map(row).join("")}</ol>` : ""}`
-    : `<p class="rk-msg">아직 새겨진 이름이 없어요. 첫 번째 기사가 되어 보세요!</p>`;
+    : `<p class="rk-msg">${isJob ? "아직 알바 기록이 없어요. 등대에서 비콘 찾기 알바를 해 보세요!" : "아직 새겨진 이름이 없어요. 첫 번째 기사가 되어 보세요!"}</p>`;
   // 고른 기사의 모습 (옷·무기) — 내 기사 모델에 잠깐 입혀 미리보기로 돌린다
   const stage = overlay.querySelector(".rk-stage");
   const select = (e) => {
@@ -276,7 +291,7 @@ async function refreshRanking() {
     stage.hidden = false;
     for (const li of body.querySelectorAll("li")) li.classList.toggle("sel", li.dataset.i === String(entries.indexOf(e)));
     overlay.querySelector(".rk-who").innerHTML = `<span class="rk-who-rank">${["🥇", "🥈", "🥉"][e.idx] ?? `${e.idx + 1}위`}</span>
-      <b>${esc(e.name)}</b><span class="rk-who-lv">Lv ${levelFromXp(e.xp).level} · ⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span>
+      <b>${esc(e.name)}</b><span class="rk-who-lv">${isJob ? `📡 최고 ${e.jobBest ?? 0}점 (${grade(e)}) · ` : ""}Lv ${levelFromXp(e.xp).level} · ⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span>
       <span class="rk-who-item"><img src="${itemImg(g.outfit.id)}" alt="" />${esc(g.outfit.name)}</span>
       <span class="rk-who-item"><img src="${itemImg(g.weapon.id)}" alt="" />${esc(g.weapon.name)}</span>`;
     hooks?.previewLook?.(g);
@@ -288,7 +303,7 @@ async function refreshRanking() {
     li.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
   });
   select(entries.find(isMe) ?? entries[0]);
-  const total = `<span class="rk-total">기사 ${data.total}명</span>`;
+  const total = `<span class="rk-total">${isJob ? "알바한 기사" : "기사"} ${data.total}명</span>`;
   if (user) {
     foot.innerHTML = `${total}<span>☁️ ${esc(user.name)} 님 — 클라우드 저장 중</span><button type="button" class="rk-logout">로그아웃</button>`;
     foot.querySelector(".rk-logout").addEventListener("click", logout);

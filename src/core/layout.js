@@ -72,6 +72,7 @@ export const LANDMARKS = [
       lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
       link: CHAPTER("advertising.html"),
       action: { id: "job", label: "📡 비콘 찾기 알바 (60초 · 🪙 최대 8개)" },
+      extra: { id: "jobRank", label: "🍎 알바 랭킹" },   // 사과나무 랭킹의 📡 비콘 알바 판 (Stage 13.8)
       walkPos: { x: TOWER_POS.x - 1.7, y: S, z: TOWER_POS.z - 1.7 }
     }
   },

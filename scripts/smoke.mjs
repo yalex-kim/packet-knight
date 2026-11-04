@@ -498,7 +498,9 @@ const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "
 await page.route((url) => url.origin === ORIGIN, (r) => {
   const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
   // 클라우드 API (Stage 13) — 랭킹만 가짜로 (Pages Functions·D1 은 배포본에서만)
-  if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
+  if (rel === "api/ranking" && new URL(r.request().url()).searchParams.get("board") === "job") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
+    board: "job", top: [{ name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv", jobBest: 560, jobRuns: 12 }, { name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded", jobBest: 300, jobRuns: 4 }], me: null, total: 2 }) });
+  if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ board: "level",
     top: [{ name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded" }, { name: "<b>해커</b>", xp: 300, maxFloor: 2, badges: 3, outfit: "x\"><img>", weapon: null }, { name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv" }], me: null, total: 3 }) });
   const file = path.resolve(ROOT, rel);
   if (!file.startsWith(ROOT + path.sep) || !existsSync(file)) return r.fulfill({ status: 404, body: "not found" });
@@ -1798,7 +1800,7 @@ await page.waitForFunction(() => window.__PK);
     const el = document.getElementById("devcard");
     const p = el.querySelector(".panel"), t = el.querySelector(".dc-title").getBoundingClientRect(), h = el.querySelector(".dc-home").getBoundingClientRect();
     const r = { open: window.__PK.devCard.isOpen(), items: el.querySelectorAll(".dc-item").length, home: el.querySelector(".dc-home")?.getAttribute("href"), title: el.querySelector(".dc-title")?.textContent,
-      noScroll: p.scrollHeight <= p.clientHeight + 1, beside: h.left >= t.left + 40 && h.top < t.bottom && h.bottom > t.top };
+      noScroll: p.scrollHeight <= p.clientHeight + 1, beside: Boolean(el.querySelector(".dc-side .dc-ring") && el.querySelector(".dc-side .dc-home")) && h.width > 0 };
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     return { ...r, closed: !window.__PK.devCard.isOpen() };
   });
@@ -1821,15 +1823,36 @@ await page.waitForFunction(() => window.__PK);
     for (let i = 0; i < 40 && !document.querySelector("#ranking .rk-who b"); i++) await new Promise((res) => setTimeout(res, 50));
     await new Promise((res) => setTimeout(res, 300));
     r.reopen = !el.querySelector(".rk-stage").hidden;
+    // 📡 비콘 알바 판 (Stage 13.8): 탭으로 바꾸면 알바 최고 점수 순
+    el.querySelector('.rk-tabs [data-board="job"]').click();
+    for (let i = 0; i < 40 && !/점/.test(el.querySelector(".rk-lv")?.textContent ?? ""); i++) await new Promise((res) => setTimeout(res, 50));
+    r.job = { tab: el.querySelector(".rk-tabs .on")?.dataset.board, first: el.querySelector(".rk-name")?.textContent, score: el.querySelector(".rk-lv")?.textContent, sub: el.querySelector(".rk-sub")?.textContent, total: el.querySelector(".rk-total")?.textContent };
     P.ranking.close();
     return r;
   });
+  const towerRank = await page.evaluate(async () => {
+    const P = window.__PK;
+    P.openLandmark("tower");
+    const x = document.getElementById("modal-extra");
+    const r = { shown: !x.hidden, label: x.textContent };
+    x.click();
+    for (let i = 0; i < 40 && !document.querySelector("#ranking .rk-tabs .on"); i++) await new Promise((res) => setTimeout(res, 50));
+    r.open = P.ranking.isOpen(); r.tab = document.querySelector("#ranking .rk-tabs .on")?.dataset.board;
+    P.ranking.close();
+    P.openLandmark("hall");
+    r.hallHidden = document.getElementById("modal-extra").hidden;
+    document.getElementById("modal-close").click();
+    return r;
+  });
+  check("등대 안내 박스에 🍎 알바 랭킹 버튼 — 누르면 사과나무 랭킹이 📡 비콘 알바 판으로 열린다 (다른 건물엔 없음)",
+    towerRank.shown && /알바 랭킹/.test(towerRank.label) && towerRank.open && towerRank.tab === "job" && towerRank.hallHidden, JSON.stringify(towerRank));
   check("숨은 사과나무(서쪽 숲)를 누르면 기사 랭킹이 열리고(이름은 글자 그대로, Lv 계산), 고른 기사의 옷·무기를 입은 모습이 보이며, Esc로 닫힌다 · 테스트 모드는 클라우드 꺼짐",
     rk.open && rk.rows === 3 && rk.first === "윤배" && rk.escaped && /Lv \d+/.test(rk.lv) && /3명/.test(rk.total) && rk.closed && !rk.cloud && rk.tree.x === -21
       && rk.stage && rk.who === "윤배" && rk.whoItems.join() === "황금 CR2032,Coded S=8 장궁" && rk.gearImgs === 6 && !rk.badImg
-      && rk.who3 === "민지" && rk.items3.join() === "메시 숲지기,확장 광고 부채" && rk.reopen,
+      && rk.who3 === "민지" && rk.items3.join() === "메시 숲지기,확장 광고 부채" && rk.reopen
+      && rk.job.tab === "job" && rk.job.first === "민지" && rk.job.score === "560점" && /S등급/.test(rk.job.sub) && /알바한 기사 2명/.test(rk.job.total),
     JSON.stringify(rk));
-  check("광고판을 누르면 home 히어로 한 장만(스크롤 없음) 뜨고, 제목 옆에 홈페이지 링크, Esc로 닫힌다",
+  check("광고판을 누르면 home 히어로 한 장만(스크롤 없음) 뜨고, 아바타 옆에 홈페이지 링크, Esc로 닫힌다",
     dc.open && dc.items === 0 && dc.noScroll && dc.beside && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));
   check("개발자 광고판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",
     bb.info.link === "https://home.yalex-k.com/" && /home/.test(bb.info.linkLabel) && posts.length === 2 && blocked && frontFree,

@@ -11,6 +11,7 @@ const modalDesc = document.getElementById("modal-desc");
 const modalLore = document.getElementById("modal-lore");
 const modalLink = document.getElementById("modal-link");
 const modalAction = document.getElementById("modal-action");
+const modalExtra = document.getElementById("modal-extra");   // 두 번째 동작 (예: 등대 🍎 알바 랭킹, Stage 13.8)
 const statsPanel = document.getElementById("stats");
 // 모바일: 스탯은 한 줄 요약(.st-sum)으로 접혀 있고, 누르면 펼친다 (데스크톱은 요약을 숨기고 늘 펼침)
 statsPanel.addEventListener("click", () => {
@@ -41,6 +42,7 @@ window.addEventListener("keydown", (e) => {
 let onAction = () => {};
 let onLink = () => {};
 modalAction.addEventListener("click", () => onAction(modalAction.dataset.action));
+modalExtra.addEventListener("click", () => onAction(modalExtra.dataset.action));
 modalLink.addEventListener("click", () => onLink(modalLink.href));
 
 /** 모달 액션 버튼(예: 강의실 입장)·교과서 링크 클릭 콜백 등록 */
@@ -83,6 +85,11 @@ export function showModal(info) {
   if (info.action) {
     modalAction.textContent = info.action.label;
     modalAction.dataset.action = info.action.id;
+  }
+  modalExtra.hidden = !info.extra;
+  if (info.extra) {
+    modalExtra.textContent = info.extra.label;
+    modalExtra.dataset.action = info.extra.id;
   }
   modal.style.display = "block";
 }
