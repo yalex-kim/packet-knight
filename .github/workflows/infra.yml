@@ -1,0 +1,27 @@
+# D1 데이터베이스(packetknight) 준비 — 없으면 만들고, migrations/ 를 원격에 적용한다. 수동 실행.
+name: Infra
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  d1:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: cloudflare
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: c0def7a36886c178cce96f73375f8f97
+      W: npx --yes wrangler@4.156.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure database
+        run: |
+          $W d1 list --json > list.json
+          if ! grep -q '"name": *"packetknight"' list.json; then $W d1 create packetknight; $W d1 list --json > list.json; fi
+          ID=$(node -e 'const l=require("./list.json");console.log(l.find(x=>x.name==="packetknight").uuid)')
+          echo "D1_ID=$ID"
+          printf 'name = "packetknight-infra"\ncompatibility_date = "2026-10-01"\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "packetknight"\ndatabase_id = "%s"\nmigrations_dir = "migrations"\n' "$ID" > wrangler.infra.toml
+      - name: Apply migrations
+        run: $W d1 migrations apply packetknight --remote -c wrangler.infra.toml
