@@ -507,30 +507,69 @@ function createStreetLamp(x, z) {
   root.add(lamp);
 }
 
-TREE_POSITIONS.forEach(([tx, tz, s]) => createVoxelTree(tx, tz, s));
+TREE_POSITIONS.forEach(([tx, tz, s]) => { if (!(tx === -21 && tz === 1.5)) createVoxelTree(tx, tz, s); });   // (−21, 1.5) = 비밀의 사과나무 (아래)
 
-// ----- 🌳 비밀의 나무 (Stage 13) — 서쪽 숲의 가장 큰 나무. 금빛 열매 세 개가 단서, 누르면 기사 랭킹 -----
+// ----- 🍎 비밀의 사과나무 (Stage 13.3) — 서쪽 숲의 가장 큰 나무. 빨간 사과가 주렁주렁, 누르면 기사 랭킹 -----
 const SECRET_TREE = TREE_POSITIONS.find(([tx, tz]) => tx === -21 && tz === 1.5);
 export const secretTree = new THREE.Group();
+const appleCrown = new THREE.Group();
+const apples = [];
 {
-  const [tx, tz, sc] = SECRET_TREE;
-  const fruitMat = new THREE.MeshBasicMaterial({ color: 0xffd76b });
-  for (const [fx, fy, fz] of [[0.92, 2.0, 0.3], [-0.5, 2.3, 0.92], [0.2, 3.1, -0.62]]) {
-    const f = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), fruitMat);
-    f.position.set(fx * sc, fy * sc, fz * sc);
-    secretTree.add(f);
-  }
+  const [tx, tz] = SECRET_TREE;
+  const sc = 1.3;
+  const bark = new THREE.MeshLambertMaterial({ color: 0x6b4a2e });
+  const barkDark = new THREE.MeshLambertMaterial({ color: 0x4e3520 });
+  const leafA = new THREE.MeshLambertMaterial({ color: 0x3f9a3c });
+  const leafB = new THREE.MeshLambertMaterial({ color: 0x53b34a });
+  const leafC = new THREE.MeshLambertMaterial({ color: 0x2f7d34 });
+  const box = (w, h, d, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.rotation.y = ry; return m; };
+  // 줄기 + 뿌리 + 두 갈래 가지
+  secretTree.add(box(0.62 * sc, 2.0 * sc, 0.62 * sc, bark, 0, 1.0 * sc, 0));
+  for (const [dx, dz, r] of [[0.42, 0, 0], [-0.42, 0, 0], [0, 0.42, Math.PI / 2], [0, -0.42, Math.PI / 2]]) secretTree.add(box(0.5 * sc, 0.22 * sc, 0.26 * sc, barkDark, dx * sc, 0.11 * sc, dz * sc, r));
+  const br1 = box(0.26 * sc, 1.1 * sc, 0.26 * sc, bark, 0.42 * sc, 2.1 * sc, 0.1 * sc); br1.rotation.z = -0.6; secretTree.add(br1);
+  const br2 = box(0.26 * sc, 1.0 * sc, 0.26 * sc, bark, -0.4 * sc, 2.2 * sc, -0.12 * sc); br2.rotation.z = 0.65; secretTree.add(br2);
+  secretTree.add(box(0.18 * sc, 0.12 * sc, 0.05, barkDark, 0, 1.1 * sc, 0.32 * sc));   // 나무껍질에 새긴 자국 (랭킹의 단서)
+  // 둥근 복셀 잎 무더기 (층층이)
+  const crown = [
+    [0, 2.75, 0, 2.6, 1.0, 2.6, leafA], [0, 3.55, 0, 2.1, 0.9, 2.1, leafB], [0, 4.2, 0, 1.3, 0.6, 1.3, leafA],
+    [1.05, 2.9, 0.35, 1.1, 0.9, 1.3, leafC], [-1.05, 3.0, -0.25, 1.1, 0.9, 1.3, leafC], [0.25, 3.0, 1.05, 1.3, 0.8, 1.0, leafB], [-0.3, 2.95, -1.05, 1.4, 0.8, 1.0, leafB]
+  ];
+  for (const [x, y, z, w, h, d, m] of crown) appleCrown.add(box(w * sc, h * sc, d * sc, m, x * sc, y * sc, z * sc));
+  secretTree.add(appleCrown);
+  // 빨간 사과 (꼭지·잎사귀) — 잎 무더기 겉면에
+  const appleMat = new THREE.MeshLambertMaterial({ color: 0xd8282c, emissive: 0x3a0606 });
+  const appleHi = new THREE.MeshBasicMaterial({ color: 0xff8a7a });
+  const stemMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1e });
+  const apple = (x, y, z, parent = appleCrown) => {
+    const g = new THREE.Group();
+    g.add(box(0.24, 0.22, 0.24, appleMat, 0, 0, 0));
+    g.add(box(0.07, 0.07, 0.02, appleHi, -0.05, 0.04, 0.125));    // 반짝임
+    g.add(box(0.04, 0.09, 0.04, stemMat, 0, 0.15, 0));
+    g.add(box(0.1, 0.03, 0.06, leafB, 0.06, 0.18, 0));
+    g.position.set(x, y, z);
+    parent.add(g);
+    apples.push(g);
+    return g;
+  };
+  for (const [x, y, z] of [
+    [1.6, 2.75, 0.5], [1.45, 3.1, -0.2], [-1.6, 2.9, 0.3], [-1.55, 3.2, -0.6], [0.6, 2.65, 1.6], [-0.5, 3.0, 1.5],
+    [0.2, 2.6, -1.55], [-0.9, 2.7, -1.3], [1.2, 3.55, 0.9], [-1.0, 3.7, 0.8], [0.9, 3.8, -1.0], [0.1, 4.45, 0.7], [-0.6, 4.2, -0.6], [1.37, 2.2, -0.6]
+  ]) apple(x * sc, y * sc, z * sc);
+  // 떨어진 사과 몇 개
+  for (const [x, z, r] of [[1.4, 1.1, 0.4], [-1.2, 1.5, 1.2], [0.6, -1.6, 2.0]]) { const g = apple(x, 0.11, z, secretTree); g.rotation.set(0.5, r, 0.3); apples.pop(); }
   // 누르기 쉬운 보이지 않는 상자 (나무 전체)
-  const hit = new THREE.Mesh(new THREE.BoxGeometry(2.0 * sc, 3.6 * sc, 2.0 * sc), new THREE.MeshBasicMaterial({ visible: false }));
-  hit.position.y = 1.8 * sc;
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(3.0 * sc, 4.8 * sc, 3.0 * sc), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.y = 2.4 * sc;
   secretTree.add(hit);
   secretTree.position.set(tx, groundHeightAt(tx, tz), tz);
   secretTree.userData.secretTree = true;
   root.add(secretTree);
 }
-/** 금빛 열매가 살짝 반짝인다 */
+/** 잎이 바람에 살랑, 사과가 살짝 흔들린다 */
 export function animateSecretTree(t) {
-  secretTree.children.forEach((c, i) => { if (c.material.visible !== false) c.scale.setScalar(1 + 0.18 * Math.sin(t * 2.2 + i * 2.1)); });
+  appleCrown.rotation.z = Math.sin(t * 0.9) * 0.015;
+  appleCrown.rotation.x = Math.sin(t * 0.7 + 1) * 0.012;
+  apples.forEach((a, i) => { a.rotation.z = Math.sin(t * 1.6 + i * 1.3) * 0.12; });
 }
 LAMP_POSITIONS.forEach(([lx, lz]) => createStreetLamp(lx, lz));
 

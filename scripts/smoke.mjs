@@ -499,7 +499,7 @@ await page.route((url) => url.origin === ORIGIN, (r) => {
   const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
   // 클라우드 API (Stage 13) — 랭킹만 가짜로 (Pages Functions·D1 은 배포본에서만)
   if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
-    top: [{ name: "윤배", xp: 900, maxFloor: 6, badges: 9 }, { name: "<b>해커</b>", xp: 300, maxFloor: 2, badges: 3 }, { name: "민지", xp: 40, maxFloor: 0, badges: 1 }], me: null, total: 3 }) });
+    top: [{ name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded" }, { name: "<b>해커</b>", xp: 300, maxFloor: 2, badges: 3, outfit: "x\"><img>", weapon: null }, { name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv" }], me: null, total: 3 }) });
   const file = path.resolve(ROOT, rel);
   if (!file.startsWith(ROOT + path.sep) || !existsSync(file)) return r.fulfill({ status: 404, body: "not found" });
   return r.fulfill({ body: readFileSync(file), contentType: MIME[path.extname(file)] ?? "application/octet-stream" });
@@ -1775,12 +1775,24 @@ await page.waitForFunction(() => window.__PK);
     const el = document.getElementById("ranking");
     const r = { open: P.ranking.isOpen(), rows: el.querySelectorAll(".rk-list li").length, first: el.querySelector(".rk-name")?.textContent,
       escaped: !el.querySelector(".rk-name b"), lv: el.querySelector(".rk-lv")?.textContent, total: el.querySelector(".rk-total")?.textContent,
-      cloud: P.ranking.cloud().enabled, tree: P.ranking.tree() };
+      cloud: P.ranking.cloud().enabled, tree: P.ranking.tree(),
+      stage: !el.querySelector(".rk-stage").hidden, who: el.querySelector(".rk-who b")?.textContent, whoItems: [...el.querySelectorAll(".rk-who-item")].map((x) => x.textContent.trim()),
+      gearImgs: el.querySelectorAll(".rk-gear img").length, badImg: [...el.querySelectorAll(".rk-gear img")].some((i) => /x%22/.test(i.src) === false && /"/.test(i.getAttribute("src"))) };
+    el.querySelectorAll(".rk-list li")[2].click();
+    r.who3 = el.querySelector(".rk-who b")?.textContent; r.items3 = [...el.querySelectorAll(".rk-who-item")].map((x) => x.textContent.trim());
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    return { ...r, closed: !P.ranking.isOpen() };
+    r.closed = !P.ranking.isOpen();
+    P.ranking.open();   // 다시 열어도 미리보기가 된다 (새 캔버스)
+    for (let i = 0; i < 40 && !document.querySelector("#ranking .rk-who b"); i++) await new Promise((res) => setTimeout(res, 50));
+    await new Promise((res) => setTimeout(res, 300));
+    r.reopen = !el.querySelector(".rk-stage").hidden;
+    P.ranking.close();
+    return r;
   });
-  check("숨은 나무(서쪽 숲, 금빛 열매)를 누르면 기사 랭킹이 열리고(이름은 글자 그대로, Lv 계산), Esc로 닫힌다 · 테스트 모드는 클라우드 꺼짐",
-    rk.open && rk.rows === 3 && rk.first === "윤배" && rk.escaped && /Lv \d+/.test(rk.lv) && /3명/.test(rk.total) && rk.closed && !rk.cloud && rk.tree.x === -21,
+  check("숨은 사과나무(서쪽 숲)를 누르면 기사 랭킹이 열리고(이름은 글자 그대로, Lv 계산), 고른 기사의 옷·무기를 입은 모습이 보이며, Esc로 닫힌다 · 테스트 모드는 클라우드 꺼짐",
+    rk.open && rk.rows === 3 && rk.first === "윤배" && rk.escaped && /Lv \d+/.test(rk.lv) && /3명/.test(rk.total) && rk.closed && !rk.cloud && rk.tree.x === -21
+      && rk.stage && rk.who === "윤배" && rk.whoItems.join() === "황금 CR2032,Coded S=8 장궁" && rk.gearImgs === 6 && !rk.badImg
+      && rk.who3 === "민지" && rk.items3.join() === "메시 숲지기,확장 광고 부채" && rk.reopen,
     JSON.stringify(rk));
   check("광고판을 누르면 home 히어로 한 장만(스크롤 없음) 뜨고, 제목 옆에 홈페이지 링크, Esc로 닫힌다",
     dc.open && dc.items === 0 && dc.noScroll && dc.beside && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));

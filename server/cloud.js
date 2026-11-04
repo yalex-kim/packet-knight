@@ -16,9 +16,9 @@ export async function currentUser(request, env) {
   const m = (request.headers.get("cookie") ?? "").match(/(?:^|;\s*)pk_sess=([0-9a-f]{64})/);
   if (!m) return null;
   const row = await env.DB.prepare(
-    "SELECT u.id, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?"
+    "SELECT u.id, u.name, u.picture FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?"
   ).bind(m[1], Date.now()).first();
-  return row ? { id: row.id, name: row.name, token: m[1] } : null;
+  return row ? { id: row.id, name: row.name, picture: row.picture ?? null, token: m[1] } : null;
 }
 
 export async function newSession(env, userId) {
@@ -62,7 +62,15 @@ export async function verifyGoogle(credential, clientId) {
   const now = Math.floor(Date.now() / 1000);
   if (!["accounts.google.com", "https://accounts.google.com"].includes(payload.iss)) return null;
   if (payload.aud !== clientId || !(payload.exp > now) || typeof payload.sub !== "string") return null;
-  return { sub: payload.sub, name: displayName(payload) };
+  return { sub: payload.sub, name: displayName(payload), picture: profilePicture(payload.picture) };
+}
+
+/** 구글 프로필 사진 주소 — googleusercontent.com 의 https 주소만 (그 밖은 null) */
+export function profilePicture(url) {
+  try {
+    const u = new URL(String(url));
+    return u.protocol === "https:" && /(^|\.)googleusercontent\.com$/.test(u.hostname) ? u.href : null;
+  } catch { return null; }
 }
 
 /** 랭킹에 보일 이름 — 구글 이름(given_name)만, 최대 12자 */

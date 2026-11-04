@@ -724,6 +724,9 @@
   #btn-me .me-mute { position: absolute; left: -6px; bottom: -6px; font-size: 11px; font-style: normal; background: #06101e; border-radius: 50%; padding: 1px; line-height: 1; }
   .acc-ini { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; font-weight: 900; font-size: 16px;
     color: #04121f; background: linear-gradient(135deg, #7de3ff, #ffd76b); }
+  .acc-ini { overflow: hidden; }
+  .acc-pic { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .acc-ini.tiny { width: 22px; height: 22px; font-size: 12px; vertical-align: middle; }
   .acc-ini.big { width: 42px; height: 42px; flex: none; font-size: 19px; }
   .acc-ini.off { background: rgba(125, 216, 255, .15); font-size: 20px; }
   .acc-dot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: #3ccf6e; border: 2px solid #06101e; box-shadow: 0 0 6px #3ccf6e; }
@@ -764,10 +767,22 @@
   .rk-head span { font-size: 12.5px; color: #a9c79a; }
   #ranking .rk-close { margin-left: auto; min-width: 0; min-height: 0; border: 0; background: none; color: #bcd8ac; font-size: 24px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; }
   #ranking .rk-close:hover, #ranking .rk-close:focus-visible { background: rgba(255,255,255,.1); color: #fff; outline: none; }
-  .rk-body { flex: 1 1 auto; overflow-y: auto; padding: 10px 12px; min-height: 120px; max-height: 56dvh; }
+  .rk-stage { display: flex; align-items: center; gap: 12px; padding: 8px 14px 4px; background: radial-gradient(80% 90% at 25% 60%, rgba(255, 215, 107, .16), transparent 70%); border-bottom: 1px solid rgba(143, 200, 120, .2); }
+  .rk-knight { width: 120px; height: 142px; flex: none; }
+  .rk-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .rk-who b { font-size: 18px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rk-who-rank { font-size: 13px; font-weight: 900; color: #ffe39a; }
+  .rk-who-lv { font-size: 12.5px; color: #a9c79a; }
+  .rk-who-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #e8f3dc; }
+  .rk-who-item img { width: 26px; height: 26px; border-radius: 6px; background: rgba(0,0,0,.25); }
+  .rk-gear { grid-row: span 2; display: flex; gap: 3px; }
+  .rk-gear img { width: 26px; height: 26px; border-radius: 6px; background: rgba(0,0,0,.25); }
+  .rk-list li { cursor: pointer; }
+  .rk-list li.sel { outline: 2px solid #9be07f; outline-offset: -1px; }
+  .rk-body { flex: 1 1 auto; overflow-y: auto; padding: 10px 12px; min-height: 120px; max-height: 40dvh; }
   .rk-msg { text-align: center; color: #a9c79a; margin: 28px 8px; }
   .rk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .rk-list li { display: grid; grid-template-columns: 36px 1fr auto; grid-template-rows: auto auto; align-items: center; column-gap: 8px;
+  .rk-list li { display: grid; grid-template-columns: 36px 1fr auto auto; grid-template-rows: auto auto; align-items: center; column-gap: 8px;
     background: rgba(0,0,0,.2); border: 1px solid rgba(143, 200, 120, .16); border-radius: 12px; padding: 7px 12px; }
   .rk-list li.me { border-color: #ffd76b; box-shadow: 0 0 12px rgba(255, 215, 107, .35); background: rgba(255, 215, 107, .1); }
   .rk-no { grid-row: span 2; font-size: 20px; text-align: center; font-weight: 900; color: #cfe6c0; }

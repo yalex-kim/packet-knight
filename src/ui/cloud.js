@@ -8,6 +8,8 @@
 
 import { levelFromXp } from "../core/combat.js";
 import { isValidSave } from "../core/progress.js";
+import { weaponById, outfitById } from "../core/shop.js";
+import { startPreview, stopPreview } from "../render/knightPreview.js";
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
 const UPLOAD_DELAY = 15000;
@@ -205,10 +207,14 @@ function buildRanking() {
   overlay.hidden = true;
   overlay.setAttribute("role", "dialog");
   overlay.setAttribute("aria-modal", "true");
-  overlay.setAttribute("aria-label", "비밀의 나무 — 기사 랭킹");
+  overlay.setAttribute("aria-label", "비밀의 사과나무 — 기사 랭킹");
   overlay.innerHTML = `<div class="panel rk">
-    <div class="rk-head"><span class="rk-tree">🌳</span><div><b>비밀의 나무</b><span>나무껍질에 새겨진 기사들의 이름</span></div>
+    <div class="rk-head"><span class="rk-tree">🍎</span><div><b>비밀의 사과나무</b><span>나무껍질에 새겨진 기사들의 이름</span></div>
       <button type="button" class="rk-close" aria-label="닫기">×</button></div>
+    <div class="rk-stage" hidden>
+      <canvas class="rk-knight" width="160" height="190" aria-hidden="true"></canvas>
+      <div class="rk-who"></div>
+    </div>
     <div class="rk-body"></div>
     <div class="rk-foot"></div>
   </div>`;
@@ -227,6 +233,10 @@ export function openRanking(close = () => {}) {
 export function closeRanking() {
   if (!overlay || overlay.hidden) return;
   overlay.hidden = true;
+  stopPreview();
+  const cv = overlay.querySelector(".rk-knight");
+  cv.replaceWith(cv.cloneNode());   // 컨텍스트를 놓아 준 캔버스는 다시 못 쓴다 — 다음에 열 때 새 캔버스로
+  hooks?.restoreLook?.();   // 미리보기로 바꿔 입혔던 내 기사 모습을 되돌린다
   onRankClose();
 }
 export const isRankingOpen = () => Boolean(overlay && !overlay.hidden);
@@ -241,17 +251,43 @@ async function refreshRanking() {
     body.innerHTML = `<p class="rk-msg">지금은 나무가 조용해요. (랭킹 서버에 닿지 않음)</p>`;
     return;
   }
-  const row = (r, i, mine) => {
-    const lv = levelFromXp(r.xp).level;
-    const medal = ["🥇", "🥈", "🥉"][i] ?? `${i + 1}`;
-    return `<li class="${mine ? "me" : ""}"><span class="rk-no">${medal}</span><b class="rk-name">${esc(r.name)}</b>
-      <span class="rk-lv">Lv ${lv}</span><span class="rk-sub">⚔️ ${r.maxFloor}층 · 🎖️ ${r.badges}</span></li>`;
-  };
+  const itemImg = (id) => `./src/assets/items/item-${encodeURIComponent(id)}-v1.webp`;
+  const gear = (r) => ({ outfit: outfitById(r.outfit ?? "classic"), weapon: weaponById(r.weapon ?? "adv") });
+  const entries = data.top.map((r, i) => ({ ...r, idx: i }));
   const myIdx = data.me ? data.me.rank - 1 : -1;
-  body.innerHTML = data.top.length
-    ? `<ol class="rk-list">${data.top.map((r, i) => row(r, i, i === myIdx && r.name === data.me?.name)).join("")}</ol>`
+  if (data.me && myIdx >= data.top.length) entries.push({ ...data.me, idx: myIdx, extra: true });
+  const isMe = (e) => data.me && e.idx === myIdx;
+  const row = (e) => {
+    const medal = ["🥇", "🥈", "🥉"][e.idx] ?? `${e.idx + 1}`;
+    const g = gear(e);
+    return `<li class="${isMe(e) ? "me" : ""}" data-i="${entries.indexOf(e)}" tabindex="0"><span class="rk-no">${medal}</span><b class="rk-name">${esc(e.name)}</b>
+      <span class="rk-gear"><img src="${itemImg(g.outfit.id)}" alt="${esc(g.outfit.name)}" title="${esc(g.outfit.name)}" /><img src="${itemImg(g.weapon.id)}" alt="${esc(g.weapon.name)}" title="${esc(g.weapon.name)}" /></span>
+      <span class="rk-lv">Lv ${levelFromXp(e.xp).level}</span><span class="rk-sub">⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span></li>`;
+  };
+  const top = entries.filter((e) => !e.extra), extra = entries.filter((e) => e.extra);
+  body.innerHTML = top.length
+    ? `<ol class="rk-list">${top.map(row).join("")}</ol>${extra.length ? `<ol class="rk-list rk-mine">${extra.map(row).join("")}</ol>` : ""}`
     : `<p class="rk-msg">아직 새겨진 이름이 없어요. 첫 번째 기사가 되어 보세요!</p>`;
-  if (data.me && myIdx >= data.top.length) body.insertAdjacentHTML("beforeend", `<ol class="rk-list rk-mine" start="${data.me.rank}">${row(data.me, myIdx, true)}</ol>`);
+  // 고른 기사의 모습 (옷·무기) — 내 기사 모델에 잠깐 입혀 미리보기로 돌린다
+  const stage = overlay.querySelector(".rk-stage");
+  const select = (e) => {
+    if (!e) { stage.hidden = true; stopPreview(); return; }
+    const g = gear(e);
+    stage.hidden = false;
+    for (const li of body.querySelectorAll("li")) li.classList.toggle("sel", li.dataset.i === String(entries.indexOf(e)));
+    overlay.querySelector(".rk-who").innerHTML = `<span class="rk-who-rank">${["🥇", "🥈", "🥉"][e.idx] ?? `${e.idx + 1}위`}</span>
+      <b>${esc(e.name)}</b><span class="rk-who-lv">Lv ${levelFromXp(e.xp).level} · ⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span>
+      <span class="rk-who-item"><img src="${itemImg(g.outfit.id)}" alt="" />${esc(g.outfit.name)}</span>
+      <span class="rk-who-item"><img src="${itemImg(g.weapon.id)}" alt="" />${esc(g.weapon.name)}</span>`;
+    hooks?.previewLook?.(g);
+    startPreview(overlay.querySelector(".rk-knight"));
+  };
+  body.querySelectorAll("li[data-i]").forEach((li) => {
+    const pick = () => select(entries[Number(li.dataset.i)]);
+    li.addEventListener("click", pick);
+    li.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+  });
+  select(entries.find(isMe) ?? entries[0]);
   const total = `<span class="rk-total">기사 ${data.total}명</span>`;
   if (user) {
     foot.innerHTML = `${total}<span>☁️ ${esc(user.name)} 님 — 클라우드 저장 중</span><button type="button" class="rk-logout">로그아웃</button>`;
@@ -282,7 +318,7 @@ function renderAccount() {
   // 시작 화면
   const sp = document.getElementById("splash-account");
   if (sp && enabled) {
-    if (user) sp.innerHTML = `<span class="pk-acc-on">☁️ <b>${esc(user.name)}</b> 님으로 로그인됨 · 클라우드 저장 중</span>`;
+    if (user) sp.innerHTML = `<span class="pk-acc-on">${avatarHtml("tiny")} <b>${esc(user.name)}</b> 님으로 로그인됨 · 클라우드 저장 중</span>`;
     else if (!sp.querySelector(".pk-gbtn")) {
       sp.innerHTML = `<div class="pk-gbtn"></div><span class="pk-acc-hint">로그인하면 이 기기 진행도를 클라우드로 옮겨, 다른 기기에서도 이어 할 수 있어요</span>`;
       googleButton(sp.querySelector(".pk-gbtn"));
@@ -299,7 +335,7 @@ export function fillAccount(el) {
     return;
   }
   if (user) {
-    el.innerHTML = `<div class="acc-head"><span class="acc-ini big">${esc([...user.name][0])}</span><div><b>${esc(user.name)}</b><span>구글 계정으로 로그인됨 · ☁️ ${dirty ? "저장 대기 중…" : ago(lastSavedAt)}</span></div></div>
+    el.innerHTML = `<div class="acc-head">${avatarHtml("big")}<div><b>${esc(user.name)}</b><span>구글 계정으로 로그인됨 · ☁️ ${dirty ? "저장 대기 중…" : ago(lastSavedAt)}</span></div></div>
       <div class="acc-row"><button type="button" class="acc-save">☁️ 지금 저장</button><button type="button" class="acc-out">로그아웃</button></div>`;
     el.querySelector(".acc-save").addEventListener("click", async () => { dirty = true; await flush(); hooks.toast("☁️ 클라우드에 저장했어요", 2); });
     el.querySelector(".acc-out").addEventListener("click", logout);
@@ -310,6 +346,14 @@ export function fillAccount(el) {
     googleButton(el.querySelector(".acc-g"), { size: "medium" });
   }
 }
-export const accountInfo = () => ({ enabled, name: user?.name ?? null });
+export const accountInfo = () => ({ enabled, name: user?.name ?? null, picture: user?.picture ?? null });
+/** 프로필 사진(있으면) 또는 이름 첫 글자 — 사진이 안 열리면 첫 글자로 */
+export function avatarHtml(cls = "") {
+  if (!user) return "";
+  const ini = esc([...user.name][0]);
+  return user.picture
+    ? `<span class="acc-ini ${cls}" data-ini="${ini}"><img class="acc-pic" src="${esc(user.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent = this.parentNode.dataset.ini" /></span>`
+    : `<span class="acc-ini ${cls}">${ini}</span>`;
+}
 
 export const cloudState = () => ({ enabled, user, dirty, lastSavedAt });

@@ -1123,7 +1123,9 @@ initCloud({
   getProgress: () => progress,
   adoptSave: (save) => { try { storage?.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* 무시 */ } location.reload(); },
   toast: (msg, sec) => fx.showToast(msg, sec),
-  sfx
+  sfx,
+  previewLook: (g) => { knightView.setWeapon(g.weapon); knightView.setOutfit(g.outfit); },   // 랭킹에서 고른 기사 모습 (Stage 13.3)
+  restoreLook: () => applyLooks()
 });
 
 if (!TEST_MODE) {

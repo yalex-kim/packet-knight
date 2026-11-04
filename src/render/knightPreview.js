@@ -6,6 +6,15 @@ let renderer = null, scene, camera, model, raf = 0;
 
 /** @param {HTMLCanvasElement} canvas */
 export function startPreview(canvas) {
+  // 같은 캔버스(랭킹에서 다른 기사를 고를 때)는 렌더러를 그대로 두고 모델만 다시 복제한다 —
+  // forceContextLoss 한 캔버스에서 새 컨텍스트를 얻으면 실패한다 (Stage 13.3)
+  if (renderer && renderer.domElement === canvas) {
+    scene.remove(model);
+    model = knight.children[0].clone(true);
+    model.position.set(0, 0, 0);
+    scene.add(model);
+    return;
+  }
   stopPreview();
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

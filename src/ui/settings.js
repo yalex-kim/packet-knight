@@ -2,7 +2,7 @@
 // 버튼 모양이 곧 로그인 상태: 로그인 = 이름 첫 글자 + 초록 점, 게스트 = 👤. 음소거면 작은 🔇 표시.
 
 import * as audio from "./audio.js";
-import { fillAccount, onCloudChange, accountInfo } from "./cloud.js";
+import { fillAccount, onCloudChange, accountInfo, avatarHtml } from "./cloud.js";
 
 let btn, pop;
 
@@ -10,7 +10,7 @@ function renderButton() {
   const a = accountInfo();
   const m = audio.isMuted();
   btn.classList.toggle("on", Boolean(a.name));
-  btn.innerHTML = (a.name ? `<span class="acc-ini">${esc([...a.name][0])}</span><i class="acc-dot"></i>` : `<span class="me-guest">👤</span>`)
+  btn.innerHTML = (a.name ? `${avatarHtml()}<i class="acc-dot"></i>` : `<span class="me-guest">👤</span>`)
     + (m ? `<i class="me-mute" aria-hidden="true">🔇</i>` : "");
   btn.setAttribute("aria-label", `${a.name ? `${a.name} 님 로그인됨` : "게스트 (로그인 안 됨)"} — 계정·설정${m ? " · 소리 꺼짐" : ""}`);
   btn.title = a.name ? `☁️ ${a.name} · 계정·설정` : "계정·설정 (로그인·소리)";
