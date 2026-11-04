@@ -420,10 +420,11 @@ function performFire(target = null) {
   const shot = fireAdvPacket(activeBattle(), motor, target, {
     cooldownMul: ciIntervalMul(effectiveStats(progress).ci) * wpn.cooldownMul,   // CI 스탯 (Stage 11.15) × 무기
     spread: wpn.spread,
+    style: wpn.blade.kind,
     rangeMul: (perks.dle ? PERKS.dle.rangeMul : 1) * wpn.rangeMul,
     coef: (perks.advBoost ? PERKS.advBoost.coef : 1) * wpn.coef
   });
-  if (shot) { clearMoveTarget(); sfx("fire"); }
+  if (shot) { clearMoveTarget(); sfx(wpn.blade.kind === "sword" ? "fire" : `fire_${wpn.blade.kind}`); knightView.playAttack(wpn.blade.kind); }   // 무기마다 다른 공격 동작 (Stage 12.6)
 }
 
 function handleBattleEvents(events) {

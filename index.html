@@ -791,6 +791,17 @@
   .dg-mon-tip { margin-top: 3px; font-size: 12px; color: #a4c7e8; line-height: 1.5; }
   .dg-rules { margin: 10px 0 4px; padding-left: 18px; font-size: 12.5px; color: #a4c7e8; line-height: 1.6; }
   @media (max-width: 640px) { .dg-brief { grid-template-columns: 1fr; } }
+  /* 알바 보수표 (Stage 12.6) */
+  .job-rw-title { margin: 8px 0 6px; color: #ffd76b; }
+  .job-rewards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+  .job-rw { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border-radius: 12px; background: rgba(14, 34, 60, .6); border: 1px solid #23476e; }
+  .job-rw.on { border-color: #ffd76b; box-shadow: 0 0 14px rgba(255, 215, 107, .35); background: rgba(242, 193, 78, .14); }
+  .job-rw-grade { font-size: 20px; font-weight: 900; }
+  .job-rw.grade-S .job-rw-grade { color: #ffd76b; } .job-rw.grade-A .job-rw-grade { color: #7dffb5; } .job-rw.grade-B .job-rw-grade { color: #7dd8ff; } .job-rw.grade-C .job-rw-grade { color: #a4c7e8; }
+  .job-rw-coin { font-size: 15px; font-weight: 800; color: #ffd76b; }
+  .job-rw small { font-size: 11px; color: #a4c7e8; }
+  .job-paid { font-size: 26px; font-weight: 900; color: #ffd76b; text-align: center; margin: 4px 0; text-shadow: 0 0 14px rgba(255, 215, 107, .5); }
+  #hunt .job-bar .job-stat:nth-child(3) { color: #ffd76b; font-weight: 800; }
   /* 상점 (Stage 12.2) */
   .shop-panel { max-width: 720px; }
   .shop-note { margin: 4px 0 8px; padding: 6px 10px; border-radius: 8px; font-size: 13px; }

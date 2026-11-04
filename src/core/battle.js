@@ -87,7 +87,7 @@ export function autoAimTarget(battle, shooter, rangeMul = 1) {
  * 발사 방향으로 shooter.rotY를 돌린다.
  * @returns {Projectile|null} 쿨다운 중이면 null
  */
-export function fireAdvPacket(battle, shooter, target = null, { rangeMul = 1, coef = COMBAT.SKILL_COEF.advPacket, cooldownMul = 1, spread = [0] } = {}) {
+export function fireAdvPacket(battle, shooter, target = null, { rangeMul = 1, coef = COMBAT.SKILL_COEF.advPacket, cooldownMul = 1, spread = [0], style = "sword" } = {}) {
   const p = battle.player;
   if (p.fireCooldown > 0 || p.hp <= 0) return null;
   const aim = target && alive(target) ? target : autoAimTarget(battle, shooter, rangeMul);
@@ -97,7 +97,7 @@ export function fireAdvPacket(battle, shooter, target = null, { rangeMul = 1, co
   let proj = null;
   for (const off of spread) {
     const dx = Math.sin(ang + off), dz = Math.cos(ang + off);
-    const p2 = { id: nextId++, x: shooter.x + dx * 0.5, y: shooter.y + 0.55, z: shooter.z + dz * 0.5, dx, dz, traveled: 0, range: COMBAT.ADV_PACKET.range * rangeMul, coef };
+    const p2 = { id: nextId++, x: shooter.x + dx * 0.5, y: shooter.y + 0.55, z: shooter.z + dz * 0.5, dx, dz, traveled: 0, range: COMBAT.ADV_PACKET.range * rangeMul, coef, style };   // style: 무기 모양 (렌더 전용, Stage 12.6)
     battle.projectiles.push(p2);
     if (off === 0 || !proj) proj = p2;
   }

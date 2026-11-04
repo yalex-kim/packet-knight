@@ -253,11 +253,65 @@ const weaponSets = {
     return [g]; })()
 };
 
+// ---------- 공격 동작 (Stage 12.6): 무기마다 다르게 ----------
+// 검: 위에서 크게 베기 + 세로 호 궤적 / 쌍단검: 좌우 번갈아 빠른 찌르기 / 장궁: 겨누고 당겼다 놓기 / 부채: 옆으로 넓게 휘두르기 + 부채꼴 빛
+const ATTACK_DUR = { sword: 0.34, dagger: 0.17, bow: 0.42, fan: 0.38 };
+const attack = { kind: null, t: 0, dur: 1, side: 0 };
+const trailMat = new THREE.MeshBasicMaterial({ color: 0x7de3ff, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+const slashTrail = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.85, 28, 1, -Math.PI * 0.1, Math.PI * 0.9), trailMat);
+slashTrail.position.set(0.12, 0.85, 0.38); slashTrail.rotation.y = Math.PI / 2; slashTrail.visible = false; knight.add(slashTrail);
+const fanTrail = new THREE.Mesh(new THREE.RingGeometry(0.35, 1.15, 28, 1, Math.PI * 0.2, Math.PI * 0.6), trailMat);
+fanTrail.position.set(0, 0.8, 0.1); fanTrail.rotation.x = -Math.PI / 2; fanTrail.visible = false; knight.add(fanTrail);
+let curKind = "sword";
+/** 공격 동작 재생 (발사할 때 main.js가 부른다) */
+export function playAttack(kind = curKind) {
+  attack.kind = kind;
+  attack.dur = ATTACK_DUR[kind] ?? 0.3;
+  attack.t = attack.dur;
+  if (kind === "dagger") attack.side ^= 1;
+}
+/** 진행 중인 공격 자세를 팔·몸통에 덮어쓴다 */
+function applyAttack(dt) {
+  slashTrail.visible = fanTrail.visible = false;
+  if (attack.t <= 0) { torso.rotation.y = 0; return; }
+  attack.t = Math.max(0, attack.t - dt);
+  const k = 1 - attack.t / attack.dur;                  // 0 → 1
+  const ease = 1 - (1 - k) ** 3;
+  switch (attack.kind) {
+    case "sword":                                       // 들어 올렸다가(0~0.25) 위에서 아래로 크게
+      if (k < 0.25) { armR.rotation.x = -2.6 * (k / 0.25); torso.rotation.y = 0.35 * (k / 0.25); }
+      else { const s = (k - 0.25) / 0.75; armR.rotation.x = -2.6 + 3.1 * (1 - (1 - s) ** 3); torso.rotation.y = 0.35 - 0.7 * s; }
+      armR.rotation.z = 0;
+      if (k > 0.25) { slashTrail.visible = true; trailMat.opacity = 0.7 * (1 - k); slashTrail.rotation.z = -1.2 + (k - 0.25) * 2.4; }
+      break;
+    case "dagger": {                                    // 번갈아 앞으로 쭉 찌르기
+      const arm = attack.side ? armL : armR, other = attack.side ? armR : armL;
+      arm.rotation.x = -1.55 * Math.sin(Math.PI * k);
+      other.rotation.x = 0.3;
+      torso.rotation.y = (attack.side ? -0.25 : 0.25) * Math.sin(Math.PI * k);
+      break;
+    }
+    case "bow":                                         // 왼팔로 겨누고, 오른팔을 당겼다가 마지막에 놓는다
+      armL.rotation.x = -1.5; armL.rotation.z = 0.15;
+      armR.rotation.x = -1.45; armR.rotation.z = k < 0.75 ? -0.5 * (k / 0.75) : -0.5 + 0.9 * ((k - 0.75) / 0.25);
+      torso.rotation.y = -0.2;
+      break;
+    case "fan":                                         // 왼쪽에서 오른쪽으로 넓게 쓸고, 부채꼴 빛이 번진다
+      armR.rotation.x = -1.35; armR.rotation.z = 1.3 - 2.6 * ease;
+      torso.rotation.y = 0.5 - 1.0 * ease;
+      fanTrail.visible = true; trailMat.opacity = 0.6 * (1 - k); fanTrail.scale.setScalar(0.7 + 0.5 * ease);
+      break;
+  }
+  if (attack.t <= 0) { armR.rotation.z = armL.rotation.z = 0; torso.rotation.y = 0; }
+}
+
 /** 무기 외형 — kind: sword · dagger · bow · fan (core/shop.js WEAPONS[].blade) */
 export function setWeapon(w) {
   MAT.blade.color.setHex(w.blade.color);
   MAT.halo.color.setHex(w.blade.color);
   const kind = w.blade.kind;
+  curKind = kind;
+  trailMat.color.setHex(w.blade.color);
   for (const [k, parts] of Object.entries(weaponSets)) for (const g of parts) g.visible = k === kind;
   shield.visible = kind === "sword" || kind === "fan";               // 활·쌍단검은 방패 대신
 }
@@ -355,6 +409,7 @@ export function syncKnight(m, isMoving, dt) {
   armL.rotation.x = -swing * 0.6 * k;
   armR.rotation.x = !m.grounded ? -0.9 : swing * 0.45;
   head.rotation.y = isMoving ? 0 : Math.sin(idleTime * 0.7) * 0.12;
+  applyAttack(dt);   // 공격 중이면 팔·몸통 자세를 덮어쓴다
   // 망토 펄럭임: 걸으면 뒤로 날리고, 서 있으면 살랑
   const flap = isMoving ? 0.35 + Math.sin(idleTime * 9) * 0.08 : 0.04 + Math.sin(idleTime * 2) * 0.03;
   for (const c of capes) { c.top.rotation.x = -flap; c.low.rotation.x = -flap * 0.8; }

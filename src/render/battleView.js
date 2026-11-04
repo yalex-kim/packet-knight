@@ -44,6 +44,36 @@ const bursts = [];
 const tmpQ = new THREE.Quaternion();
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
+// ---------- 무기별 투사체 (Stage 12.6) ----------
+const projStyle = {
+  sword: { color: 0x7de3ff }, dagger: { color: 0xffd76b }, bow: { color: 0x7dffb5 }, fan: { color: 0xb49bff }
+};
+const haloMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+function makeProjectile(style = "sword") {
+  const c = (projStyle[style] ?? projStyle.sword).color;
+  const core = new THREE.MeshBasicMaterial({ color: c });
+  const g = new THREE.Group();
+  if (style === "sword") {          // 반달 참격: 가로로 누운 호
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 6, 20, Math.PI * 0.9), core);
+    arc.rotation.set(Math.PI / 2, 0, Math.PI * 0.05); g.add(arc);
+    const glow = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.13, 6, 20, Math.PI * 0.9), haloMat(c));
+    glow.rotation.copy(arc.rotation); g.add(glow);
+  } else if (style === "dagger") {  // 가늘고 빠른 금빛 탄
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.42), core));
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.5), haloMat(c)));
+  } else if (style === "bow") {     // 화살: 자루 + 촉 + 깃 + 꼬리 빛
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.6), new THREE.MeshBasicMaterial({ color: 0x8a6a45 })); g.add(shaft);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 4), core); head.rotation.x = Math.PI / 2; head.position.z = 0.36; g.add(head);
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.01, 0.1), core); fl.position.z = -0.26; g.add(fl);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.7), haloMat(c)); tail.position.z = -0.1; g.add(tail);
+  } else {                          // 부채: 돌아가는 보랏빛 크리스털 조각
+    const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), core); shard.scale.set(0.7, 1, 0.5); g.add(shard);
+    g.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.28), haloMat(c)));
+    g.userData.spin = true;
+  }
+  return g;
+}
+
 // ---------- 몬스터 모델 (Stage 11.11 — 상자 → 캐릭터) ----------
 /** 상자 하나 (그림자 드리움, 빛나는 재질은 제외) */
 function part(parent, w, h, d, mat, x, y, z) {
@@ -431,12 +461,13 @@ export function syncBattle(battle, camera, t, dt) {
     liveProj.add(p.id);
     let mesh = projMeshes.get(p.id);
     if (!mesh) {
-      mesh = new THREE.Mesh(projGeo, projMat);
+      mesh = makeProjectile(p.style);
       battleRoot.add(mesh);
       projMeshes.set(p.id, mesh);
     }
     mesh.position.set(p.x, p.y, p.z);
     mesh.rotation.y = Math.atan2(p.dx, p.dz);
+    if (mesh.userData.spin) mesh.children[0].rotation.z += dt * 18;   // 부채 조각은 돌며 난다
   }
   for (const [id, mesh] of projMeshes) if (!liveProj.has(id)) { battleRoot.remove(mesh); projMeshes.delete(id); }
 

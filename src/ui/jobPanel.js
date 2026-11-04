@@ -2,7 +2,7 @@
 // 매 시뮬레이션 스텝마다 updateJob(job)로 그린다. 캔버스: 최근 5초의 RSSI 샘플(점)과 지금 자리의 누적 평균(선)
 
 import { RSSI_JOB } from "../core/balance.js";
-import { averageRssi, distanceFromRssi } from "../core/rssiJob.js";
+import { averageRssi, distanceFromRssi, gradeSession } from "../core/rssiJob.js";
 import { chapterUrl } from "../core/book.js";
 
 const overlay = document.getElementById("job");
@@ -61,12 +61,23 @@ function startButton(label) {
   return b;
 }
 
+/** 보수표 (Stage 12.6 — 알바 보상이 잘 보이게): 등급별 점수 문턱 → CR2032 */
+function rewardTable(current = null) {
+  return el("div", { class: "job-rewards", role: "table", "aria-label": "알바 보수표" },
+    RSSI_JOB.GRADES.map((g) => el("div", { class: `job-rw grade-${g.grade}${current === g.grade ? " on" : ""}` },
+      el("b", { class: "job-rw-grade", textContent: g.grade }),
+      el("span", { class: "job-rw-coin", textContent: `🪙 ×${g.reward}` }),
+      el("small", { textContent: Number.isFinite(g.minScore) ? `${g.minScore}점 이상` : "참가만 해도" }))));
+}
+
 // ---------- 화면 1: 안내 ----------
 function showIntro() {
   const p = hooks.getProgress();
   const c = RSSI_JOB;
   render(
     header("📡 비콘 찾기", "알바 · 60초"),
+    el("h3", { class: "job-rw-title", textContent: "🪙 보수 — CR2032 (등급별)" }),
+    rewardTable(),
     el("p", { class: "npc", textContent: `비콘 찾기 기사 모집! 등대 둘레 노란 원(반경 ${c.AREA_R} m) 안 어딘가에 비콘을 숨겨 두었네. 측정기를 들고 걸어 다니며 RSSI로 찾아 주게. 다만 패킷마다 신호가 크게 출렁이니, 멈춰 서서 여러 개를 평균 내야 거리를 믿을 수 있지. 너무 오래 서 있으면 60초 안에 몇 개 못 찾는다네.` }),
     el("h3", { textContent: "찾는 법" }),
     el("div", { class: "formula", textContent: `추정 거리 d ≈ 10^((P₁ₘ − RSSI평균) / (10·n))     P₁ₘ = ${c.P1M} dBm, n = ${c.PATH_LOSS_N} (집 환경)` }),
@@ -76,7 +87,7 @@ function showIntro() {
       el("li", { textContent: `🗺️ 측정기 미니맵: 한 자리에서 패킷 ${c.PROBE_MIN}개 이상 모으면 그 자리를 중심으로 "추정 거리 원"이 그려진다. 두세 자리의 원이 겹치는 곳이 비콘이다(삼변측량).` }),
       el("li", { textContent: "여기다 싶으면 📍 여기다! (B 키·Enter·버튼). 내 자리와 실제 비콘 사이 거리로 판정한다." }),
       el("li", { textContent: `판정: ${c.TIERS.map((t) => `${t.label} ≤${t.maxErr} m ${tierPts(t.points)}`).join(" · ")} · ${c.MISS.label} ${tierPts(c.MISS.points)}` }),
-      el("li", { textContent: `보수(CR2032): ${c.GRADES.map((g) => `${g.grade} ${Number.isFinite(g.minScore) ? `${g.minScore}점+` : "참가"} → ${g.reward}개`).join(" · ")}` })
+      el("li", { textContent: "보수는 60초 동안 모은 점수의 등급으로 정해진다 — 맨 위 보수표 참고. 찾는 동안 측정기 위에 "지금 등급 → 🪙"이 보인다." })
     ),
     el("p", { class: "muted", textContent: `🪙 보유 CR2032 ${p.cr2032}개 · 최고 기록 ${p.job.bestScore ?? "-"}점 · 그만두면(✖ 또는 Esc) 보수가 없습니다.` }),
     chargeLine(),
@@ -182,7 +193,9 @@ export function updateJob(job) {
   const b = job.beacon;
   view.timer.textContent = `⏱ ${Math.max(0, job.timeLeft).toFixed(1)}초`;
   view.round.textContent = `비콘 #${job.history.length + (job.phase === "search" ? 1 : 0)}`;
-  view.score.textContent = `점수 ${job.score}`;
+  const g = gradeSession(job.score, Math.max(1, job.history.length));
+  view.score.textContent = `점수 ${job.score} → ${g.grade} 🪙${g.reward}`;   // 지금 받을 보수 (Stage 12.6)
+  view.score.dataset.grade = g.grade;
 
   const n = b.samples.length;
   const avg = averageRssi(job);
@@ -223,7 +236,9 @@ export function showResult(r, paid, history) {
   render(
     header("📡 비콘 찾기 결과", "알바 정산"),
     el("div", { class: "result-big", textContent: `등급 ${r.grade} · ${r.score}점${paid.newBest ? " 🏆 최고 기록!" : ""}` }),
-    el("p", { class: "reward", textContent: `🪙 CR2032 +${paid.earned}개 (보유 ${paid.balance}개)` }),
+    el("div", { class: "job-paid", textContent: `🪙 CR2032 +${paid.earned}개` }),
+    el("p", { class: "reward", textContent: `보유 ${paid.balance}개` }),
+    rewardTable(r.grade),
     el("p", { textContent: `찾은 비콘 ${r.rounds}개 · ${tiers}` }),
     el("p", { class: "npc", textContent: `신고한 자리에서 평균 패킷 ${r.avgN.toFixed(1)}개를 보고 있었네. 패킷 N개를 평균하면 흔들림이 σ/√N 으로 줄어 약 ${sigmaAvg} dB가 되지. 걸으면서 본 숫자 하나는 거리를 두 배쯤 틀리게 말한다네 — 멈춰서 재고, 여러 자리를 겹쳐 보는 게 비콘 찾기의 요령일세.` }),
     chargeLine(),

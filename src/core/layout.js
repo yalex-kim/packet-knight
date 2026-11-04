@@ -71,7 +71,7 @@ export const LANDMARKS = [
       desc: "2.402GHz 주파수로 주기적인 Advertising 패킷 신호를 사방으로 뿜어내는 마을의 랜드마크입니다. 등대지기에게서 측정기를 받아, 등대 둘레 측정 구역(바닥의 노란 원) 안에 숨겨진 비콘을 RSSI로 찾아내는 60초 알바를 할 수 있습니다.",
       lore: "블루투스 기기가 자신을 발견(Discovery)시키기 위해 브로드캐스트하는 3개 고정 채널(37, 38, 39) 중 첫 번째 채널입니다.",
       link: CHAPTER("advertising.html"),
-      action: { id: "job", label: "📡 비콘 찾기 알바 (60초)" },
+      action: { id: "job", label: "📡 비콘 찾기 알바 (60초 · 🪙 최대 8개)" },
       walkPos: { x: TOWER_POS.x - 1.7, y: S, z: TOWER_POS.z - 1.7 }
     }
   },
