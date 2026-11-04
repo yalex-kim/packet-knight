@@ -1542,8 +1542,11 @@ await page.waitForFunction(() => window.__PK);
     const A = await import("/src/ui/audio.js");
     const errs = [];
     for (const n of A.SFX_NAMES) { try { A.sfx(n); } catch (e) { errs.push(`${n}: ${e.message}`); } }
-    return { n: A.SFX_NAMES.length, errs };
+    const { MONSTERS } = await import("/src/core/balance.js");
+    const missMon = Object.keys(MONSTERS).filter((k) => !A.SFX_NAMES.includes(`windup_${k}`) || !A.SFX_NAMES.includes(`atk_${k}`));
+    return { n: A.SFX_NAMES.length, errs, missMon };
   });
+  check("몬스터마다 고유한 공격 예고음(windup_*)과 공격음(atk_*)이 있다", synth.missMon.length === 0, synth.missMon.join() || "전 종 OK");
   check("첫 사용자 입력 뒤 AudioContext가 동작하고, 효과음 전부가 에러 없이 합성된다", au.ctx === "running" && synth.errs.length === 0 && synth.n >= 35, `${au.ctx} · 효과음 ${synth.n}종`);
 
   // ⑤ DoD: 상호작용마다 음향 피드백 (행동 → 기대 효과음)

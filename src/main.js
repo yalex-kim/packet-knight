@@ -36,7 +36,7 @@ import * as hud from "./ui/hud.js";
 import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, chapterLink, lastChapterUrl } from "./ui/library.js";
 import * as questLog from "./ui/questLog.js";
 import * as audio from "./ui/audio.js";
-import { sfx } from "./ui/audio.js";
+import { sfx, SFX_NAMES } from "./ui/audio.js";
 import { questEvent, answerWhatif, questById, readyForWhatif, PERKS } from "./core/quests.js";
 import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
@@ -427,10 +427,13 @@ function performFire(target = null) {
   if (shot) { clearMoveTarget(); sfx(wpn.blade.kind === "sword" ? "fire" : `fire_${wpn.blade.kind}`); knightView.playAttack(wpn.blade.kind); }   // 무기마다 다른 공격 동작 (Stage 12.6)
 }
 
+const ATTACK_RESOLVE = new Set(["playerHit", "dodge", "outOfBand", "shieldBlock"]);
 function handleBattleEvents(events) {
   let dirty = false;
   const changed = [];
   for (const e of events) {
+    // 몬스터 공격이 터지는 순간 — 맞든 피하든 그 몬스터 고유의 공격음 (Stage 12.8)
+    if (ATTACK_RESOLVE.has(e.type) && e.monster) sfx(`atk_${e.monster.type}`);
     switch (e.type) {
       case "hit": {
         const m = e.monster;
@@ -490,7 +493,7 @@ function handleBattleEvents(events) {
         sfx("outOfBand");
         break;
       case "windup":
-        if (Math.hypot(e.monster.x - motor.x, e.monster.z - motor.z) < 8) sfx("windup"); // 가까운 공격 예고만
+        if (Math.hypot(e.monster.x - motor.x, e.monster.z - motor.z) < 8) sfx(SFX_NAMES.includes(`windup_${e.monster.type}`) ? `windup_${e.monster.type}` : "windup"); // 가까운 공격 예고만 — 몬스터마다 다른 소리
         break;
       case "ko":
         sfx("ko");

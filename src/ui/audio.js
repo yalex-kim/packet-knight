@@ -114,6 +114,17 @@ const SFX = {
   packetLost: (t) => { noise(t, { dur: 0.12, f: 3000, q: 4, gain: 0.12 }); noise(t + 0.06, { dur: 0.08, f: 1800, q: 6, gain: 0.08 }); },
   outOfBand: (t) => tone(t, { f: 2093, dur: 0.06, type: "sine", gain: 0.04 }),
   windup: (t) => tone(t, { f: 220, to: 330, dur: 0.25, type: "triangle", gain: 0.05 }),
+  // 몬스터별 공격 예고·공격음 (Stage 12.8) — windup_<type> = 기를 모으는 소리, atk_<type> = 공격이 터지는 소리
+  windup_trainingBot: (t) => arp(t, [523, 784], 0.08, { dur: 0.1, type: "square", gain: 0.04 }),                                   // 삐-삐 (훈련 봇)
+  atk_trainingBot: (t) => { noise(t, { dur: 0.06, f: 700, q: 1, gain: 0.1 }); tone(t, { f: 330, to: 220, dur: 0.08, type: "square", gain: 0.05 }); },
+  windup_wifiInterferer: (t) => { noise(t, { dur: 0.45, f: 400, to: 3000, q: 3, gain: 0.07 }); tone(t, { f: 120, to: 240, dur: 0.45, type: "sawtooth", gain: 0.03 }); }, // 정전기 차오름
+  atk_wifiInterferer: (t) => { noise(t, { dur: 0.35, f: 2400, to: 300, q: 0.7, gain: 0.16 }); tone(t, { f: 90, to: 45, dur: 0.3, type: "sawtooth", gain: 0.08 }); },     // 광역 지지직 폭발
+  windup_advFlooder: (t) => arp(t, [1760, 2093, 1760, 2349], 0.045, { dur: 0.04, type: "square", gain: 0.035 }),                    // 다다닥 처프
+  atk_advFlooder: (t) => arp(t, [2637, 2349, 2093, 1760, 1568], 0.03, { dur: 0.035, type: "square", gain: 0.045 }),               // 광고 폭주 연타
+  windup_microwave: (t) => { tone(t, { f: 60, dur: 0.6, type: "sawtooth", gain: 0.06, attack: 0.15 }); tone(t, { f: 120, dur: 0.6, type: "square", gain: 0.025, attack: 0.15 }); }, // 웅— (마그네트론)
+  atk_microwave: (t) => { noise(t, { dur: 0.3, f: 500, to: 150, q: 0.9, gain: 0.18, type: "lowpass" }); tone(t, { f: 70, to: 40, dur: 0.3, type: "sawtooth", gain: 0.09 }); tone(t + 0.22, { f: 1568, dur: 0.5, type: "sine", gain: 0.06 }); }, // 쾅 + 땡!
+  windup_sniffer: (t) => tone(t, { f: 400, to: 3200, dur: 0.75, type: "sine", gain: 0.04, attack: 0.4 }),                          // 레이저 충전
+  atk_sniffer: (t) => { tone(t, { f: 3200, to: 500, dur: 0.16, type: "square", gain: 0.06 }); noise(t, { dur: 0.1, f: 6000, q: 3, gain: 0.08 }); }, // 지잉— 사격
   ko: (t) => tone(t, { f: 440, to: 90, dur: 0.7, type: "sawtooth", gain: 0.12 }),
   levelUp: (t) => arp(t, [523, 659, 784, 1047, 1319], 0.07, { dur: 0.16, type: "triangle", gain: 0.1 }),
   // 학습·퀘스트
