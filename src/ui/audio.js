@@ -126,6 +126,15 @@ const SFX = {
   windup_sniffer: (t) => tone(t, { f: 400, to: 3200, dur: 0.75, type: "sine", gain: 0.04, attack: 0.4 }),                          // 레이저 충전
   atk_sniffer: (t) => { tone(t, { f: 3200, to: 500, dur: 0.16, type: "square", gain: 0.06 }); noise(t, { dur: 0.1, f: 6000, q: 3, gain: 0.08 }); }, // 지잉— 사격
   ko: (t) => tone(t, { f: 440, to: 90, dur: 0.7, type: "sawtooth", gain: 0.12 }),
+  // 시작 연출 "두둥" (Stage 13.6) — 엠블럼이 가운데서 두 번 고동칠 때 맞춰 낮은 북 두 번 + 반짝
+  dudung: (t) => {
+    for (const [dt, g] of [[0.48, 0.32], [0.74, 0.4]]) {
+      tone(t + dt, { f: 110, to: 38, dur: 0.42, type: "sine", gain: g });
+      noise(t + dt, { dur: 0.12, f: 180, to: 60, q: 0.8, gain: 0.12, type: "lowpass" });
+    }
+    arp(t + 0.76, [784, 1175, 1568], 0.05, { dur: 0.3, type: "triangle", gain: 0.05 });
+    arp(t + 1.9, [2093, 2637], 0.06, { dur: 0.35, type: "sine", gain: 0.05 });   // 왼쪽 위에 앉으며 반짝 — 띵
+  },
   levelUp: (t) => arp(t, [523, 659, 784, 1047, 1319], 0.07, { dur: 0.16, type: "triangle", gain: 0.1 }),
   // 학습·퀘스트
   correct: (t) => arp(t, [784, 1175], 0.07, { dur: 0.12, type: "sine", gain: 0.1 }),

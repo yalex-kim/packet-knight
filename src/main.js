@@ -1140,11 +1140,12 @@ if (!TEST_MODE) {
     onStart: () => {
       startLanding(1.8);
       setInputEnabled(true);
-      sfx("portal");
+      sfx("dudung");   // 엠블럼이 가운데서 두둥 (Stage 13.6)
       document.body.classList.add("revealing");
-      setTimeout(() => document.body.classList.remove("prestart"), 900);   // 거의 내려앉았을 때 HUD가 차례로
-      setTimeout(() => document.body.classList.remove("revealing"), 2200);
-      if (!tutorialSeen()) setTimeout(showTutorial, 2300);   // 처음 온 사람: 설명서 → UI 투어 (Stage 11.13)
+      const lag = splash.EMBLEM_FLY_MS - 900;   // 엠블럼이 왼쪽 위에 앉을 즈음 HUD가 차례로
+      setTimeout(() => document.body.classList.remove("prestart"), 900 + lag);
+      setTimeout(() => document.body.classList.remove("revealing"), 2200 + lag);
+      if (!tutorialSeen()) setTimeout(showTutorial, 2300 + lag);   // 처음 온 사람: 설명서 → UI 투어 (Stage 11.13)
       setTimeout(promptLogin, tutorialSeen() ? 2600 : 600);   // 구글 One Tap — 전에 허락했으면 저절로 로그인 (Stage 13)
     }
   })));
