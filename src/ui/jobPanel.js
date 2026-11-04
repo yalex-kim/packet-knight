@@ -252,12 +252,12 @@ export function showResult(r, paid, history) {
   );
 }
 
-/** 🎓 2배 받기 (Stage 13.12): 진행한 퀘스트의 장에서 한 문제 — 맞히면 보수만큼 더. 한 정산에 한 번 */
+/** 🎓 2배 받기 (Stage 13.12·13.13): 전체 장에서 한 문제 — 맞히면 보수만큼 더. 한 정산에 한 번 */
 function doubleBox(paid) {
   const box = el("div", { class: "job-double" });
   if (!paid.earned || !hooks.drawDoubleQuestion) return box;
   const extra = paid.earned * (JOB_DOUBLE.MULT - 1);
-  const btn = el("button", { type: "button", class: "btn-double", textContent: `🎓 ${JOB_DOUBLE.MULT}배 받기 — 진행한 퀘스트 문제를 맞히면 🪙 +${extra}` });
+  const btn = el("button", { type: "button", class: "btn-double", textContent: `🎓 ${JOB_DOUBLE.MULT}배 받기 — 블루투스 문제를 맞히면 🪙 +${extra}` });
   btn.addEventListener("click", () => {
     const q = hooks.drawDoubleQuestion();
     askQuestion(box, q, (ok) => {

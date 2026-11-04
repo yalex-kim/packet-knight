@@ -29,7 +29,7 @@ import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
 import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { initSpecCard, showSpecCard, isSpecCardOpen, loadSeen as specSeen } from "./ui/specCard.js";
-import { pickCard, questChapters, drawOne } from "./core/specCards.js";
+import { pickCard, drawOne } from "./core/specCards.js";
 import { SPEC_CARD } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -817,7 +817,7 @@ function onJobDone() {
 
 jobPanel.initJobPanel({
   getProgress: () => progress,
-  drawDoubleQuestion: () => drawOne(questChapters(progress.quests)),   // 🎓 2배 받기: 진행한 퀘스트의 장에서 (Stage 13.12)
+  drawDoubleQuestion: () => drawOne(CHAPTERS.map((c) => c.id)),   // 🎓 2배 받기: 전체 장에서 (Stage 13.13 — 처음엔 퀘스트 장만이라 같은 문제가 반복됐다)
   onDouble: (n) => grantLearnReward(n),
   getCharges: () => jobChargesAt(progress, now()),
   getRechargeSec: () => chargeCfg(progress).RECHARGE_SEC,

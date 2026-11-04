@@ -895,8 +895,8 @@ await reset();
     r.cr = window.__PK.progress().cr2032;
     return r;
   });
-  check("🎓 알바 2배 받기: 정산 화면 버튼 → 진행한 퀘스트의 장 문제, 틀리면 기본 보수 그대로·다시 못 고름",
-    dbl.btn && /2배 받기/.test(dbl.label) && dbl.q && ["intro", "radio"].includes(dbl.chapter) && dbl.again && dbl.cr === result.reward, JSON.stringify(dbl));
+  check("🎓 알바 2배 받기: 정산 화면 버튼 → 전체 장에서 문제, 틀리면 기본 보수 그대로·다시 못 고름",
+    dbl.btn && /2배 받기/.test(dbl.label) && dbl.q && typeof dbl.chapter === "string" && dbl.again && dbl.cr === result.reward, JSON.stringify(dbl));
 
   // 두 번째 판은 도중에 그만두면 보수 없음
   await page.locator("#job-panel .lib-btn.primary").click(); // 한 번 더
@@ -1975,6 +1975,21 @@ await page.waitForFunction(() => window.__PK);
 // ---------- 📡 스펙 한 장 + 🎯 맞혀 보기 (Stage 13.12) ----------
 {
   const C = await import(pathToFileURL(path.join(ROOT, "src/core/specCards.js")).href);
+  // 문항 확충 (Stage 13.13): 장마다 10개 이상, 추가 문항은 형식이 맞고 문제 글이 겹치지 않는다
+  {
+    const Qz = await import(pathToFileURL(path.join(ROOT, "src/core/quiz.js")).href);
+    const { CHAPTERS: CH } = await import(pathToFileURL(path.join(ROOT, "src/core/chapters.data.js")).href);
+    const { EXTRA_QUESTIONS: EX } = await import(pathToFileURL(path.join(ROOT, "src/core/extraQuestions.js")).href);
+    const counts = CH.map((c) => [c.id, Qz.questionPool(c.id).length]);
+    const all = CH.flatMap((c) => Qz.questionPool(c.id));
+    const badForm = Object.values(EX).flat().filter((q) => !q.q || q.options.length < 3 || !(q.answer >= 0 && q.answer < q.options.length) || !q.explain || new Set(q.options).size !== q.options.length);
+    const dupStem = all.length - new Set(all.map((q) => q.q)).size;
+    const unknown = Object.keys(EX).filter((k) => !CH.some((c) => c.id === k));
+    const drawn = Qz.drawQuiz("design", Qz.createRng(7), 10);
+    check("문항 확충: 장마다 10개 이상 (교과서 + 추가), 추가 문항 형식·정답 인덱스 정상, 문제 글 중복 없음, 퀴즈가 추가 문항까지 뽑는다",
+      counts.every(([, n]) => n >= 10) && badForm.length === 0 && dupStem === 0 && unknown.length === 0 && drawn.length === 10 && drawn.every((q) => q.options[q.answer] !== undefined),
+      `${all.length}문항 · ${counts.map(([id, n]) => `${id} ${n}`).join(", ")}${badForm.length ? ` · 형식 오류 ${badForm.length}` : ""}${dupStem ? ` · 중복 ${dupStem}` : ""}`);
+  }
   const qc = C.questChapters({ done: { Q0: "x", Q1: "y" }, active: "Q2" });
   check("스펙 카드는 교과서 핵심 정리 75장 · 진행한 퀘스트의 장 = 완료 + 진행 중 (없으면 intro)",
     C.SPEC_CARDS.length === 75 && qc.join() === "intro,radio,phy" && C.questChapters({ done: {}, active: null }).join() === "intro" && C.pickCard(new Set(C.SPEC_CARDS.slice(1).map((c) => c.id))).id === C.SPEC_CARDS[0].id,

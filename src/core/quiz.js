@@ -2,6 +2,10 @@
 
 import { CHAPTERS } from "./chapters.data.js";
 import { QUIZ } from "./balance.js";
+import { EXTRA_QUESTIONS } from "./extraQuestions.js";
+
+/** 장의 문항 풀 = 교과서 문항(자동 생성) + 추가 문항 (Stage 13.13, 장마다 10개 이상) */
+export const questionPool = (chapterId) => [...(chapterById(chapterId)?.questions ?? []), ...(EXTRA_QUESTIONS[chapterId] ?? [])];
 
 /** @typedef {import("./chapters.data.js").QuizQuestion} QuizQuestion */
 
@@ -35,7 +39,7 @@ function shuffle(arr, rng) {
 export function drawQuiz(chapterId, rng = createRng(), n = QUIZ.QUESTIONS_PER_QUIZ) {
   const chapter = chapterById(chapterId);
   if (!chapter) throw new Error(`알 수 없는 챕터: ${chapterId}`);
-  return shuffle(chapter.questions, rng).slice(0, n).map((q) => {
+  return shuffle(questionPool(chapterId), rng).slice(0, n).map((q) => {
     const order = shuffle(q.options.map((_, i) => i), rng);
     return { q: q.q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer), explain: q.explain };
   });
