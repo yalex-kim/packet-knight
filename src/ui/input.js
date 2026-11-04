@@ -203,7 +203,10 @@ function initPointer(h) {
     active.delete(e.pointerId);
     if (active.size < 2) isPinching = false;
     if (e.pointerId === primaryId) {
-      if (isDown && !isDragging && !isPinching && e.button !== 2) h.onTap(e.clientX, e.clientY);
+      if (isDown && !isDragging && !isPinching && e.button !== 2) {
+        lastTap = { t: performance.now(), x: e.clientX, y: e.clientY, surface: e.target };
+        h.onTap(e.clientX, e.clientY);
+      }
       isDown = false;
       isDragging = false;
       primaryId = null;
@@ -211,6 +214,15 @@ function initPointer(h) {
   };
   window.addEventListener("pointerup", end);
   window.addEventListener("pointercancel", end);
+  // 유령 클릭 막기 (Stage 13.7): 맵을 눌러 건물 카드·대사창이 그 자리에 뜨면, 같은 손가락의 click 이
+  // 방금 뜬 카드의 버튼(📖 교과서 링크 등)에 그대로 떨어진다 → 탭 직후 같은 자리의 click 은 맵이 아니면 버린다
+  let lastTap = null;
+  document.addEventListener("click", (e) => {
+    if (!lastTap || e.target === lastTap.surface) return;
+    const fresh = performance.now() - lastTap.t < 450 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30;
+    lastTap = null;
+    if (fresh) { e.preventDefault(); e.stopPropagation(); }
+  }, { capture: true });
 
   // 휠 줌은 맵(surface) 위에서만, 팝업이 열려 있지 않을 때만 — 팝업 위 휠은 팝업 스크롤에 쓴다 (Stage 11 수정)
   window.addEventListener("wheel", (e) => {

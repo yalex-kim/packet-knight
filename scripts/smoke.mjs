@@ -1544,6 +1544,27 @@ await page.waitForFunction(() => window.__PK);
   await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2);
   await wheelAt(400, 2);
   const z2 = await zoom();
+  // 유령 클릭 (Stage 13.7): 건물을 누른 그 자리에 카드의 📖 링크가 떠도, 같은 탭의 click 은 링크로 가지 않는다 — 진짜 다음 클릭은 된다
+  const ghost = await page.evaluate(async (pt) => {
+    const link = document.getElementById("modal-link");
+    const cv = document.querySelector("canvas");
+    const at = { clientX: pt.x, clientY: pt.y, bubbles: true, pointerId: 7, isPrimary: true, button: 0 };
+    cv.dispatchEvent(new PointerEvent("pointerdown", at));
+    window.dispatchEvent(new PointerEvent("pointerup", at));
+    const c1 = new MouseEvent("click", { clientX: pt.x, clientY: pt.y, bubbles: true, cancelable: true });
+    link.addEventListener("click", (e) => e.preventDefault(), { once: true });   // 실제로 새 탭을 열지는 않게
+    let reached = false; const mark = () => { reached = true; };
+    link.addEventListener("click", mark);
+    link.dispatchEvent(c1);
+    const ghostBlocked = !reached;
+    await new Promise((r) => setTimeout(r, 500));
+    reached = false;
+    link.addEventListener("click", (e) => e.preventDefault(), { once: true });
+    link.dispatchEvent(new MouseEvent("click", { clientX: pt.x, clientY: pt.y, bubbles: true, cancelable: true }));
+    link.removeEventListener("click", mark);
+    return { ghostBlocked, laterOk: reached };
+  }, lp);
+  check("건물을 누른 자리에 뜬 카드의 📖 링크로 같은 탭의 클릭이 새지 않는다 (유령 클릭 차단) · 다음 클릭은 정상", ghost.ghostBlocked && ghost.laterOk, JSON.stringify(ghost));
   await page.click("#modal-close");
   // ③ 맵 위 휠은 줌한다
   await page.mouse.move(500, 120);
