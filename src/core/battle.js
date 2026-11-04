@@ -233,6 +233,9 @@ function stepMonster(battle, m, dt, ctx, events) {
             events.push({ type: "playerHit", monster: m, amount, crit });
             if (p.hp <= 0) events.push({ type: "ko", monster: m });
           }
+        } else if (def.aoe && p.hp > 0 && d <= def.attackRange + 3.0) {
+          // 광역 몬스터(전자레인지·Wi-Fi)는 기사가 사거리 밖으로 피했어도 폭발은 터진다 (공격음 재생 및 회피 피드백)
+          events.push({ type: "dodge", monster: m, aoeMiss: true });
         }
         m.state = "cooldown";
         m.t = def.cooldown;

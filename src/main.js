@@ -484,7 +484,7 @@ function handleBattleEvents(events) {
         sfx("hurt");
         break;
       case "dodge":
-        fx.floatText(motor.x, motor.y + 0.9, motor.z, e.dash ? "⚡ 돌진 회피!" : "회피!", "dodge");
+        fx.floatText(motor.x, motor.y + 0.9, motor.z, e.dash ? "⚡ 돌진 회피!" : e.aoeMiss ? "광역 회피!" : "회피!", "dodge");
         sfx("dodge");
         break;
       case "shieldBlock":

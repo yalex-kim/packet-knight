@@ -154,12 +154,21 @@ const SFX = {
       noise(t + dt, { dur: 0.025, f: 4000, to: 1200, q: 2, gain: 0.1 });
     });
   }, // 20ms 간격 4연발 기관총 처프
-  windup_microwave: (t) => { tone(t, { f: 60, dur: 0.6, type: "sawtooth", gain: 0.06, attack: 0.15 }); tone(t, { f: 120, dur: 0.6, type: "square", gain: 0.025, attack: 0.15 }); }, // 웅— (마그네트론)
+  windup_microwave: (t) => {
+    // 마그네트론 가열 윙— (모바일에서도 잘 들리는 160~320Hz 배음 웅—)
+    tone(t, { f: 160, to: 320, dur: 0.9, type: "sawtooth", gain: 0.14, attack: 0.2 });
+    tone(t, { f: 110, to: 220, dur: 0.9, type: "triangle", gain: 0.16, attack: 0.2 });
+    noise(t + 0.2, { dur: 0.7, f: 2450, q: 3, gain: 0.09 });
+  }, // 웅— (마그네트론 가열)
   atk_microwave: (t) => {
-    noise(t, { dur: 0.32, f: 600, to: 100, q: 0.8, gain: 0.25, type: "lowpass" });
-    tone(t, { f: 80, to: 30, dur: 0.35, type: "sawtooth", gain: 0.14 });
-    noise(t + 0.04, { dur: 0.16, f: 2450, q: 4, gain: 0.12 });
-    tone(t + 0.2, { f: 1568, dur: 0.45, type: "sine", gain: 0.09, attack: 0.002 });
+    // 콰앙! 마그네트론 광역 파열 (모바일에서도 찰진 240~60Hz 펀치 + 1800Hz 크런치)
+    noise(t, { dur: 0.35, f: 1800, to: 220, q: 1.0, gain: 0.32 });
+    tone(t, { f: 240, to: 60, dur: 0.35, type: "sawtooth", gain: 0.22 });
+    tone(t, { f: 140, to: 45, dur: 0.4, type: "triangle", gain: 0.25 });
+    // 2.45GHz 지글거리는 잔향
+    noise(t + 0.05, { dur: 0.22, f: 2450, q: 2.5, gain: 0.18 });
+    // 조리 완료 '땡!!' 선명한 벨소리
+    tone(t + 0.15, { f: 1568, dur: 0.6, type: "sine", gain: 0.25, attack: 0.002 });
   }, // 2.45GHz 마그네트론 고주파 파동 + 콰앙 + 끝에 울리는 '땡!'
   windup_sniffer: (t) => tone(t, { f: 400, to: 3200, dur: 0.75, type: "sine", gain: 0.04, attack: 0.4 }),                          // 레이저 충전
   atk_sniffer: (t) => {
