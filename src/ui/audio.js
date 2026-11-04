@@ -1,6 +1,6 @@
-// 사운드 — Web Audio API 합성 효과음 · 생성형 BGM (Stage 11, PRD §7) (브라우저 전용)
+// 사운드 — Web Audio API 합성 효과음 · BGM 음원 재생 (Stage 11·12.9, PRD §7) (브라우저 전용)
 //
-// 음원 파일 없이 오실레이터·노이즈로 합성한다 (무빌드·무에셋 원칙). 소리는 "패킷" 은유를 따른다:
+// 효과음은 음원 파일 없이 오실레이터·노이즈로 합성한다. 배경음악만 CC0 음원 파일을 쓴다 (Stage 12.9). 소리는 "패킷" 은유를 따른다:
 //   발사 = 짧은 하강 처프(송신), 명중 = 짧은 클릭, 처치 = 상승 아르페지오, 손실 = 지직거리는 노이즈.
 // 브라우저 자동 재생 정책: 첫 사용자 입력(포인터·키)에서 AudioContext를 깨운다.
 // 설정(음소거·볼륨)은 localStorage "packetKnight.audio"에 따로 저장한다 (세이브 데이터와 분리).
@@ -37,7 +37,7 @@ function ensureCtx() {
     sfxBus = ctx.createGain();
     sfxBus.connect(master);
     bgmBus = ctx.createGain();
-    bgmBus.gain.value = 0.35;
+    bgmBus.gain.value = 0.3;
     bgmBus.connect(master);
     applyVolume();
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
@@ -163,67 +163,41 @@ export function sfx(name) {
   try { SFX[name](t + 0.005); } catch { /* 합성 실패는 무시 (게임 진행에 영향 없음) */ }
 }
 
-// ---------- 생성형 BGM (Stage 12.6: 마을 = 평화로운 오르골, 던전 = 긴박한 드럼·베이스) ----------
-// 한 마디씩 미리 예약한다. 마을은 장조 I–vi–IV–V 위에 부드러운 패드 + 오르골 아르페지오(8분음표),
-// 던전은 128 BPM 단조 i–VI–VII–v, 8분음표 베이스 반복구 + 킥·스네어·하이햇 + 스타카토 아르페지오 + 가끔 긴장 화음.
-const BGM = {
-  village: { bar: 3.2, chords: [[261.6, 329.6, 392.0], [220.0, 261.6, 329.6], [174.6, 220.0, 261.6], [196.0, 246.9, 293.7]] },
-  dungeon: { bar: 1.875, chords: [[110.0, 130.8, 164.8], [87.3, 110.0, 130.8], [98.0, 123.5, 146.8], [82.4, 98.0, 123.5]] }
+// ---------- BGM 음원 (Stage 12.9: 마을 = 잔잔한 통기타 "Peaceful Days", 던전 = 빠른 8비트 "Battle 1", CC0) ----------
+// 효과음은 계속 합성하고, 배경음악만 음원 파일(src/assets/bgm/*.mp3)을 반복 재생한다.
+// <audio>를 MediaElementSource로 BGM 버스에 이어 음소거·볼륨 설정을 그대로 따르고, 장면이 바뀌면 교차 페이드.
+// 파일은 그 장면에 처음 들어갈 때 불러온다 (첫 화면 로딩을 무겁게 하지 않는다). 테스트 모드는 불러오지 않는다.
+const BGM_FILES = {
+  village: new URL("../assets/bgm/bgm-village.mp3", import.meta.url).href,
+  dungeon: new URL("../assets/bgm/bgm-dungeon.mp3", import.meta.url).href
 };
 let bgmMode = null;
-let bgmTimer = null;
-let bgmBar = 0;
-let bgmNext = 0;
-let bgmRng = 7;
-const bgmRand = () => ((bgmRng = (bgmRng * 1103515245 + 12345) >>> 0) / 2 ** 32);
-/** 드럼 (BGM 버스로) */
-function kick(t) {
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
-  g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-  o.connect(g).connect(bgmBus); o.start(t); o.stop(t + 0.2);
+let bgmEnabled = false;
+const bgmTracks = {};
+function bgmTrack(mode) {
+  if (bgmTracks[mode]) return bgmTracks[mode];
+  const el = new Audio();
+  el.src = BGM_FILES[mode];
+  el.loop = true;
+  el.preload = "auto";
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  ctx.createMediaElementSource(el).connect(gain).connect(bgmBus);
+  return (bgmTracks[mode] = { el, gain, stop: 0 });
 }
-function hiss(t, { dur, f, q = 1, gain, type = "highpass" }) {
-  const src = ctx.createBufferSource(); src.buffer = noiseBuf;
-  const flt = ctx.createBiquadFilter(); flt.type = type; flt.frequency.value = f; flt.Q.value = q;
-  const g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(flt).connect(g).connect(bgmBus); src.start(t); src.stop(t + dur + 0.02);
-}
-
-function villageBar(t, song) {
-  const chord = song.chords[bgmBar % song.chords.length], b = song.bar;
-  for (const f of chord) tone(t, { f, dur: b * 0.98, type: "sine", gain: 0.035, attack: 1.0, bus: bgmBus });       // 부드러운 패드
-  tone(t, { f: chord[0] / 2, dur: b * 0.48, type: "sine", gain: 0.05, attack: 0.2, bus: bgmBus });                 // 베이스: 1·3박
-  tone(t + b / 2, { f: chord[2] / 2, dur: b * 0.45, type: "sine", gain: 0.04, attack: 0.2, bus: bgmBus });
-  // 오르골 아르페지오: 화음을 두 옥타브 올려 8분음표로 오르내린다 (가끔 쉰다)
-  const notes = [chord[0] * 2, chord[1] * 2, chord[2] * 2, chord[0] * 4, chord[2] * 2, chord[1] * 2, chord[0] * 2, chord[1] * 2];
-  notes.forEach((f, k) => { if (bgmRand() < 0.82) tone(t + (k * b) / 8, { f, dur: 0.5, type: "triangle", gain: 0.03, attack: 0.004, bus: bgmBus }); });
-  if (bgmBar % 4 === 3) tone(t + b * 0.75, { f: 1568, dur: 0.9, type: "sine", gain: 0.02, bus: bgmBus });           // 반짝 (네 마디마다)
-}
-
-function dungeonBar(t, song) {
-  const chord = song.chords[bgmBar % song.chords.length], b = song.bar, e = b / 8;
-  tone(t, { f: chord[0] * 2, dur: b, type: "sawtooth", gain: 0.012, attack: 0.3, bus: bgmBus });                  // 어두운 패드
-  tone(t, { f: chord[2] * 2, dur: b, type: "sawtooth", gain: 0.01, attack: 0.3, bus: bgmBus });
-  for (let k = 0; k < 8; k++) {                                                                                     // 8분음표 베이스 반복구
-    const f = k % 4 === 3 ? chord[1] / 2 : chord[0] / 2;
-    tone(t + k * e, { f, dur: e * 0.8, type: "square", gain: 0.035, attack: 0.004, bus: bgmBus });
-  }
-  for (const k of [0, 3, 4, 6]) kick(t + k * e);                                                                   // 킥 (밀어붙이는 박)
-  for (const k of [2, 6]) hiss(t + k * e, { dur: 0.12, f: 1800, q: 0.8, gain: 0.08, type: "bandpass" });          // 스네어
-  for (let k = 0; k < 16; k++) hiss(t + (k * b) / 16, { dur: 0.03, f: 7000, gain: k % 2 ? 0.015 : 0.03 });          // 하이햇 16분
-  const arpN = [chord[0] * 4, chord[1] * 4, chord[2] * 4, chord[1] * 4];                                          // 스타카토 아르페지오
-  for (let k = 0; k < 8; k++) tone(t + k * e, { f: arpN[k % 4], dur: e * 0.45, type: "triangle", gain: 0.018, attack: 0.003, bus: bgmBus });
-  if (bgmBar % 4 === 3) tone(t + b * 0.5, { f: chord[0] * 4 * 1.06, dur: b * 0.5, type: "sawtooth", gain: 0.012, bus: bgmBus });   // 반음 위 긴장 화음
-}
-
-function scheduleBgm() {
-  if (!ctx || !bgmMode || ctx.state !== "running") return;
-  const song = BGM[bgmMode];
-  while (bgmNext < ctx.currentTime + 1.5) {
-    (bgmMode === "dungeon" ? dungeonBar : villageBar)(bgmNext, song);
-    bgmNext += song.bar;
-    bgmBar++;
+/** 지금 장면의 곡은 페이드 인, 나머지는 페이드 아웃 후 일시정지 */
+function syncBgm() {
+  if (!bgmEnabled || !ctx || ctx.state !== "running") return;
+  const now = ctx.currentTime;
+  for (const mode of Object.keys(BGM_FILES)) {
+    const on = mode === bgmMode && !document.hidden;
+    const tr = on ? bgmTrack(mode) : bgmTracks[mode];
+    if (!tr) continue;
+    tr.gain.gain.cancelScheduledValues(now);
+    tr.gain.gain.setTargetAtTime(on ? 1 : 0, now, on ? 0.5 : 0.25);
+    clearTimeout(tr.stop);
+    if (on) { if (tr.el.paused) tr.el.play().catch(() => {}); }
+    else if (!tr.el.paused) tr.stop = setTimeout(() => { if (bgmMode !== mode || document.hidden) tr.el.pause(); }, 1500);
   }
 }
 
@@ -232,9 +206,7 @@ export function setBgm(mode) {
   if (mode === bgmMode) return;
   bgmMode = mode;
   log.push(`bgm:${mode}`);
-  if (!ctx) return;
-  bgmNext = Math.max(ctx.currentTime + 0.1, bgmNext);
-  bgmBar = 0;
+  try { syncBgm(); } catch { /* 음원 재생 실패는 무시 */ }
 }
 
 // ---------- 설정 ----------
@@ -259,7 +231,7 @@ export function initAudio({ bgm = true } = {}) {
   // 자동 재생 정책: 첫 사용자 입력에서 AudioContext 생성·재개
   const unlock = () => {
     ensureCtx();
-    ctx?.resume?.().catch(() => {});
+    ctx?.resume?.().then(() => { try { syncBgm(); } catch { /* 무시 */ } }).catch(() => {});
   };
   window.addEventListener("pointerdown", unlock, { capture: true });
   window.addEventListener("keydown", unlock, { capture: true });
@@ -277,11 +249,11 @@ export function initAudio({ bgm = true } = {}) {
     }
   });
   for (const el of document.querySelectorAll(".overlay")) watch.observe(el, { attributes: true, attributeFilter: ["hidden"] });
-  if (bgm) bgmTimer = setInterval(scheduleBgm, 400);
+  bgmEnabled = bgm;
   document.addEventListener("visibilitychange", () => {
     if (!ctx) return;
-    if (document.hidden) ctx.suspend?.().catch(() => {});
-    else ctx.resume?.().catch(() => {});
+    if (document.hidden) { syncBgm(); ctx.suspend?.().catch(() => {}); }
+    else ctx.resume?.().then(() => syncBgm()).catch(() => {});
   });
-  return () => clearInterval(bgmTimer);
+  return () => { bgmEnabled = false; for (const tr of Object.values(bgmTracks)) tr.el.pause(); };
 }

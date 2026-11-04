@@ -481,7 +481,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
 // 저장소 루트를 정적 서버처럼 제공 (index.html + src/*.js 모듈)
-const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json", ".webp": "image/webp" };
+const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json", ".webp": "image/webp", ".mp3": "audio/mpeg" };
 await page.route((url) => url.origin === ORIGIN, (r) => {
   const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
   const file = path.resolve(ROOT, rel);
@@ -1546,6 +1546,10 @@ await page.waitForFunction(() => window.__PK);
     const missMon = Object.keys(MONSTERS).filter((k) => !A.SFX_NAMES.includes(`windup_${k}`) || !A.SFX_NAMES.includes(`atk_${k}`));
     return { n: A.SFX_NAMES.length, errs, missMon };
   });
+  const bgmFiles = await page.evaluate(async () => Promise.all(["village", "dungeon"].map(async (m) => {
+    const r = await fetch(`/src/assets/bgm/bgm-${m}.mp3`); return r.ok ? (await r.arrayBuffer()).byteLength : 0;
+  })));
+  check("BGM 음원 두 곡(마을·던전 mp3)이 배포 경로에 있다", bgmFiles.every((n) => n > 500000), bgmFiles.map((n) => `${(n / 1e6).toFixed(1)}MB`).join(" · "));
   check("몬스터마다 고유한 공격 예고음(windup_*)과 공격음(atk_*)이 있다", synth.missMon.length === 0, synth.missMon.join() || "전 종 OK");
   check("첫 사용자 입력 뒤 AudioContext가 동작하고, 효과음 전부가 에러 없이 합성된다", au.ctx === "running" && synth.errs.length === 0 && synth.n >= 35, `${au.ctx} · 효과음 ${synth.n}종`);
 
