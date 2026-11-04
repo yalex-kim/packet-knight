@@ -97,6 +97,19 @@ const fmt = (s) => `(${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`;
   const v1 = { v: 1, bonus: { hp: 5, tx: 0, rx: 0, hop: 0, sec: 0, pwr: 0 }, skillSlots: 2, cleared: { intro: "2026-11-01" }, metrics: { quizAttempts: { intro: 1 }, quizPerfect: { intro: 1 }, chapterOpens: {} } };
   const mem = new Map([[P.SAVE_KEY, JSON.stringify(v1)]]);
   const loadedV1 = P.loadProgress({ getItem: (k) => mem.get(k) ?? null, setItem: () => {} });
+  {
+    // 클라우드 세이브 서버 도우미 (Stage 13): 랭킹 숫자 추출·이름·잘못된 토큰 거부·클라우드 세이브 검증
+    const C = await import(pathToFileURL(path.join(ROOT, "server/cloud.js")).href);
+    const good = P.createProgress(); good.xp = 120; good.dungeon.maxFloor = 3; good.quests.done = { Q1: "x", Q2: "y" };
+    const rf = C.rankFields(good), bad = C.rankFields({ xp: -5, dungeon: { maxFloor: "9" } });
+    const bogus = await C.verifyGoogle("a.b", "cid"), noCid = await C.verifyGoogle("a.b.c", "");
+    check("클라우드: 세이브에서 랭킹 숫자(XP·최고 층·배지)만 뽑고, 이상한 값은 0 · 이름은 구글 이름 앞부분 12자 · 깨진 토큰 거부 · 못 읽는 세이브는 불러오지 않는다",
+      rf.xp === 120 && rf.maxFloor === 3 && rf.badges === 2 && bad.xp === 0 && bad.maxFloor === 0
+        && C.displayName({ given_name: "윤배" }) === "윤배" && C.displayName({ name: "Yalex Kim" }) === "Yalex" && C.displayName({}) === "기사"
+        && [...C.displayName({ given_name: "가".repeat(30) })].length === 12 && bogus === null && noCid === null
+        && P.isValidSave(good) && !P.isValidSave({ v: 8, xp: "lots" }) && !P.isValidSave(null),
+      JSON.stringify(rf));
+  }
   check("Stage 4 세이브(v1)가 진행도 손실 없이 v2로 마이그레이션된다", loadedV1.status === "loaded" && loadedV1.progress.bonus.hp === 5 && loadedV1.progress.skillSlots === 2 && loadedV1.progress.cr2032 === 0);
 }
 
@@ -484,6 +497,9 @@ page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 const MIME = { ".html": "text/html", ".js": "application/javascript", ".json": "application/json", ".webp": "image/webp", ".mp3": "audio/mpeg" };
 await page.route((url) => url.origin === ORIGIN, (r) => {
   const rel = decodeURIComponent(new URL(r.request().url()).pathname).replace(/^\/+/, "") || "index.html";
+  // 클라우드 API (Stage 13) — 랭킹만 가짜로 (Pages Functions·D1 은 배포본에서만)
+  if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
+    top: [{ name: "윤배", xp: 900, maxFloor: 6, badges: 9 }, { name: "<b>해커</b>", xp: 300, maxFloor: 2, badges: 3 }, { name: "민지", xp: 40, maxFloor: 0, badges: 1 }], me: null, total: 3 }) });
   const file = path.resolve(ROOT, rel);
   if (!file.startsWith(ROOT + path.sep) || !existsSync(file)) return r.fulfill({ status: 404, body: "not found" });
   return r.fulfill({ body: readFileSync(file), contentType: MIME[path.extname(file)] ?? "application/octet-stream" });
@@ -1739,6 +1755,21 @@ await page.waitForFunction(() => window.__PK);
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     return { ...r, closed: !window.__PK.devCard.isOpen() };
   });
+  // 🌳 비밀의 나무 → 랭킹 (Stage 13)
+  const rk = await page.evaluate(async () => {
+    const P = window.__PK;
+    P.ranking.open();
+    for (let i = 0; i < 40 && !document.querySelector("#ranking .rk-list"); i++) await new Promise((r) => setTimeout(r, 50));
+    const el = document.getElementById("ranking");
+    const r = { open: P.ranking.isOpen(), rows: el.querySelectorAll(".rk-list li").length, first: el.querySelector(".rk-name")?.textContent,
+      escaped: !el.querySelector(".rk-name b"), lv: el.querySelector(".rk-lv")?.textContent, total: el.querySelector(".rk-total")?.textContent,
+      cloud: P.ranking.cloud().enabled, tree: P.ranking.tree() };
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return { ...r, closed: !P.ranking.isOpen() };
+  });
+  check("숨은 나무(서쪽 숲, 금빛 열매)를 누르면 기사 랭킹이 열리고(이름은 글자 그대로, Lv 계산), Esc로 닫힌다 · 테스트 모드는 클라우드 꺼짐",
+    rk.open && rk.rows === 3 && rk.first === "윤배" && rk.escaped && /Lv \d+/.test(rk.lv) && /3명/.test(rk.total) && rk.closed && !rk.cloud && rk.tree.x === -21,
+    JSON.stringify(rk));
   check("광고판을 누르면 home 히어로 한 장만(스크롤 없음) 뜨고, 제목 옆에 홈페이지 링크, Esc로 닫힌다",
     dc.open && dc.items === 0 && dc.noScroll && dc.beside && dc.home === "https://home.yalex-k.com/" && /바이브코딩/.test(dc.title) && dc.closed, JSON.stringify(dc));
   check("개발자 광고판: 홈(home.yalex-k.com) 링크·기둥 2개는 막히고 정면은 걸어갈 수 있다",

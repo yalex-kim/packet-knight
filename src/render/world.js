@@ -508,6 +508,30 @@ function createStreetLamp(x, z) {
 }
 
 TREE_POSITIONS.forEach(([tx, tz, s]) => createVoxelTree(tx, tz, s));
+
+// ----- 🌳 비밀의 나무 (Stage 13) — 서쪽 숲의 가장 큰 나무. 금빛 열매 세 개가 단서, 누르면 기사 랭킹 -----
+const SECRET_TREE = TREE_POSITIONS.find(([tx, tz]) => tx === -21 && tz === 1.5);
+export const secretTree = new THREE.Group();
+{
+  const [tx, tz, sc] = SECRET_TREE;
+  const fruitMat = new THREE.MeshBasicMaterial({ color: 0xffd76b });
+  for (const [fx, fy, fz] of [[0.92, 2.0, 0.3], [-0.5, 2.3, 0.92], [0.2, 3.1, -0.62]]) {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), fruitMat);
+    f.position.set(fx * sc, fy * sc, fz * sc);
+    secretTree.add(f);
+  }
+  // 누르기 쉬운 보이지 않는 상자 (나무 전체)
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(2.0 * sc, 3.6 * sc, 2.0 * sc), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.y = 1.8 * sc;
+  secretTree.add(hit);
+  secretTree.position.set(tx, groundHeightAt(tx, tz), tz);
+  secretTree.userData.secretTree = true;
+  root.add(secretTree);
+}
+/** 금빛 열매가 살짝 반짝인다 */
+export function animateSecretTree(t) {
+  secretTree.children.forEach((c, i) => { if (c.material.visible !== false) c.scale.setScalar(1 + 0.18 * Math.sin(t * 2.2 + i * 2.1)); });
+}
 LAMP_POSITIONS.forEach(([lx, lz]) => createStreetLamp(lx, lz));
 
 // ----- ⚔️ 패킷 훈련장 표지판 -----

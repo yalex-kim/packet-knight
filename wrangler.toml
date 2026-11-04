@@ -1,0 +1,15 @@
+# Cloudflare Pages 설정 (Stage 13) — wrangler pages deploy 가 이 파일의 바인딩을 쓴다.
+# 정적 파일은 _site (tools/build_site.sh), API 는 functions/api/*.js (Pages Functions).
+name = "packetknight"
+pages_build_output_dir = "_site"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "packetknight"
+database_id = "d974c211-aa57-4e45-89ac-b6510c1a502a"
+migrations_dir = "migrations"
+
+[vars]
+# 구글 OAuth 웹 클라이언트 ID (공개 값, 보안 비밀 아님). 비어 있으면 로그인·클라우드 세이브가 숨겨진다.
+GOOGLE_CLIENT_ID = "285581859186-7iucichevor3taukuvhcf16eva5tn32u.apps.googleusercontent.com"

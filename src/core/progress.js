@@ -114,6 +114,11 @@ function validate(raw) {
   };
 }
 
+/** 다른 곳(클라우드)에서 온 진행도가 이 버전에서 불러올 수 있는 모양인지 (Stage 13) */
+export function isValidSave(raw) {
+  try { return validate(structuredClone(raw)) !== null; } catch { return false; }
+}
+
 /**
  * 저장소에서 불러오기. 저장소가 없거나(사생활 보호 모드) 데이터가 깨졌으면 새 진행도로 시작한다.
  * @param {StorageLike|null} storage

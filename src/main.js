@@ -27,6 +27,7 @@ import { startTutorial, isTutorialOpen, tutorialSeen, tutorialState, tutorialNex
 import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerCircles, sayNow } from "./render/villagers.js";
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openDevCard, isDevCardOpen } from "./ui/devCard.js";
+import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
 import { weaponById, outfitById } from "./core/shop.js";
 import { initInventory, openInventory, closeInventory, isInventoryOpen } from "./ui/inventory.js";
@@ -154,6 +155,7 @@ let stepDist = 0;  // 발소리 간격
 let questReadyShown = null; // 🔮 열림 안내를 한 번만 띄우려고 기억해 둔 퀘스트
 function persist() {
   lastSaveOk = saveProgress(storage, progress);
+  markDirty();   // 로그인했으면 15초 모아 클라우드에 (Stage 13)
   if (!lastSaveOk) hud.setBadge("⚠️ 진행도를 저장할 수 없습니다 (브라우저 저장소 차단)");
   refreshQuests();
 }
@@ -289,7 +291,7 @@ function handleTap(clientX, clientY) {
   // 건물·지형을 한 번에 검사해 화면에서 가장 앞에 있는 대상을 고른다
   const targets = run
     ? [...battleView.monsterTargets, ...dungeonView.dungeonTargets]
-    : [...battleView.monsterTargets, ...villagerTargets, ...world.interactiveObjects, world.terrain, world.sea];
+    : [...battleView.monsterTargets, ...villagerTargets, ...world.interactiveObjects, world.secretTree, world.terrain, world.sea];
   const hits = raycaster.intersectObjects(targets, true).filter((h) => h.object.visible);
   if (hits.length === 0) {
     if (run) tapDungeonFloor();
@@ -310,6 +312,10 @@ function handleTap(clientX, clientY) {
   }
   if (run) { tapDungeonFloor(); return; }
 
+  // 🌳 비밀의 나무를 누르면 기사 랭킹 (Stage 13)
+  for (let o = hits[0].object; o; o = o.parent) {
+    if (o.userData.secretTree) { openSecretTree(); return; }
+  }
   // 주민을 누르면 대사창 (Stage 11.14)
   for (let o = hits[0].object; o; o = o.parent) {
     if (o.userData.villager) { talkTo(o.userData.villager); return; }
@@ -324,6 +330,15 @@ function handleTap(clientX, clientY) {
   setMoveTarget({ x: p.x, y, z: p.z }, null);
   hud.setBadge(`📍 이동 중 (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`);
   hud.hideModal();
+}
+
+function openSecretTree() {
+  hud.hideModal();
+  clearMoveTarget();
+  setInputEnabled(false);
+  inputLocked = true;
+  sfx("questReady");
+  openRanking(() => { setInputEnabled(true); inputLocked = false; });
 }
 
 /** 던전 바닥 탭: 바닥 평면(floorY)과 광선의 교점으로 이동 */
@@ -1094,6 +1109,7 @@ function animate() {
   const t = clock.elapsedTime;
   renderFrame(t, dt);
   world.animateWorld(t);
+  world.animateSecretTree(t);
   if (!run) stepLife(dt, t, motor);
   else dungeonLamp.position.set(motor.x, motor.y + 5, motor.z);
   knightView.animateEffects(t, dt);
@@ -1105,6 +1121,15 @@ updateCamera(motor, 1);
 animate();
 
 // ---------- 타이틀 → 착지 (Stage 11.5) ----------
+// ☁️ 구글 로그인 · 클라우드 세이브 (Stage 13) — 클라우드 쪽 진행도를 고르면 이 기기에 쓰고 다시 불러온다
+initCloud({
+  disabled: TEST_MODE,
+  getProgress: () => progress,
+  adoptSave: (save) => { try { storage?.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* 무시 */ } location.reload(); },
+  toast: (msg, sec) => fx.showToast(msg, sec),
+  sfx
+});
+
 if (!TEST_MODE) {
   setInputEnabled(false);
   const q = questById(progress.quests.active);
@@ -1122,6 +1147,7 @@ if (!TEST_MODE) {
       setTimeout(() => document.body.classList.remove("prestart"), 900);   // 거의 내려앉았을 때 HUD가 차례로
       setTimeout(() => document.body.classList.remove("revealing"), 2200);
       if (!tutorialSeen()) setTimeout(showTutorial, 2300);   // 처음 온 사람: 설명서 → UI 투어 (Stage 11.13)
+      setTimeout(promptLogin, tutorialSeen() ? 2600 : 600);   // 구글 One Tap — 전에 허락했으면 저절로 로그인 (Stage 13)
     }
   })));
 }
@@ -1166,6 +1192,7 @@ window.__PK = {
   dash: () => ({ ...dash }),
   zoom: () => orbit.distance,
   devCard: { open: () => goToLandmark(landmark("billboard").info), isOpen: isDevCardOpen },
+  ranking: { open: () => openSecretTree(), isOpen: isRankingOpen, close: closeRanking, cloud: cloudState, tree: () => ({ x: world.secretTree.position.x, z: world.secretTree.position.z }) },
   inventory: { open: openInventory, close: closeInventory, isOpen: isInventoryOpen },
   shop: { open: openShop, close: closeShop, isOpen: isShopOpen, state: () => structuredClone(progress.shop) },
   setView: (yaw, distance) => { orbit.yaw = yaw; if (distance) setOrbitDistance(distance); },   // 스크린샷·테스트용 카메라 방향
