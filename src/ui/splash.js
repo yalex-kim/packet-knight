@@ -27,6 +27,7 @@ export function ready({ save, onStart }) {
     if (started) return;
     started = true;
     window.removeEventListener("keydown", onKey);
+    flyEmblem();
     splash.classList.add("leaving");
     onStart();
     setTimeout(() => splash.remove(), 800);
@@ -34,6 +35,32 @@ export function ready({ save, onStart }) {
   const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
   start.addEventListener("click", go);
   window.addEventListener("keydown", onKey);
+}
+
+/**
+ * 시작을 누르면 가운데 큰 엠블럼이 작아지며 왼쪽 위 자리(모바일: #corner-emblem, 데스크톱: 조작법 상자 머리)로 날아가 앉는다 (Stage 13.5).
+ * 복제본을 띄워 날리고, HUD가 나타날 즈음 겹쳐 사라진다 (진짜 엠블럼이 그 자리에서 이어받는다).
+ */
+function flyEmblem() {
+  const src = splash.querySelector(".pk-emblem");
+  const corner = document.getElementById("corner-emblem");
+  const target = corner && getComputedStyle(corner).display !== "none" ? corner : document.querySelector("#hud .hud-emblem");
+  if (!src || !target || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const a = src.getBoundingClientRect(), b = target.getBoundingClientRect();
+  if (!a.width || !b.width) return;
+  const fly = src.cloneNode();
+  fly.removeAttribute("class");
+  Object.assign(fly.style, { position: "fixed", left: `${a.left}px`, top: `${a.top}px`, width: `${a.width}px`, height: `${a.height}px`, margin: "0",
+    zIndex: "120", pointerEvents: "none", transformOrigin: "0 0", filter: "drop-shadow(0 10px 24px rgba(0,0,0,.35)) drop-shadow(0 0 20px rgba(57,208,255,.4))" });
+  document.body.append(fly);
+  src.style.visibility = "hidden";
+  const k = b.width / a.width, dx = b.left - a.left, dy = b.top - a.top;
+  const anim = fly.animate([
+    { transform: "translate(0, 0) scale(1) rotate(0deg)", offset: 0 },
+    { transform: `translate(${dx * 0.35}px, ${dy * 0.2 - 30}px) scale(${1 - (1 - k) * 0.35}) rotate(-8deg)`, offset: 0.35 },
+    { transform: `translate(${dx}px, ${dy}px) scale(${k}) rotate(0deg)`, offset: 1 }
+  ], { duration: 950, easing: "cubic-bezier(.55,.05,.3,1)", fill: "forwards" });
+  anim.finished.then(() => fly.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600, delay: 150, fill: "forwards" }).finished).then(() => fly.remove()).catch(() => fly.remove());
 }
 
 export const isSplashUp = () => Boolean(splash?.isConnected) && !splash.classList.contains("leaving");

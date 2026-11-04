@@ -107,7 +107,6 @@ export function initInventory(h) {
     if (document.querySelector(".overlay:not([hidden])")) return;
     openInventory();
   });
-  document.getElementById("btn-bag")?.addEventListener("click", () => openInventory());
 }
 export function openInventory(which) {
   if (!overlay) build();

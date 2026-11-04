@@ -1652,12 +1652,16 @@ await page.waitForFunction(() => window.__PK);
   const ov = ["badge", "stats", "hud", "hp"].filter((k) => hit(bx["btn-me"], bx[k])).concat(["hp", "stats", "badge"].filter((k) => hit(bx["corner-emblem"], bx[k])).map((k) => `엠블럼×${k}`)).concat(hit(bx.stats, bx.badge) ? ["스탯×배지"] : []);
   const em = bx["corner-emblem"];
   const layout = { emblemH: Math.round(em.height), indent: [Math.round(bx.hp.left), Math.round(bx.stats.left)], spans: em.bottom >= bx.stats.top + bx.stats.height / 2, guide: await page.evaluate(() => Boolean(document.getElementById("btn-guide"))) };
-  const bagAt = async () => page.evaluate(() => { const b = document.getElementById("btn-bag").getBoundingClientRect(), q = document.getElementById("quest-tracker").getBoundingClientRect(); return { gap: Math.round(q.top - b.bottom), dx: Math.round(b.left - q.left) }; });
-  const bagM = await bagAt();
-  await page.setViewportSize({ width: 1000, height: 700 }); await tick(10);
-  const bagD = await bagAt();
-  await page.setViewportSize({ width: 390, height: 780 }); await tick(10);
-  check("🎒 가방 버튼은 퀘스트 트래커 바로 위, 왼쪽 맞춤 (모바일·데스크톱)", [bagM, bagD].every((b) => b.gap >= 2 && b.gap <= 16 && Math.abs(b.dx) <= 1), JSON.stringify({ bagM, bagD }));
+  const bagIn = await page.evaluate(() => {
+    document.getElementById("btn-me").click();
+    const btn = document.querySelector("#settings-pop .set-bag"), guide = document.querySelector("#settings-pop .set-guide");
+    const same = btn && guide && Math.abs(btn.getBoundingClientRect().top - guide.getBoundingClientRect().top) < 2;
+    btn?.click();
+    const r = { floating: Boolean(document.getElementById("btn-bag")), same, inv: window.__PK.inventory.isOpen?.() ?? null, popClosed: document.getElementById("settings-pop").hidden };
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return r;
+  });
+  check("🎒 가방은 👤 설정 창 안 — 설명서 버튼 오른쪽 반쪽, 누르면 설정 창이 닫히고 가방이 열린다 (떠 있는 가방 버튼 없음)", !bagIn.floating && bagIn.same && bagIn.inv === true && bagIn.popClosed, JSON.stringify(bagIn));
   check("모바일: 큰 엠블럼이 위 두 줄(HP·스탯)을 차지하고, HP·스탯은 같은 들여쓰기 · 계정 버튼·배지와 겹치지 않음 · 📘 버튼은 설정 창 안으로",
     ov.length === 0 && layout.indent[0] === layout.indent[1] && layout.indent[0] > em.right && layout.spans && !layout.guide, `${ov.join(", ") || "겹침 없음"} · ${JSON.stringify(layout)}`);
   await page.setViewportSize({ width: 1000, height: 700 });

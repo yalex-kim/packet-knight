@@ -1,8 +1,9 @@
-// 👤 계정·설정 버튼 (Stage 13.1) — 예전 🔊 자리. 누르면 계정(로그인 상태·구글 로그인·로그아웃) + 소리 설정 + 설명서
+// 👤 계정·설정 버튼 (Stage 13.1) — 예전 🔊 자리. 누르면 계정(로그인 상태·구글 로그인·로그아웃) + 소리 설정 + 설명서 | 🎒 가방 (Stage 13.5)
 // 버튼 모양이 곧 로그인 상태: 로그인 = 이름 첫 글자 + 초록 점, 게스트 = 👤. 음소거면 작은 🔇 표시.
 
 import * as audio from "./audio.js";
 import { fillAccount, onCloudChange, accountInfo, avatarHtml } from "./cloud.js";
+import { openInventory } from "./inventory.js";
 
 let btn, pop;
 
@@ -31,11 +32,15 @@ function build() {
       <label class="set-row"><span>🔊 소리 <small>(M)</small></span><input type="checkbox" class="set-mute" role="switch" /></label>
       <label class="set-row"><span>🎚️ 볼륨</span><input type="range" class="set-vol" min="0" max="100" step="5" /></label>
     </div>
-    <button type="button" class="set-guide" data-action="tutorial">📘 설명서·튜토리얼 다시 보기</button>`;
+    <div class="set-btns">
+      <button type="button" class="set-guide" data-action="tutorial">📘 설명서 다시 보기</button>
+      <button type="button" class="set-bag">🎒 가방 보기 <small>(I)</small></button>
+    </div>`;
   document.body.append(pop);
   pop.querySelector(".set-mute").addEventListener("change", (e) => { audio.setMuted(!e.target.checked); renderButton(); });
   pop.querySelector(".set-vol").addEventListener("input", (e) => audio.setVolume(e.target.value / 100));
   pop.querySelector(".set-guide").addEventListener("click", closeSettings);
+  pop.querySelector(".set-bag").addEventListener("click", () => { closeSettings(); openInventory(); });
   document.addEventListener("pointerdown", (e) => {
     if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) closeSettings();
   }, { capture: true });
