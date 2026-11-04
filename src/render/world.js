@@ -84,7 +84,7 @@ export const signs = [];
 export function makeSign(text, topY) {
   const font = "bold 44px system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
   const c = document.createElement("canvas");
-  const ctx = c.getContext("2d");
+  const ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.font = font;
   const pad = 22, h = 72;
   c.width = Math.ceil(ctx.measureText(text).width) + pad * 2;
@@ -338,7 +338,7 @@ placeLandmark(tower, "tower");
 function bluetoothTexture() {
   const c = document.createElement("canvas");
   c.width = c.height = 128;
-  const x = c.getContext("2d");
+  const x = c.getContext("2d", { willReadFrequently: true });
   const g = x.createRadialGradient(64, 64, 10, 64, 64, 62);
   g.addColorStop(0, "#2f8cff"); g.addColorStop(1, "#0b4fc4");
   x.fillStyle = g; x.beginPath(); x.arc(64, 64, 60, 0, Math.PI * 2); x.fill();

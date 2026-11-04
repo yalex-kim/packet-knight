@@ -81,13 +81,21 @@ app.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 // 하늘: 위는 하늘색, 지평선은 밝은 안개색 — 떠 있는 섬 뒤로 보인다
 const VILLAGE_SKY_TEX = (() => {
-  const c = document.createElement("canvas");
-  c.width = 2; c.height = 256;
-  const g = c.getContext("2d").createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0, "#7fbfea"); g.addColorStop(0.55, "#bfe0f2"); g.addColorStop(1, "#eef5f1");
-  const ctx = c.getContext("2d"); ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 256);
-  const t = new THREE.CanvasTexture(c);
+  // 캔버스 없이 픽셀 데이터로 — 모바일 크롬이 앱을 내렸다 오면 캔버스 내용을 버려 하늘이 까매지던 문제 (Stage 13.2)
+  const stops = [[0, [0x7f, 0xbf, 0xea]], [0.55, [0xbf, 0xe0, 0xf2]], [1, [0xee, 0xf5, 0xf1]]];
+  const H = 256, px = new Uint8Array(H * 4);
+  for (let y = 0; y < H; y++) {
+    const v = 1 - y / (H - 1);   // DataTexture 는 아래 줄부터 — 위(0) = 하늘 꼭대기
+    const k = v <= stops[1][0] ? 0 : 1;
+    const [a0, c0] = stops[k], [a1, c1] = stops[k + 1], f = (v - a0) / (a1 - a0);
+    for (let i = 0; i < 3; i++) px[y * 4 + i] = Math.round(c0[i] + (c1[i] - c0[i]) * f);
+    px[y * 4 + 3] = 255;
+  }
+  const t = new THREE.DataTexture(px, 1, H);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
   return t;
 })();
 const VILLAGE_FOG = new THREE.Color(0xd8ebf3);

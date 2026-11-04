@@ -138,7 +138,7 @@ function stepPackets(dt) {
 function makeBubble(text) {
   const font = "600 34px 'Pretendard Variable', Pretendard, system-ui, 'Noto Sans KR', sans-serif";
   const c = document.createElement("canvas");
-  const ctx = c.getContext("2d");
+  const ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.font = font;
   const maxW = 520;
   // 낱말 단위 줄바꿈 (한국어는 공백 기준), 너무 길면 3줄째에서 …

@@ -191,7 +191,7 @@ function tagTexture(w) {
   if (!tagTextures.has(w)) {
     const c = document.createElement("canvas");
     c.width = 128; c.height = 40;
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext("2d", { willReadFrequently: true });
     ctx.fillStyle = "rgba(120, 20, 14, 0.85)";
     ctx.fillRect(0, 0, 128, 40);
     ctx.fillStyle = "#ffd6d2";
