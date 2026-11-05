@@ -31,7 +31,7 @@ import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
 import { drawOne } from "./core/specCards.js";
 import { makeTip, itemChapters } from "./core/villagerTips.js";
-import { itemById, takeItem, pickApple, ITEM_FX } from "./core/items.js";
+import { itemById, takeItem, pickApple, ITEM_FX, firstClearItem, giveItem } from "./core/items.js";
 import { goalEvent, checkAchievements, todayKey, ensureDaily, missionById, claimDaily, DAILY_REWARD } from "./core/goals.js";
 import { initDaily, refreshDaily, openDaily, closeDaily, isDailyOpen } from "./ui/daily.js";
 import { VILLAGER_TIP } from "./core/balance.js";
@@ -820,7 +820,14 @@ dungeonUi.initDungeonPanel({
     if (result.ok) {
       run.phase = "open";
       run.observing = false;
+      const firstClear = run.floor > progress.dungeon.maxFloor;   // 🎁 층 첫 클리어 (Stage 13.25)
       applyFloorClear(progress, run.floor, result.stars);
+      if (firstClear) {
+        const it = itemById(firstClearItem(run.floor));
+        giveItem(progress, it.id);
+        sfx("questReady");
+        fx.showToast(`🎁 ${run.floor}층 첫 클리어 상자 — ${it.icon} ${it.name} (가방 › 소지품)`, 4.5);
+      }
       persist();
       tipEvent("floorClear");
       if (!run.hurt && FLOOR_CHEST.NO_DAMAGE_BONUS) {   // 🛡️ 무피해 클리어 (Stage 13.21)

@@ -201,8 +201,37 @@ function cape(g, mat, trimMat) {
     coin(p, sx * 0.02, 0.1, 0, 0.1, 0);
   }
 }
-const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"], magnetron: ["gold"],
-  leaudio: ["auracast"], pawr: ["sig"], retro: ["classic"], aoa: ["gold"], hunter: ["mesh", "meshHood"] };   // Stage 13.22: 기존 옷 틀 + 새 색   // 마그네트론 갑옷 = 금빛 갑옷 모양 + 주황·크롬 색 (Stage 13.19)
+// ---------- 기존 옷 틀을 복제해 색만 바꿔 칠한 옷 (Stage 13.24) ----------
+// 틀(오라캐스트·SIG·금빛·메시)은 색이 모양에 박혀 있어서, 그대로 빌리면 원래 색으로 나온다(LE 오디오 망토가 보라색이던 버그).
+// 틀을 통째로 복제하고 색표(원래 색 → 새 색)대로 재질을 바꿔 칠한다. 펄럭이는 망토도 복제본에 따로 등록한다.
+function recolorCostume(src, dst, map) {
+  const orig = COSTUME[src], copy = orig.clone(true);
+  const a = [], b = [];
+  orig.traverse((o) => a.push(o)); copy.traverse((o) => b.push(o));
+  const cache = new Map();
+  b.forEach((o) => {
+    if (!o.isMesh || !o.material?.color) return;
+    const to = map[o.material.color.getHex()];
+    if (to === undefined) return;
+    const key = `${o.material.uuid}:${to}`;
+    let m = cache.get(key);
+    if (!m) { m = o.material.clone(); m.color.setHex(to); cache.set(key, m); }
+    o.material = m;
+  });
+  for (const c of [...capes]) { const i = a.indexOf(c.top); if (i >= 0) capes.push({ top: b[i], low: b[a.indexOf(c.low)] }); }
+  copy.visible = false;
+  orig.parent.add(copy);
+  COSTUME[dst] = copy;
+}
+recolorCostume("auracast", "leaudio", { 0x7a5cc9: 0x0f8f8a, 0x4f3a8f: 0x0a4f4c, 0xd5c6ff: 0x2ff0e0 });                         // 🎧 청록·검정 + 빛나는 청록 테
+recolorCostume("sig", "pawr", { 0x0b62d6: 0xf2f4f7, 0x0a4aa3: 0xd23a3a, 0xffffff: 0xff4a4a });                                // 🏷️ 흰 제복 + 빨간 치마·룬
+recolorCostume("gold", "aoa", { 0xf2c14e: 0xc9d3de, 0xc9962a: 0x7e8a98, 0xdfe4ea: 0x39d0ff, 0x9aa3ad: 0x1d6f8f });             // 📐 은빛 판 + 하늘색 안테나 원판
+recolorCostume("gold", "magnetron", { 0xf2c14e: 0xff7a1a, 0xc9962a: 0xb8510a, 0xdfe4ea: 0xe8ecf0, 0x9aa3ad: 0xff9a3c });       // 🟧 주황 판 + 크롬 원판
+recolorCostume("mesh", "hunter", { 0x2f8f5a: 0x1f6a3a, 0x22704a: 0x123d24, 0x7dffb5: 0xffd76b });                             // 🎯 짙은 초록 + 금빛 테
+recolorCostume("meshHood", "hunterHood", { 0x2f8f5a: 0x1f6a3a, 0x22704a: 0x123d24, 0x7dffb5: 0xffd76b });
+
+const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"],
+  magnetron: ["magnetron"], leaudio: ["leaudio"], pawr: ["pawr"], retro: ["classic"], aoa: ["aoa"], hunter: ["hunter", "hunterHood"] };   // retro는 classic 틀 — 그 틀은 옷 색(MAT.tabard)을 따른다
 
 // ---------- 무기 ----------
 const shieldParts = [];
@@ -320,7 +349,7 @@ export function setWeapon(w) {
 export function setOutfit(o) {
   const on = new Set(OUTFIT_SET[o.id] ?? ["classic"]);
   for (const [k, g] of Object.entries(COSTUME)) g.visible = on.has(k);
-  const hooded = on.has("meshHood") || on.has("stealthHood");
+  const hooded = on.has("meshHood") || on.has("stealthHood") || on.has("hunterHood");
   helm.visible = plume.visible = !hooded;
   antenna.visible = antennaTip.visible = true;
   MAT.plume.color.setHex(o.plume);

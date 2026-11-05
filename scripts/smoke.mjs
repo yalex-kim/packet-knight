@@ -496,6 +496,8 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const t1 = I.takeItem(fp, "battery"), t2 = I.takeItem(fp, "battery");
     const a1 = I.pickApple(fp, "2026-11-05"), a2 = I.pickApple(fp, "2026-11-05"), a3 = I.pickApple(fp, "2026-11-06");
     const hunterBuy = Sh.buy({ shop: Sh.emptyShop(), cr2032: 999 }, "outfit", "hunter");
+    const fc = [1, 2, 3, 4, 5].map((f) => I.firstClearItem(f)).join();
+    check("🎁 층 첫 클리어 상자: 층 번호대로 🔋 → 📶 → 🛡️ → ⏱️ 소모품 하나", fc === "battery,afhCharm,mic,ciPotion,battery", fc);
     check("🧪 소모품: 사면 CR2032가 줄고 가방에 쌓임, 돈 모자라면 못 삼, 사과는 못 사고 사과나무에서 하루 한 번 · 업적 전용 옷(비콘 사냥꾼)은 살 수 없음 · 새 옷 4벌",
       b1.ok && b2.ok && !poor.ok && poor.reason === "funds" && !apple.ok && fp.cr2032 === 0 && t1 && !t2 && a1 && !a2 && a3 && fp.items.bag.apple === 2
         && !hunterBuy.ok && ["leaudio", "pawr", "retro", "aoa"].every((id) => Sh.OUTFITS.some((o) => o.id === id && o.price > 0)),

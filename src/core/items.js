@@ -37,6 +37,11 @@ export function takeItem(progress, id) {
   if (n === 1) delete progress.items.bag[id]; else progress.items.bag[id] = n - 1;
   return true;
 }
+/** 🎁 층 첫 클리어 보상 (Stage 13.25): 층 번호대로 돌아가며 소모품 하나 — 🔋 → 📶 → 🛡️ → ⏱️ (CR2032 수지에 영향 없음) */
+export const FIRST_CLEAR_ITEMS = Object.freeze(["battery", "afhCharm", "mic", "ciPotion"]);
+export function firstClearItem(floor) { return FIRST_CLEAR_ITEMS[(floor - 1) % FIRST_CLEAR_ITEMS.length]; }
+export function giveItem(progress, id, n = 1) { progress.items.bag[id] = Math.min(99, (progress.items.bag[id] ?? 0) + n); }
+
 /** 🍎 오늘 사과를 아직 안 주웠으면 하나 (true) */
 export function pickApple(progress, day) {
   if (progress.items.appleDay === day) return false;

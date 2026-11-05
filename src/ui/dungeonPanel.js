@@ -90,7 +90,7 @@ export function openEntry({ floor, fromPortal }) {
   }));
   render(
     header(fromPortal ? "🌀 다음 층 포털" : "⚔️ 37채널 호핑 던전", `${floor}층 · ${plan.name}${fromPortal ? ` — ${floor - 1}층 클리어!` : ` · 최고 기록 ${best}층`}`),
-    picker && el("h3", { class: "dg-brief-title", textContent: "🗺️ 층 고르기 — 깬 층은 다시 도전할 수 있어요 (상자 없음 · 보스 동전 적게)" }),
+    picker && el("h3", { class: "dg-brief-title", textContent: "🗺️ 층 고르기 — 깬 층은 다시 도전할 수 있어요 (상자 없음 · 보스 동전 적게) · 🆕 새 층을 처음 깨면 🎁 소모품 상자" }),
     picker,
     el("h3", { class: "dg-brief-title", textContent: `📋 몬스터 브리핑 — ${plan.roster.length}마리${replay ? " · 다시 도전" : ""}` }),
     brief,
