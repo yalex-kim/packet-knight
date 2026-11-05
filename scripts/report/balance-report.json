@@ -1,6 +1,6 @@
 {
   "generatedBy": "node scripts/simulate.mjs",
-  "balanceHash": "8e1ed1e4811e1178",
+  "balanceHash": "f957773ac2eafeaa",
   "seed": 1,
   "bots": 1000,
   "strategy": "all",
@@ -203,107 +203,107 @@
     {
       "mode": "stand",
       "gear": 0,
-      "clearPct": 95,
-      "koPct": 5,
-      "clearTime": 18.3
-    },
-    {
-      "mode": "stand",
-      "gear": 1,
-      "clearPct": 98,
-      "koPct": 2,
-      "clearTime": 17.1
-    },
-    {
-      "mode": "stand",
-      "gear": 2,
-      "clearPct": 99.5,
-      "koPct": 0.5,
-      "clearTime": 16
-    },
-    {
-      "mode": "stand",
-      "gear": 3,
-      "clearPct": 100,
-      "koPct": 0,
-      "clearTime": 14.7
-    },
-    {
-      "mode": "stand",
-      "gear": 4,
-      "clearPct": 99.5,
-      "koPct": 0.5,
-      "clearTime": 14.4
-    },
-    {
-      "mode": "kite",
-      "gear": 0,
       "clearPct": 99,
       "koPct": 1,
-      "clearTime": 16
-    },
-    {
-      "mode": "kite",
-      "gear": 1,
-      "clearPct": 99,
-      "koPct": 1,
-      "clearTime": 16.2
-    },
-    {
-      "mode": "kite",
-      "gear": 2,
-      "clearPct": 100,
-      "koPct": 0,
       "clearTime": 14.5
     },
     {
+      "mode": "stand",
+      "gear": 1,
+      "clearPct": 99,
+      "koPct": 1,
+      "clearTime": 14.3
+    },
+    {
+      "mode": "stand",
+      "gear": 2,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 12.5
+    },
+    {
+      "mode": "stand",
+      "gear": 3,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 12.5
+    },
+    {
+      "mode": "stand",
+      "gear": 4,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 12.5
+    },
+    {
+      "mode": "kite",
+      "gear": 0,
+      "clearPct": 99.5,
+      "koPct": 0.5,
+      "clearTime": 14
+    },
+    {
+      "mode": "kite",
+      "gear": 1,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 13.6
+    },
+    {
+      "mode": "kite",
+      "gear": 2,
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 11.7
+    },
+    {
       "mode": "kite",
       "gear": 3,
       "clearPct": 100,
       "koPct": 0,
-      "clearTime": 13.4
+      "clearTime": 11.7
     },
     {
       "mode": "kite",
       "gear": 4,
       "clearPct": 100,
       "koPct": 0,
-      "clearTime": 13.7
+      "clearTime": 11.8
     },
     {
       "mode": "rush",
       "gear": 0,
-      "clearPct": 91.5,
-      "koPct": 8.5,
-      "clearTime": 21.1
+      "clearPct": 98.5,
+      "koPct": 1.5,
+      "clearTime": 17.7
     },
     {
       "mode": "rush",
       "gear": 1,
-      "clearPct": 89.5,
-      "koPct": 10.5,
-      "clearTime": 21.6
+      "clearPct": 99,
+      "koPct": 1,
+      "clearTime": 17.6
     },
     {
       "mode": "rush",
       "gear": 2,
-      "clearPct": 94.5,
-      "koPct": 5.5,
-      "clearTime": 18.7
+      "clearPct": 98.5,
+      "koPct": 1.5,
+      "clearTime": 14.3
     },
     {
       "mode": "rush",
       "gear": 3,
-      "clearPct": 98.5,
-      "koPct": 1.5,
-      "clearTime": 17.1
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 13.8
     },
     {
       "mode": "rush",
       "gear": 4,
-      "clearPct": 98.5,
-      "koPct": 1.5,
-      "clearTime": 17.6
+      "clearPct": 100,
+      "koPct": 0,
+      "clearTime": 13.8
     }
   ],
   "quizContribution": [
@@ -404,6 +404,26 @@
             "Q8": {
               "donePct": 0,
               "meanMin": null
+            },
+            "Q9": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q10": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q11": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q12": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q13": {
+              "donePct": 0,
+              "meanMin": null
             }
           },
           "meanQuestMin": 13,
@@ -473,6 +493,26 @@
               "meanMin": null
             },
             "Q8": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q9": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q10": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q11": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q12": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q13": {
               "donePct": 0,
               "meanMin": null
             }
@@ -546,6 +586,26 @@
             "Q8": {
               "donePct": 0,
               "meanMin": null
+            },
+            "Q9": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q10": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q11": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q12": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q13": {
+              "donePct": 0,
+              "meanMin": null
             }
           },
           "meanQuestMin": 12.6,
@@ -615,6 +675,26 @@
               "meanMin": null
             },
             "Q8": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q9": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q10": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q11": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q12": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q13": {
               "donePct": 0,
               "meanMin": null
             }
@@ -688,6 +768,26 @@
             "Q8": {
               "donePct": 0,
               "meanMin": null
+            },
+            "Q9": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q10": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q11": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q12": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q13": {
+              "donePct": 0,
+              "meanMin": null
             }
           },
           "meanQuestMin": 12.7,
@@ -759,6 +859,26 @@
             "Q8": {
               "donePct": 0,
               "meanMin": null
+            },
+            "Q9": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q10": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q11": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q12": {
+              "donePct": 0,
+              "meanMin": null
+            },
+            "Q13": {
+              "donePct": 0,
+              "meanMin": null
             }
           },
           "meanQuestMin": null,
@@ -780,7 +900,7 @@
       "id": "questTime",
       "label": "퀘스트 하나 완료에 걸리는 시간 평균 (중간 전략, 직전 퀘스트 완료부터 · 1시간 안에 끝낸 Q0~Q3)",
       "target": "10~20분",
-      "value": "12.6분 (1시간에 4개 · Q0 100%@6.5분 · Q1 100%@20.5분 · Q2 100%@35.5분 · Q3 100%@50.5분 · Q4 0% · Q5 0% · Q6 0% · Q7 0% · Q8 0%)",
+      "value": "12.6분 (1시간에 4개 · Q0 100%@6.5분 · Q1 100%@20.5분 · Q2 100%@35.5분 · Q3 100%@50.5분 · Q4 0% · Q5 0% · Q6 0% · Q7 0% · Q8 0% · Q9 0% · Q10 0% · Q11 0% · Q12 0% · Q13 0%)",
       "pass": true,
       "note": "Stage 9: 대리 지표(첫 던전 클리어 시간)를 실제 퀘스트 완료 시간(core/quests.js 판정)으로 교체"
     },
@@ -828,5 +948,5 @@
       "note": "Stage 8에서 합격 판정에 포함 (사용자 결정: 도달 층 기준) — 공부 시간의 기회비용까지 따진 학습 인센티브"
     }
   ],
-  "elapsedSec": 104.6
+  "elapsedSec": 103.8
 }

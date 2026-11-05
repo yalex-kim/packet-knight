@@ -65,7 +65,7 @@ export function refreshTracker() {
   // 한 줄로 접는다 (모바일에서 화면을 가리지 않게) — 단계 전체는 눌러서 여는 퀘스트 로그에 있다
   if (!quest) {
     tracker.replaceChildren(el("span", { class: "qt-head", textContent: `📜 Q0~${QUESTS.at(-1).code} 완료` }),
-      el("span", { class: "qt-next", textContent: ` · 다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 업데이트에서` }));
+      el("span", { class: "qt-next", textContent: UPCOMING_QUESTS.length ? ` · 다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 업데이트에서` : " · 모든 퀘스트를 끝냈다!" }));
     tracker.title = "";
     tracker.classList.remove("ready");
     return;
@@ -180,7 +180,7 @@ function renderPop() {
   const fullLog = button("📜 전체 퀘스트 로그", () => { closeQuestPop(); openQuestLog(); }, "lib-btn qp-log");
   if (!quest) {
     pop.replaceChildren(el("div", { class: "qp-head" }, el("b", { textContent: `📜 Q0~${QUESTS.at(-1).code} 모두 완료` }), close),
-      el("div", { class: "muted", textContent: `다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 다음 업데이트에서 열린다` }),
+      el("div", { class: "muted", textContent: UPCOMING_QUESTS.length ? `다음 퀘스트(${UPCOMING_QUESTS[0][0]}~)는 다음 업데이트에서 열린다` : "🏅 모든 퀘스트를 끝냈다 — 사과나무 랭킹과 오늘의 임무에 도전해 보자" }),
       el("div", { class: "lib-actions" }, fullLog));
     return;
   }

@@ -229,7 +229,7 @@ function stepMonster(battle, m, dt, ctx, events) {
             events.push({ type: "shieldBlock", monster: m }); // AES 실드: MIC 검사 실패 → 위조 패킷 폐기 (Stage 10)
           } else {
             // bandMul < 1 = 근접 블로킹 (Stage 13.11): 대역 밖이어도 전자레인지 바로 옆이면 일부가 들어온다
-            const { amount, crit } = computeDamage(m.atk ?? def.atk, bandMul, ctx.stats.sec, ctx.rng);
+            const { amount, crit } = computeDamage((m.atk ?? def.atk) * (ctx.monsterDmgMul?.(m) ?? 1), bandMul, ctx.stats.sec, ctx.rng);   // monsterDmgMul: 퀘스트 보상 등 (Stage 13.27)
             p.hp = Math.max(0, p.hp - amount);
             p.sinceHit = 0;
             events.push({ type: "playerHit", monster: m, amount, crit, ...(bandMul < 1 ? { blocking: true } : {}) });

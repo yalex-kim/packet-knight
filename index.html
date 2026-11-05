@@ -842,6 +842,27 @@
     background: rgba(57, 208, 255, .1); border: 1.5px solid rgba(57, 208, 255, .45); color: #e2f1ff; font-size: 15px; }
   #cloud-choose button span { font-size: 12.5px; color: #9db4cc; }
   #cloud-choose button:hover, #cloud-choose button:focus-visible { background: rgba(57, 208, 255, .22); outline: none; }
+  /* 📜 주민 실습 의뢰 (Stage 13.27) */
+  #trial .panel.tr { max-width: 520px; }
+  .tr-book { display: inline-flex; min-height: 30px; align-items: center; font-size: 13px; color: #7de3ff; }
+  .tr-q { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.6; margin: 10px 0; }
+  .tr-opts { display: grid; gap: 6px; }
+  .tr-opts .opt { text-align: left; }
+  .tr-fb { margin: 8px 0; padding: 8px 10px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+  .tr-fb.ok { background: rgba(60, 207, 110, .15); color: #c8f5d8; }
+  .tr-fb.bad { background: rgba(255, 90, 90, .15); color: #ffd0d0; }
+  svg.mesh { width: 100%; max-height: 260px; background: rgba(0,0,0,.25); border-radius: 12px; margin: 6px 0; }
+  .mn { cursor: pointer; }
+  .mn-reach { fill: rgba(57, 208, 255, .07); stroke: rgba(57, 208, 255, .35); stroke-dasharray: 4 4; }
+  .mn-dot { fill: #12263f; stroke: #3a5878; stroke-width: 2; }
+  .mn.rel .mn-dot { stroke: #39d0ff; stroke-width: 4; }
+  .mn.src .mn-dot { fill: #3a2a00; stroke: #ffd76b; stroke-width: 3; }
+  .mn.got .mn-dot { fill: #4a3a00; }
+  .mn text { font-size: 16px; pointer-events: none; }
+  .mesh-ctl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .mesh-ctl .ttl { display: inline-flex; align-items: center; gap: 6px; }
+  .mesh-ctl .ttl .lib-btn { min-width: 36px; padding: 0; }
+  #talk .talk-task { background: linear-gradient(100deg, #39d0ff, #7de3ff); color: #04121f; border-color: transparent; font-weight: 800; }
   /* 🗺️ 던전 층 고르기 (Stage 13.24) */
   .dg-floors { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; max-height: 120px; overflow-y: auto; }
   .dg-floors .dg-floor { min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 13px; }

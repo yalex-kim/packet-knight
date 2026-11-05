@@ -114,7 +114,8 @@ function validate(raw) {
     goals: validGoals(raw.goals),
     items: validItems(raw.items),
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
-    quests: { active: q.active, progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) }, claimed: { ...(q.claimed ?? {}) } },
+    // Stage 13.27: Q8까지 끝내 active가 null이던 세이브는 새 퀘스트(Q9~)의 첫 미완료로 이어 간다
+    quests: { active: q.active ?? (QUESTS.find((x) => !q.done[x.id])?.id ?? null), progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) }, claimed: { ...(q.claimed ?? {}) } },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),
     metrics: { quizAttempts: { ...m.quizAttempts }, quizPerfect: { ...m.quizPerfect }, chapterOpens: { ...m.chapterOpens } }
   };

@@ -6,7 +6,7 @@ import { CHAPTERS } from "../core/chapters.data.js";
 import { chapterUrl } from "../core/book.js";
 import { askQuestion } from "./specCard.js";
 
-let box, hooks, current = null, typing = 0, lastText = null, tip = null;
+let box, hooks, current = null, typing = 0, lastText = null, tip = null, task = null;
 
 function build() {
   box = document.createElement("div");
@@ -22,6 +22,7 @@ function build() {
       <p class="talk-text" aria-live="polite"></p>
       <div class="talk-quiz" hidden></div>
       <div class="talk-actions">
+        <button type="button" class="talk-btn talk-task" hidden></button>
         <button type="button" class="talk-btn talk-tipq" hidden></button>
         <button type="button" class="talk-btn talk-more">💬 다른 이야기</button>
         <a class="talk-btn talk-book" target="_blank" rel="noopener"></a>
@@ -31,6 +32,7 @@ function build() {
   box.querySelector(".talk-close").addEventListener("click", closeTalk);
   box.querySelector(".talk-more").addEventListener("click", () => speak());
   box.querySelector(".talk-tipq").addEventListener("click", startTipQuiz);
+  box.querySelector(".talk-task").addEventListener("click", () => { const t = task; closeTalk(); t?.run(); });
   box.querySelector(".talk-text").addEventListener("click", finishTyping);
   box.querySelector(".talk-book").addEventListener("click", () => hooks.onChapterOpen?.(box.querySelector(".talk-book").dataset.chapter));
   window.addEventListener("keydown", (e) => {
@@ -98,9 +100,13 @@ export function initTalk(h) { hooks = h; }
  * @param {{ id: string, name: string, role: string, face: string, topics: string[] }} villager
  * @param {{ card: { chapter: string, text: string }, question: any, reward: number, onAnswer: (ok: boolean) => void } | null} [tipInfo] 💡 이야기 (Stage 13.14)
  */
-export function openTalk(villager, tipInfo = null) {
+export function openTalk(villager, tipInfo = null, taskInfo = null) {
   if (!box) build();
   current = villager;
+  task = taskInfo;   // 📜 실습 의뢰 (Stage 13.27): { label, run }
+  const tb = box.querySelector(".talk-task");
+  tb.hidden = !task;
+  if (task) tb.textContent = `📜 의뢰: ${task.label}`;
   tip = tipInfo && { ...tipInfo, told: false };
   if (tip) box.querySelector(".talk-tipq").textContent = `🎯 맞혀 볼래? 🪙 +${tip.reward}`;
   lastText = null;

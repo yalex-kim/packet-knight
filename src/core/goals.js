@@ -27,7 +27,7 @@ export const ACHIEVEMENTS = Object.freeze([
   { id: "tips20", icon: "💡", title: "마을의 귀 밝은 기사", desc: "주민 퀴즈 20개 맞히기", reward: 15, check: (p, c) => (c.tipRight ?? 0) >= 20 },
   { id: "bestiary", icon: "📖", title: "도감 완성", desc: "모든 몬스터를 도감에 올렸다", reward: 15, check: (p) => Object.keys(MONSTERS).every((k) => p.bestiary?.[k]) },
   { id: "kill100", icon: "⚔️", title: "백 번의 패킷", desc: "몬스터 100마리 처치", reward: 10, check: (p) => Object.values(p.bestiary ?? {}).reduce((n, b) => n + (b.kills ?? 0), 0) >= 100 },
-  { id: "allBadges", icon: "🏅", title: "완독 기사", desc: "퀘스트 9개를 모두 끝냈다", reward: 25, check: (p) => QUESTS.every((q) => p.quests?.done?.[q.id]) },
+  { id: "allBadges", icon: "🏅", title: "완독 기사", desc: "퀘스트 14개를 모두 끝냈다", reward: 25, check: (p) => QUESTS.every((q) => p.quests?.done?.[q.id]) },
   { id: "wardrobe", icon: "👗", title: "옷장 가득", desc: "상점의 옷을 모두 모았다", reward: 10, check: (p) => OUTFITS.filter((o) => !o.bossOnly && !o.achOnly).every((o) => p.shop?.outfits?.includes(o.id)) }
 ]);
 

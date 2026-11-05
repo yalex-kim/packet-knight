@@ -25,7 +25,7 @@ const STEP_PLACE = {
   floor: "dungeonGate", visit: "hall", trial: "prison", contracts: "crypt"
 };
 /** @param {QuestStep} step @returns {string|null} */
-export const stepPlace = (step) => STEP_PLACE[step.id] ?? null;
+export const stepPlace = (step) => step.place ?? STEP_PLACE[step.id] ?? null;
 
 export const QUESTS = [
   {
@@ -114,14 +114,57 @@ export const QUESTS = [
       { id: "contracts", text: "지하묘지: CR2032 배터리 계약 3건 완수 (간격·지연·수면 시계)", kind: "event", event: "power", need: 1 },
       { id: "whatif", text: "🔮 예측해 보기: 광고 간격 2 s → 4 s, 수명은 정확히 두 배?", kind: "whatif", whatif: 0 }
     ]
+  },
+  // ---- Stage 13.27: 남은 다섯 장 — 도서관 강좌 → 주민의 실습 의뢰(core/trials.js) → 예측해 보기 ----
+  {
+    id: "Q9", code: "Q9", title: "간섭 속의 공존", chapter: "coexistence", region: "도서관 앞 — QA 엔지니어",
+    reward: { label: "PTA 우선권 — Wi-Fi 간섭 몬스터에게 받는 피해 ×0.8", perk: "pta" },
+    steps: [
+      { id: "course", text: "도서관: '공존: 2.4 GHz를 나눠 쓰는 법' 만점 이수", kind: "state", check: (p) => Boolean(p.cleared.coexistence) },
+      { id: "work", text: "QA 엔지니어의 📶 공존 조율 의뢰 통과 (말을 걸어 받기)", kind: "event", event: "trial", match: { place: "coex" }, need: 1, place: "library" },
+      { id: "whatif", text: "🔮 예측해 보기: 순수 TDM에서 센트럴 시계의 기준점", kind: "whatif", whatif: 0 }
+    ]
+  },
+  {
+    id: "Q10", code: "Q10", title: "타워에 신호를 릴레이하라", chapter: "mesh", region: "전파의 등대 — 등대지기",
+    reward: { label: "❤️ HP +10 · 칭호 '릴레이 기사'", bonus: { hp: 10 }, title: "릴레이 기사" },
+    steps: [
+      { id: "course", text: "도서관: '메시와 사물 인터넷' 만점 이수", kind: "state", check: (p) => Boolean(p.cleared.mesh) },
+      { id: "work", text: "등대지기의 💡 릴레이 배치 의뢰 통과 (3단계 퍼즐)", kind: "event", event: "trial", match: { place: "mesh" }, need: 1, place: "tower" },
+      { id: "whatif", text: "🔮 예측해 보기: 가격표 5,000개를 메시로 하면", kind: "whatif", whatif: 0 }
+    ]
+  },
+  {
+    id: "Q11", code: "Q11", title: "광장에 방송을 울려라", chapter: "audio", region: "광장 남쪽 — 펌웨어 개발자",
+    reward: { label: "💨 RX +3 (회피)", bonus: { rx: 3 } },
+    steps: [
+      { id: "course", text: "도서관: '블루투스 오디오' 만점 이수", kind: "state", check: (p) => Boolean(p.cleared.audio) },
+      { id: "work", text: "펌웨어 개발자의 🎧 방송 세팅 의뢰 통과", kind: "event", event: "trial", match: { place: "audio" }, need: 1, place: "fountain" },
+      { id: "whatif", text: "🔮 예측해 보기: Auracast 청취자가 100명이 되면", kind: "whatif", whatif: 0 }
+    ]
+  },
+  {
+    id: "Q12", code: "Q12", title: "전파로 위치를 잡아라", chapter: "location", region: "패킷 대장간 — 대장장이",
+    reward: { label: "⚔️ TX +2 · CR2032 10개", bonus: { tx: 2 }, cr2032: 10 },
+    steps: [
+      { id: "course", text: "도서관: '위치 찾기: RSSI에서 채널 사운딩까지' 만점 이수", kind: "state", check: (p) => Boolean(p.cleared.location) },
+      { id: "work", text: "대장장이의 📍 보물 탐지기 의뢰 통과", kind: "event", event: "trial", match: { place: "loc" }, need: 1, place: "forge" },
+      { id: "whatif", text: "🔮 예측해 보기: 디지털 키를 노린 중계 공격", kind: "whatif", whatif: 0 }
+    ]
+  },
+  {
+    id: "Q13", code: "Q13", title: "기사의 설계 철학", chapter: "design", region: "도서관 — 사서",
+    reward: { label: "칭호 '설계 기사' · CR2032 20개", title: "설계 기사", cr2032: 20 },
+    steps: [
+      { id: "course", text: "도서관: '블루투스 제품 설계 플레이그라운드' 만점 이수", kind: "state", check: (p) => Boolean(p.cleared.design) },
+      { id: "work", text: "사서의 🛠️ 제품 설계 심사 통과", kind: "event", event: "trial", match: { place: "design" }, need: 1, place: "library" },
+      { id: "whatif", text: "🔮 예측해 보기: 몸에 붙이면 12 dB — 도달 거리는?", kind: "whatif", whatif: 0 }
+    ]
   }
 ];
 
-/** 로드맵에만 있는 이후 퀘스트 (퀘스트 로그에 잠금으로 표시) — PRD §6 */
-export const UPCOMING_QUESTS = [
-  ["Q9", "간섭 속의 공존", "coexistence"],
-  ["Q10", "타워에 신호를 릴레이하라", "mesh"], ["Q11", "소리로 위치를 잡아라", "audio"], ["Q12", "기사의 설계 철학", "design"]
-];
+/** 로드맵에만 있는 이후 퀘스트 (퀘스트 로그에 잠금으로 표시) — PRD §6. Stage 13.27에서 Q9~Q13으로 모두 만들어 비었다 */
+export const UPCOMING_QUESTS = [];
 
 export const PERKS = Object.freeze({
   dle: Object.freeze({ rangeMul: 1.5, label: "DLE — ADV 패킷 사거리 ×1.5" }),
@@ -129,6 +172,7 @@ export const PERKS = Object.freeze({
   afh: Object.freeze({ label: "AFH — 간섭 채널 자동 빼기" }),
   dash: Object.freeze({ label: "Connect Request 돌진" }),
   gattAccess: Object.freeze({ label: "서비스 상자 열기 권한" }),
+  pta: Object.freeze({ wifiDmgMul: 0.8, label: "PTA 우선권 — Wi-Fi 간섭 피해 ×0.8" }),
   aesShield: Object.freeze({ label: "AES 암호화 실드" })
 });
 

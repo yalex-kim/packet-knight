@@ -464,9 +464,9 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
   const rc0 = P.chargeCfg(p).RECHARGE_SEC;
   p.cleared.power = "x"; Q9.questEvent(qs, { type: "power" });
   const r8 = ans("Q8");
-  check("Q4~Q8: AFH·돌진·서비스 상자 권한·AES 실드·PWR +20 보상, 다른 장소 방문·A등급은 불인정",
+  check("Q4~Q8: AFH·돌진·서비스 상자 권한·AES 실드·PWR +20 보상, 다른 장소 방문·A등급은 불인정, 다음은 Q9",
     !afhBefore && r4 === "Q4" && P.hasAfhSkill(p) && r5 === "Q5" && qs.perks.dash && !r6early && r6 === "Q6" && qs.perks.gattAccess
-      && r7 === "Q7" && qs.perks.aesShield && r8 === "Q8" && qs.active === null && Q9.badges(qs).length === 9,
+      && r7 === "Q7" && qs.perks.aesShield && r8 === "Q8" && qs.active === "Q9" && Q9.badges(qs).length === 9,
     `완독 배지 ${Q9.badges(qs).length}개`);
   check("PWR가 측정기 충전 시간을 줄인다 (RECHARGE_SEC × 100 / PWR)", rc0 === 300 && P.chargeCfg(p).RECHARGE_SEC === 250, `${rc0}초 → ${P.chargeCfg(p).RECHARGE_SEC}초`);
 
@@ -479,6 +479,24 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 📜 퀘스트 Q9~Q13 (Stage 13.27): 남은 다섯 장, 실습 의뢰, Q8을 끝낸 세이브는 Q9로 이어 간다, 메시 퍼즐은 한도 안에서 풀린다
+  {
+    const Qs = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).href);
+    const Tr = await import(pathToFileURL(path.join(ROOT, "src/core/trials.js")).href);
+    const Pg = await import(pathToFileURL(path.join(ROOT, "src/core/progress.js")).href);
+    const ids = Qs.QUESTS.map((q) => q.id);
+    const chapters = Qs.QUESTS.map((q) => q.chapter);
+    const whatifOk = Qs.QUESTS.every((q) => Qs.whatifFor(q)?.options?.length);
+    const old = Pg.createProgress(); for (const q of Qs.QUESTS.slice(0, 9)) old.quests.done[q.id] = "x"; old.quests.active = null;
+    const mem = new Map([[Pg.SAVE_KEY, JSON.stringify(old)]]);
+    const migrated = Pg.loadProgress({ getItem: (k) => mem.get(k) ?? null, setItem: () => {} }).progress.quests.active;
+    const sols = [[[1, 3], 3], [[2, 3, 5], 3], [[1, 5, 7], 3]];
+    const meshOk = Tr.MESH_LEVELS.every((L, i) => Tr.runMesh(L, new Set(sols[i][0]), sols[i][1]).ok) && !Tr.runMesh(Tr.MESH_LEVELS[0], new Set([1, 2, 3, 4]), 5).ok;
+    const g = Tr.gradeTrial(Tr.TRIALS.coex, Tr.TRIALS.coex.rounds.map((r) => r.answer));
+    check("퀘스트 14개(Q0~Q13)가 교과서 14장을 모두 덮고 예측해 보기가 있다 · Q8까지 끝낸 세이브는 Q9로 · 메시 퍼즐은 한도 안에서 풀리고 릴레이를 다 켜면 실패 · 의뢰 채점",
+      ids.length === 14 && ids.at(-1) === "Q13" && new Set(chapters).size === 14 && whatifOk && Qs.UPCOMING_QUESTS.length === 0 && migrated === "Q9" && meshOk && g.passed && g.score === 4,
+      `${ids.join(",")} · 이어서 ${migrated}`);
+  }
   // 🗺️ 다시 도전 (Stage 13.24): 이미 깬 보스 층은 보스 동전 ×0.2
   {
     const D = await import(pathToFileURL(path.join(ROOT, "src/core/dungeon.js")).href);
@@ -1632,7 +1650,7 @@ await page.waitForFunction(() => window.__PK);
     .map((id) => [id, document.getElementById(id).getBoundingClientRect().toJSON()])));
   const hit = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
   const ov = ["btn-fire", "btn-jump", "quest-tracker", "stats", "hp", "joystick-zone"].filter((k) => hit(boxes["btn-dash"], boxes[k]));
-  check("Stage 10 진행이 저장되고, 모바일 폭에서 돌진 버튼이 겹치지 않는다", kept.active === null && kept.perks.aesShield && boxes["btn-dash"].width > 0 && ov.length === 0, ov.join(", ") || "겹침 없음");
+  check("Stage 10 진행이 저장되고, 모바일 폭에서 돌진 버튼이 겹치지 않는다", kept.active === "Q9" && kept.perks.aesShield && boxes["btn-dash"].width > 0 && ov.length === 0, ov.join(", ") || "겹침 없음");
   await page.setViewportSize({ width: 1000, height: 700 });
 }
 
@@ -2173,6 +2191,24 @@ await page.waitForFunction(() => window.__PK);
     itemUi.tabs === 2 && itemUi.items === 4 && itemUi.apples === 1 && itemUi.hpAfter > 10 && /사과/.test(itemUi.note) && itemUi.applesLeft === 0, JSON.stringify(itemUi));
   check("📅 오늘의 임무 버튼이 퀘스트 트래커 바로 위(왼쪽 맞춤), 누르면 임무 창(3줄, 다 하기 전엔 상자 잠김)·Esc로 닫힘, 퀘스트 로그엔 없음 · 가방 › 소지품에 🏅 업적 8개",
     gui.open && gui.daily === 3 && gui.chest === true && gui.above && /오늘의 임무/.test(gui.label) && gui.inLog === 0 && gui.closed && gui.ach === 8, JSON.stringify(gui));
+  // 📜 실습 의뢰 UI: Q9가 진행 중이고 강좌를 이수했으면 QA 엔지니어에게 의뢰 버튼 → 4라운드 → 통과하면 단계 완료
+  const tri = await page.evaluate(async () => {
+    const P = window.__PK;
+    const before = P.progress().quests.active;
+    const r = { before, taskBefore: P.trial.taskFor("walkerB") };
+    P.trial.open("coex");
+    const st = P.trial.state();
+    for (let i = 0; i < 4; i++) { const ans = st.order[i]; document.querySelector(`#trial [data-act="pick"][data-k="${ans}"]`)?.click(); }
+    r.result = document.querySelector("#trial .result-big")?.textContent ?? "";
+    document.querySelector('#trial [data-act="close"]')?.click();
+    P.trial.open("mesh");
+    r.meshNodes = document.querySelectorAll("#trial .mn").length;
+    document.querySelector('#trial [data-act="close"]')?.click();
+    r.closed = !P.trial.isOpen();
+    return r;
+  });
+  check("📜 실습 의뢰 창: 4라운드를 다 맞히면 '의뢰 완료', 메시 퍼즐은 조명 노드가 그려지고 닫힌다",
+    /4 \/ 4/.test(tri.result) && /의뢰 완료/.test(tri.result) && tri.meshNodes === 6 && tri.closed, JSON.stringify(tri));
   check("교과서 링크(?quest=Q7): 그 퀘스트를 퀘스트 로그로 연다 (없는 퀘스트는 무시)", dl.ok && !dl.bad && dl.open && /Q7/.test(dl.title), JSON.stringify(dl));
   check("💡 주민 이야기: 층 클리어 → 관련 장(호핑·공존·연결) 주민 머리 위 💡(한 번에 하나), 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래 정답 🪙+2, 들은 뒤 2분 쿨다운",
     ["hopping", "coexistence", "connection"].includes(sc.st.chapter) && sc.marker === sc.st.villagerId && sc.oneAtATime && sc.full.startsWith("💡") && sc.markerGone && sc.qbtn && sc.gain === 2 && sc.cooldown && sc.afterCooldown

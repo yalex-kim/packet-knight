@@ -34,6 +34,8 @@ import { makeTip, itemChapters } from "./core/villagerTips.js";
 import { itemById, takeItem, pickApple, ITEM_FX, firstClearItem, giveItem } from "./core/items.js";
 import { goalEvent, checkAchievements, todayKey, ensureDaily, missionById, claimDaily, DAILY_REWARD } from "./core/goals.js";
 import { initDaily, refreshDaily, openDaily, closeDaily, isDailyOpen } from "./ui/daily.js";
+import { initTrial, openTrial, isTrialOpen, trialState } from "./ui/trial.js";
+import { TRIALS } from "./core/trials.js";
 import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -46,7 +48,7 @@ import { initLibrary, openLibrary, isLibraryOpen, currentAnswerKey, chapterLink,
 import * as questLog from "./ui/questLog.js";
 import * as audio from "./ui/audio.js";
 import { sfx, SFX_NAMES } from "./ui/audio.js";
-import { questEvent, answerWhatif, questById, readyForWhatif, PERKS } from "./core/quests.js";
+import { questEvent, answerWhatif, questById, readyForWhatif, PERKS, stepDone } from "./core/quests.js";
 import {
   SAVE_KEY, loadProgress, saveProgress, effectiveStats, applyQuizResult, recordChapterOpen
 } from "./core/progress.js";
@@ -658,9 +660,19 @@ initInventory({
   onOpenChange: (open) => { setInputEnabled(!open); inputLocked = open; if (open) { clearMoveTarget(); hud.hideModal(); } }
 });
 
+/** 📜 지금 진행 중인 퀘스트에서 이 주민이 맡길 실습 의뢰 (Stage 13.27) */
+function taskFor(v) {
+  const q = questById(progress.quests.active);
+  const step = q?.steps.find((s) => s.id === "work");
+  const t = step && Object.values(TRIALS).find((x) => x.quest === q.id && x.villager === v.id);
+  if (!t || stepDone(progress.quests, progress, q, step)) return null;
+  return { label: t.title, run: () => openTrial(t.id) };
+}
 function talkTo(v) {
   hud.hideModal();
   clearMoveTarget();
+  const task = taskFor(v);
+  if (task) { openTalk(v, null, task); return; }
   if (tip && tip.villagerId === v.id) {   // 💡 이야기 (Stage 13.14) — 들으면 💡는 사라지고 쿨다운
     const t = tip;
     tip = null;
@@ -1127,6 +1139,7 @@ function simulate(dt) {
     handleBattleEvents(stepBattle(activeBattle(), dt, {
       player: motor, stats: effectiveStats(progress), rng: battleRng, interference,
       invulnerable: dash.t > 0,
+      monsterDmgMul: (m) => (progress.quests.perks.pta && m.type === "wifiInterferer" ? PERKS.pta.wifiDmgMul : 1),   // PTA 우선권 (Q9)
       shieldBlock: run?.micLeft > 0 ? 1 : progress.quests.perks.aesShield ? QUEST_SKILLS.AES_SHIELD.blockChance : 0   // 🛡️ MIC 두루마리 (Stage 13.22)
     }));
   }
@@ -1276,6 +1289,11 @@ function claimDailyChest() {
   refreshDaily();
   return n;
 }
+initTrial({
+  onPassed: (id) => { questProgress({ type: "trial", place: id }); fx.showToast(`📜 ${TRIALS[id].title} 통과! — 퀘스트 로그에서 🔮 예측해 보기`, 4); },
+  onOpenChange: overlayChange,
+  sfx
+});
 initDaily({ getDaily: () => ensureDaily(progress.goals), onClaim: claimDailyChest, onOpenChange: overlayChange });
 
 // ---------- 💡 주민이 들려주는 스펙 이야기 (Stage 13.14): 이벤트 → 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래 ----------
@@ -1386,6 +1404,7 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
+  trial: { open: (id) => openTrial(id), isOpen: isTrialOpen, state: trialState, taskFor: (vid) => Boolean(taskFor(VILLAGERS.find((v) => v.id === vid))) },
   goals: { event: (ev) => goal(ev), state: () => structuredClone(progress.goals), open: openDaily, close: closeDaily, isOpen: isDailyOpen },
   tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },
   quests: {

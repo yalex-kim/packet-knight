@@ -59,7 +59,13 @@ export const LIBRARY_COURSES = Object.freeze([
   { chapter: "connection",  reward: "hp"  }, // 연결 유지·감독 타임아웃 → 연결 안정성
   { chapter: "gatt",        reward: "tx"  }, // 데이터 교환 → 공격(보낼 수 있는 데이터)
   { chapter: "security",    reward: "sec" }, // 페어링·암호화 → 방어
-  { chapter: "power",       reward: "pwr" }  // 전력 → 배터리 효율 (측정기 충전이 빨라진다)
+  { chapter: "power",       reward: "pwr" }, // 전력 → 배터리 효율 (측정기 충전이 빨라진다)
+  // Stage 13.27: 남은 다섯 장 (퀘스트 Q9~Q13) — 1시간 시뮬레이션은 앞의 넷만 쓰므로 §8.3과 무관
+  { chapter: "coexistence", reward: "sec" }, // 공존 → 간섭 내성(방어)
+  { chapter: "mesh",        reward: "hp"  }, // 메시(릴레이·재전송) → 연결 안정성
+  { chapter: "audio",       reward: "rx"  }, // 오디오(재전송·플러시) → 회피
+  { chapter: "location",    reward: "tx"  }, // 위치(정밀 측정) → 송신(정확히 맞힌다)
+  { chapter: "design",      reward: "pwr" }  // 설계(전력 예산) → 배터리 효율
 ]);
 
 /**
