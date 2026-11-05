@@ -348,3 +348,15 @@ export const FLOOR_MODS = Object.freeze({
 /** 이미 깬 층 다시 도전 (Stage 13.24): 상자 없음, 보스 동전 ×BOSS_DROP_MUL (첫 처치 옷·업적은 그대로) — 쉬운 층 반복 벌이를 막는다 */
 export const REPLAY = Object.freeze({ BOSS_DROP_MUL: 0.2 });
 export const FLOOR_CHEST = Object.freeze({ CHANCE: 0, MIN: 2, MAX: 4, MOD_CHEST_MUL: 1.5, PICK_R: 1.4, NO_DAMAGE_BONUS: 1 });
+
+/**
+ * 🌟 특성 (Stage 13.32) — 5레벨마다 셋 중 하나를 고른다 (core/talents.js). 스탯형은 effectiveStats에 더해지고,
+ * 효과형은 처치·줍기 때 main.js가 적용한다. 시뮬레이션 봇은 특성을 고르지 않는다 (기준선은 특성 없이도 맞아야 한다).
+ */
+export const TALENT = Object.freeze({
+  EVERY: 5,
+  STAT: Object.freeze({ hp: 10, tx: 2, rx: 3, sec: 2, ci: 1 }),   // 스탯형 한 번에 오르는 양
+  XP_MUL: 1.1,          // 📢 확장 광고: 처치 XP ×1.1
+  HEAL_ON_KILL: 4,      // 🔁 재전송: 처치마다 HP +4
+  CR_EXTRA_CHANCE: 0.25 // 🔋 에너지 하베스팅: CR2032를 주울 때 25%로 +1
+});

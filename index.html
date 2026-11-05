@@ -519,8 +519,8 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#btn-daily, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#btn-daily, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.prestart :is(#btn-talent, #btn-daily, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#btn-talent, #btn-daily, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-me) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
   body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
@@ -912,6 +912,22 @@
   @keyframes dailyPulse { 50% { box-shadow: 0 0 0 6px rgba(255, 215, 107, .25), 0 4px 14px rgba(0,0,0,.35); transform: scale(1.04); } }
   @media (prefers-reduced-motion: reduce) { #btn-daily.ready { animation: none; } }
   @media (max-width: 640px) { #btn-daily { left: 8px; bottom: 198px; font-size: 12px; padding: 5px 11px; } }
+  /* 🌟 특성 고르기 (Stage 13.32) — 오늘의 임무 버튼 바로 위 */
+  #btn-talent { position: fixed; left: 14px; bottom: 244px; z-index: 10; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 800; color: #1d1040; background: linear-gradient(100deg, #c9a7ff, #8fd3ff); border: 0; box-shadow: 0 4px 14px rgba(0,0,0,.35); animation: dailyPulse 1.4s ease-in-out infinite; }
+  #btn-talent[hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) { #btn-talent { animation: none; } }
+  @media (max-width: 640px) { #btn-talent { left: 8px; bottom: 236px; font-size: 12px; padding: 5px 11px; } }
+  #talent .panel.tl { max-width: 560px; }
+  .tl-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0; }
+  .tl-card { display: grid; gap: 6px; justify-items: center; text-align: center; padding: 14px 10px; border-radius: 14px; cursor: pointer; font: inherit; color: #e2f1ff;
+    background: rgba(20, 40, 70, .75); border: 1px solid #3b6ea5; transition: transform .12s, border-color .12s; }
+  .tl-card:hover, .tl-card:focus-visible { transform: translateY(-2px); border-color: #c9a7ff; }
+  .tl-card.fx { border-style: dashed; }
+  .tl-card .tl-ico { font-size: 30px; }
+  .tl-card span:not(.tl-ico) { font-size: 12.5px; color: #b8cde3; }
+  .tl-card small { color: #c9a7ff; }
+  .tl-mine { font-size: 12px; }
   #daily .panel.dl { max-width: 420px; }
   #daily .daily-list { padding: 0; margin: 4px 0 10px; display: grid; gap: 6px; }
   #daily .daily-list li { display: grid; grid-template-columns: 24px 1fr auto; gap: 4px 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.2); }

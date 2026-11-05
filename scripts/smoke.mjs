@@ -2223,6 +2223,36 @@ await page.waitForFunction(() => window.__PK);
     itemUi.tabs === 2 && itemUi.items === 4 && itemUi.apples === 1 && itemUi.hpAfter > 10 && /사과/.test(itemUi.note) && itemUi.applesLeft === 0, JSON.stringify(itemUi));
   check("📅 오늘의 임무 버튼이 퀘스트 트래커 바로 위(왼쪽 맞춤), 누르면 임무 창(3줄, 다 하기 전엔 상자 잠김)·Esc로 닫힘, 퀘스트 로그엔 없음 · 가방 › 소지품에 🏅 업적 8개",
     gui.open && gui.daily === 3 && gui.chest === true && gui.above && /오늘의 임무/.test(gui.label) && gui.inLog === 0 && gui.closed && gui.ach === 8, JSON.stringify(gui));
+  // 🌟 특성 (Stage 13.32): Lv 5가 되면 버튼이 뜨고, 셋 중 하나를 고르면 스탯이 오르며 저장된다. 지금 나온 것 말고는 못 고른다
+  const tal = await page.evaluate(() => {
+    const P = window.__PK, p = P.progress();
+    const save = { xp: p.xp, talents: [...p.talents] };
+    const r = { before: P.talent.pending(), btnHidden0: document.getElementById("btn-talent").hidden };
+    p.xp = 1000; p.talents = [];   // Lv 5 (누적 851 XP 이상)
+    P.talent.refresh();
+    r.pending = P.talent.pending(); r.btn = !document.getElementById("btn-talent").hidden;
+    const hp0 = P.stats().hp;
+    P.talent.open();
+    r.cards = [...document.querySelectorAll("#talent .tl-card")].map((b) => b.dataset.id);
+    document.querySelector('#talent .tl-card[data-id="coded"]').click();
+    r.hpGain = P.stats().hp - hp0; r.closed = !P.talent.isOpen(); r.btnAfter = document.getElementById("btn-talent").hidden;
+    r.saved = JSON.parse(localStorage.getItem("packetKnight.save")).talents;
+    p.xp = save.xp; p.talents = save.talents; P.talent.refresh();
+    return r;
+  });
+  {
+    const T = await import(pathToFileURL(path.join(ROOT, "src/core/talents.js")).href);
+    const Pg = await import(pathToFileURL(path.join(ROOT, "src/core/progress.js")).href);
+    const p = Pg.createProgress(); p.xp = 5000;   // Lv 9 → 1번
+    const wrong = T.chooseTalent(p, "retx"), right = T.chooseTalent(p, "lna"), again = T.chooseTalent(p, "coded");
+    const fx = T.talentFx(["extadv", "extadv", "retx", "harvest"]);
+    const kept = Pg.loadProgress({ getItem: () => JSON.stringify({ ...p, talents: ["lna", "bogus"] }), setItem: () => {} }).progress.talents;
+    check("🌟 특성: Lv 5마다 버튼 → 셋(Coded PHY·송신 전력·LNA) 중 하나, 고르면 스탯이 오르고 저장 · 나오지 않은 특성·남은 횟수 없이 고르기 거부 · 효과는 쌓이고 모르는 id는 버림",
+      tal.pending === 1 && tal.btn && tal.cards.join() === "coded,txpow,lna" && tal.hpGain === 10 && tal.closed && tal.btnAfter && tal.saved?.join() === "coded"
+        && !wrong && right?.id === "lna" && !again && Pg.effectiveStats(p).rx === Pg.effectiveStats(Pg.createProgress()).rx + 3
+        && Math.abs(fx.xpMul - 1.21) < 1e-9 && fx.healOnKill === 4 && fx.crChance === 0.25 && kept.join() === "lna",
+      JSON.stringify(tal));
+  }
   // 🐞 오류 수집 (Stage 13.29): 처리 안 된 오류·promise 거절을 경로·버전과 함께 모으고, 같은 오류는 한 번만 (로컬은 보내지 않음)
   const errs = await page.evaluate(async () => {
     const n0 = window.__pkErrors.length;

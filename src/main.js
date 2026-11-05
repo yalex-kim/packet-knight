@@ -36,6 +36,8 @@ import { goalEvent, checkAchievements, todayKey, ensureDaily, missionById, claim
 import { initDaily, refreshDaily, openDaily, closeDaily, isDailyOpen } from "./ui/daily.js";
 import { initTrial, openTrial, isTrialOpen, trialState } from "./ui/trial.js";
 import { TRIALS } from "./core/trials.js";
+import { initTalent, refreshTalent, openTalent, isTalentOpen } from "./ui/talent.js";
+import { chooseTalent, pendingTalents, talentFx } from "./core/talents.js";
 import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -488,16 +490,21 @@ function handleBattleEvents(events) {
         }
         shake(0.14, 0.18); hitStop(0.07);
         sfx("kill");
-        const { level, leveledUp } = applyKill(progress, m.type, e.xp);
+        const tfx = talentFx(progress.talents);   // 🌟 특성 (Stage 13.32): 확장 광고 XP ×, 재전송 회복
+        const xpGot = Math.round(e.xp * tfx.xpMul);
+        const { level, leveledUp } = applyKill(progress, m.type, xpGot);
+        if (tfx.healOnKill && battle.player.hp < battle.player.maxHp) battle.player.hp = Math.min(battle.player.maxHp, battle.player.hp + tfx.healOnKill);
         questEvent(progress.quests, { type: "kill", monsterType: m.type });
-        fx.floatText(m.x, m.y + 1.0, m.z, `XP +${e.xp}`, "loot");
+        fx.floatText(m.x, m.y + 1.0, m.z, `XP +${xpGot}`, "loot");
         changed.push("xp");
         if (leveledUp) { sfx("levelUp"); tipEvent("levelUp"); battleView.pillarAt(motor.x, motor.y, motor.z); }
-        if (leveledUp) fx.showToast(`⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
+        if (leveledUp) fx.showToast(pendingTalents(progress) > 0 ? `⭐ 레벨 업! Lv ${level} — 🌟 새 특성을 고를 수 있어요 (왼쪽 🌟 버튼)` : `⭐ 레벨 업! Lv ${level} — 스탯 포인트 +${leveledUp * STAT_POINTS_PER_LEVEL} (패킷 대장간 RF 랩에서 분배)`, 4);
+        if (leveledUp) refreshTalent();
         dirty = true;
         break;
       }
       case "pickup":
+        { const c = talentFx(progress.talents).crChance; if (e.item === "cr2032" && c > 0 && battleRng() < c) e.count += 1; }   // 🔋 에너지 하베스팅 (Stage 13.32)
         applyPickup(progress, e.item, e.count);
         fx.floatText(motor.x, motor.y + 0.8, motor.z, `🪙 CR2032 +${e.count}`, "loot");
         if (Number.isFinite(e.drop?.x)) battleView.lootFly(e.drop.x, e.drop.y ?? motor.y, e.drop.z, Math.min(6, 2 + e.count), 0xffd76b);
@@ -1295,6 +1302,21 @@ initTrial({
   sfx
 });
 initDaily({ getDaily: () => ensureDaily(progress.goals), onClaim: claimDailyChest, onOpenChange: overlayChange });
+// 🌟 특성 고르기 (Stage 13.32)
+initTalent({   // 시작 화면 뒤에 버튼이 보이도록 prestart 목록에도 있다 (index.html)
+  getProgress: () => progress,
+  onChoose: (id) => {
+    const t = chooseTalent(progress, id);
+    if (!t) return null;
+    persist();
+    hud.renderStats(effectiveStats(progress), wallet(), t.kind === "stat" ? [t.stat] : []);
+    syncPlayerHp(battle, effectiveStats(progress).hp);
+    sfx("perfect");
+    fx.showToast(`🌟 ${t.icon} ${t.name} — ${t.desc}`, 4);
+    return t;
+  },
+  onOpenChange: overlayChange
+});
 
 // ---------- 💡 주민이 들려주는 스펙 이야기 (Stage 13.14): 이벤트 → 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래 ----------
 /** 학습 보상 🪙 (💡 맞혀 보기·알바 2배) */
@@ -1404,6 +1426,7 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
+  talent: { open: () => openTalent(), isOpen: isTalentOpen, pending: () => pendingTalents(progress), refresh: () => refreshTalent() },
   trial: { open: (id) => openTrial(id), isOpen: isTrialOpen, state: trialState, taskFor: (vid) => Boolean(taskFor(VILLAGERS.find((v) => v.id === vid))) },
   goals: { event: (ev) => goal(ev), state: () => structuredClone(progress.goals), open: openDaily, close: closeDaily, isOpen: isDailyOpen },
   tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },

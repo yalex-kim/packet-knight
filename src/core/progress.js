@@ -4,6 +4,7 @@
 import { emptyShop, validShop } from "./shop.js";
 import { emptyGoals, validGoals } from "./goals.js";
 import { emptyItems, validItems } from "./items.js";
+import { validTalents, talentStats } from "./talents.js";
 import {
   PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
   GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, RSSI_JOB, CONN_INTERVAL } from "./balance.js";
@@ -52,6 +53,7 @@ export function createProgress() {
     shop: emptyShop(),   // Stage 12.2 상점가 — 옛 세이브는 기본값으로 (버전 그대로)
     goals: emptyGoals(), // Stage 13.20 오늘의 임무·업적 — 옛 세이브는 기본값으로 (버전 그대로)
     items: emptyItems(), // Stage 13.22 소모품 — 옛 세이브는 기본값으로 (버전 그대로)
+    talents: [], // 🌟 Stage 13.32 특성 (고른 순서)
     lab: { tries: 0, success: 0, spent: 0 },
     quests: createQuestState(),
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
@@ -113,6 +115,7 @@ function validate(raw) {
     shop: validShop(raw.shop),
     goals: validGoals(raw.goals),
     items: validItems(raw.items),
+    talents: validTalents(raw.talents),
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
     // Stage 13.27: Q8까지 끝내 active가 null이던 세이브는 새 퀘스트(Q9~)의 첫 미완료로 이어 간다
     quests: { active: q.active ?? (QUESTS.find((x) => !q.done[x.id])?.id ?? null), progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) }, claimed: { ...(q.claimed ?? {}) } },
@@ -164,6 +167,7 @@ export function effectiveStats(progress) {
   for (const k of Object.keys(PLAYER_BASE)) {
     out[k] = PLAYER_BASE[k] + (progress.bonus[k] ?? 0) + (progress.alloc?.[k] ?? 0) * STAT_POINT_GAIN[k];
   }
+  for (const [k, v] of Object.entries(talentStats(progress.talents))) out[k] += v;   // 🌟 특성 (Stage 13.32)
   const geared = applyGear(out, progress.gear ?? emptyGear());
   for (const k of Object.keys(geared)) {
     if (STAT_CAPS[k] !== undefined) geared[k] = Math.min(STAT_CAPS[k], geared[k]);
