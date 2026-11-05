@@ -67,6 +67,7 @@ box(torso, 0.48, 0.08, 0.3, MAT.leather, 0, 0.02, 0);                 // 허리�
 box(torso, 0.1, 0.08, 0.04, MAT.gold, 0, 0.02, 0.16);                  // 버클
 // 머리: 큰 투구 (귀여운 비율) + 바이저 + BLE 안테나 깃
 const head = pivot(torso, 0, 0.44, 0);
+head.scale.setScalar(0.84);   // Stage 13.26: 머리가 너무 커 보여 16% 줄임 (투구·두건·안테나 모두)
 const helm = group(head, true);
 box(helm, 0.5, 0.44, 0.48, MAT.steel, 0, 0.22, 0);
 box(helm, 0.54, 0.08, 0.52, MAT.steelDark, 0, 0.02, 0);               // 목가리개
@@ -230,8 +231,60 @@ recolorCostume("gold", "magnetron", { 0xf2c14e: 0xff7a1a, 0xc9962a: 0xb8510a, 0x
 recolorCostume("mesh", "hunter", { 0x2f8f5a: 0x1f6a3a, 0x22704a: 0x123d24, 0x7dffb5: 0xffd76b });                             // 🎯 짙은 초록 + 금빛 테
 recolorCostume("meshHood", "hunterHood", { 0x2f8f5a: 0x1f6a3a, 0x22704a: 0x123d24, 0x7dffb5: 0xffd76b });
 
+// ---------- 새 옷마다 다른 모양 (Stage 13.26) — 색만 바꾼 틀 위에 얹는 장식 ----------
+{
+  const T = (c) => toon(c), G = (c) => glowMat(c);
+  // 🎧 LE 오디오: 투구 위 헤드폰 + 가슴의 이퀄라이저 막대
+  const lh = COSTUME.leaudioHead = group(head);
+  const band = T(0x1c2430), cupM = T(0x0f8f8a), ringM = G(0x2ff0e0);
+  box(lh, 0.06, 0.06, 0.12, band, 0, 0.5, 0);
+  for (const sx of [-1, 1]) {
+    box(lh, 0.06, 0.2, 0.08, band, sx * 0.24, 0.4, 0);
+    box(lh, 0.08, 0.18, 0.18, cupM, sx * 0.29, 0.24, 0);
+    box(lh, 0.02, 0.12, 0.12, ringM, sx * 0.335, 0.24, 0, false);
+  }
+  const lc = COSTUME.leaudioChest = group(torso);
+  [0.1, 0.16, 0.22, 0.14, 0.08].forEach((h, i) => box(lc, 0.035, h, 0.02, G(0x2ff0e0), (i - 2) * 0.055, 0.2 + h / 2, 0.168, false));
+  // 🏷️ PAwR: 가슴·치마·어깨에 매달린 전자 가격표
+  const pt = COSTUME.pawrTags = group(torso);
+  const tagW = T(0xffffff), tagR = G(0xff4a4a);
+  for (const [x, y, z, r] of [[-0.12, 0.3, 0.17, 0.2], [0.13, 0.25, 0.17, -0.15], [-0.05, -0.05, 0.17, 0.1], [0.1, -0.08, 0.17, -0.2], [-0.33, 0.36, 0.05, 0], [0.33, 0.36, 0.05, 0]]) {
+    const t = pivot(pt, x, y, z); t.rotation.z = r;
+    box(t, 0.1, 0.07, 0.02, tagW, 0, 0, 0);
+    box(t, 0.07, 0.02, 0.022, tagR, 0, 0.012, 0.002, false);
+  }
+  // 📻 BR/EDR 레트로: 왼쪽 어깨의 굵은 안테나 + 가슴의 라디오
+  const rg = COSTUME.retroGear = group(torso);
+  box(rg, 0.05, 0.42, 0.05, T(0x2a2a2a), -0.3, 0.68, -0.05);
+  box(rg, 0.09, 0.09, 0.09, G(0xff6a3c), -0.3, 0.9, -0.05);
+  box(rg, 0.22, 0.15, 0.06, T(0x5a3a20), 0, 0.27, 0.17);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) box(rg, 0.02, 0.02, 0.02, T(0x1a120a), -0.07 + i * 0.03, 0.29 - j * 0.04, 0.205, false);
+  box(rg, 0.05, 0.05, 0.02, G(0xffd76b), 0.06, 0.27, 0.205, false);
+  // 📐 AoA: 어깨 위 2×2 안테나 배열 판 + 등의 안테나 네 가닥
+  const aa = COSTUME.aoaArray = group(torso);
+  for (const sx of [-1, 1]) {
+    box(aa, 0.2, 0.03, 0.2, T(0x7e8a98), sx * 0.3, 0.52, 0);
+    for (const ax of [-0.05, 0.05]) for (const az of [-0.05, 0.05]) box(aa, 0.06, 0.05, 0.06, G(0x39d0ff), sx * 0.3 + ax, 0.56, az, false);
+  }
+  for (let i = 0; i < 4; i++) { box(aa, 0.025, 0.3, 0.025, T(0xc9d3de), -0.09 + i * 0.06, 0.55, -0.18); box(aa, 0.045, 0.045, 0.045, G(0x39d0ff), -0.09 + i * 0.06, 0.71, -0.18, false); }
+  // 🟧 마그네트론: 가슴의 전자레인지 문(주황 창) + 등의 냉각 핀
+  const mg = COSTUME.magGear = group(torso);
+  box(mg, 0.3, 0.2, 0.03, T(0xe8ecf0), -0.02, 0.26, 0.17);
+  box(mg, 0.2, 0.13, 0.02, G(0xff8a2a), -0.05, 0.26, 0.188, false);
+  box(mg, 0.05, 0.13, 0.02, T(0x3a3f4f), 0.1, 0.26, 0.188, false);
+  for (let i = 0; i < 4; i++) box(mg, 0.4, 0.03, 0.05, T(0xb8510a), 0, 0.12 + i * 0.08, -0.18);
+  // 🎯 비콘 사냥꾼: 허리의 랜턴 + 등의 화살통
+  const hg = COSTUME.hunterGear = group(torso);
+  box(hg, 0.08, 0.12, 0.08, T(0x3a2a14), 0.24, -0.02, 0.1);
+  box(hg, 0.06, 0.08, 0.06, G(0xffd76b), 0.24, -0.02, 0.1, false);
+  const qv = pivot(hg, 0.1, 0.3, -0.19); qv.rotation.z = -0.35;
+  box(qv, 0.1, 0.36, 0.1, T(0x5a3a20), 0, 0, 0);
+  for (const dx of [-0.025, 0.025]) box(qv, 0.02, 0.1, 0.02, T(0xd8d0c0), dx, 0.22, 0, false);
+}
+
 const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"],
-  magnetron: ["magnetron"], leaudio: ["leaudio"], pawr: ["pawr"], retro: ["classic"], aoa: ["aoa"], hunter: ["hunter", "hunterHood"] };   // retro는 classic 틀 — 그 틀은 옷 색(MAT.tabard)을 따른다
+  magnetron: ["magnetron", "magGear"], leaudio: ["leaudio", "leaudioHead", "leaudioChest"], pawr: ["pawr", "pawrTags"], retro: ["classic", "retroGear"],
+  aoa: ["aoa", "aoaArray"], hunter: ["hunter", "hunterHood", "hunterGear"] };   // retro는 classic 틀 — 그 틀은 옷 색(MAT.tabard)을 따른다
 
 // ---------- 무기 ----------
 const shieldParts = [];
