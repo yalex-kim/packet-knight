@@ -214,8 +214,10 @@ function buildRanking() {
       <button type="button" class="rk-close" aria-label="닫기">×</button></div>
     <div class="rk-tabs" role="tablist">
       <button type="button" role="tab" data-board="level">⭐ 레벨</button>
+      <button type="button" role="tab" data-board="week">🗓️ 이번 주</button>
       <button type="button" role="tab" data-board="job">📡 비콘 알바</button>
     </div>
+    <div class="rk-season"></div>
     <div class="rk-stage" hidden>
       <canvas class="rk-knight" width="160" height="190" aria-hidden="true"></canvas>
       <div class="rk-who"></div>
@@ -231,11 +233,11 @@ function buildRanking() {
 }
 
 let board = "level";
-/** @param {"level"|"job"} which 처음 보일 판 (등대 안내 박스의 🍎 알바 랭킹 = job) */
+/** @param {"level"|"job"|"week"} which 처음 보일 판 (등대 안내 박스의 🍎 알바 랭킹 = job) */
 export function openRanking(close = () => {}, which = "level") {
   if (!overlay) buildRanking();
   onRankClose = close;
-  board = which === "job" ? "job" : "level";
+  board = which === "job" || which === "week" ? which : "level";
   overlay.hidden = false;
   refreshRanking();
 }
@@ -268,21 +270,23 @@ async function refreshRanking() {
   const myIdx = data.me ? data.me.rank - 1 : -1;
   if (data.me && myIdx >= data.top.length) entries.push({ ...data.me, idx: myIdx, extra: true });
   const isMe = (e) => data.me && e.idx === myIdx;
-  const isJob = data.board === "job";
+  const isJob = data.board === "job", isWeek = data.board === "week";
+  renderSeason(data.season, isWeek);
+  const crown = (e) => (e.champ ? `<span class="rk-crown" title="지난주 ${e.champ}위">👑</span>` : "");
   const grade = (e) => gradeSession(e.jobBest ?? 0, 1).grade;
-  const mainScore = (e) => (isJob ? `${e.jobBest ?? 0}점` : `Lv ${levelFromXp(e.xp).level}`);
-  const subScore = (e) => (isJob ? `📡 ${grade(e)}등급 · 알바 ${e.jobRuns ?? 0}번 · Lv ${levelFromXp(e.xp).level}` : `⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}`);
+  const mainScore = (e) => (isJob ? `${e.jobBest ?? 0}점` : isWeek ? `+${e.gain ?? 0} XP` : `Lv ${levelFromXp(e.xp).level}`);
+  const subScore = (e) => (isWeek ? `Lv ${levelFromXp(e.xp).level} · ⚔️ ${e.maxFloor}층` : isJob ? `📡 ${grade(e)}등급 · 알바 ${e.jobRuns ?? 0}번 · Lv ${levelFromXp(e.xp).level}` : `⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}`);
   const row = (e) => {
     const medal = ["🥇", "🥈", "🥉"][e.idx] ?? `${e.idx + 1}`;
     const g = gear(e);
-    return `<li class="${isMe(e) ? "me" : ""}" data-i="${entries.indexOf(e)}" tabindex="0"><span class="rk-no">${medal}</span><b class="rk-name">${esc(e.name)}</b>
+    return `<li class="${isMe(e) ? "me" : ""}" data-i="${entries.indexOf(e)}" tabindex="0"><span class="rk-no">${medal}</span><b class="rk-name">${esc(e.name)}</b>${crown(e)}
       <span class="rk-gear"><img src="${itemImg(g.outfit.id)}" alt="${esc(g.outfit.name)}" title="${esc(g.outfit.name)}" /><img src="${itemImg(g.weapon.id)}" alt="${esc(g.weapon.name)}" title="${esc(g.weapon.name)}" /></span>
       <span class="rk-lv">${mainScore(e)}</span><span class="rk-sub">${subScore(e)}</span></li>`;
   };
   const top = entries.filter((e) => !e.extra), extra = entries.filter((e) => e.extra);
   body.innerHTML = top.length
     ? `<ol class="rk-list">${top.map(row).join("")}</ol>${extra.length ? `<ol class="rk-list rk-mine">${extra.map(row).join("")}</ol>` : ""}`
-    : `<p class="rk-msg">${isJob ? "아직 알바 기록이 없어요. 등대에서 비콘 찾기 알바를 해 보세요!" : "아직 새겨진 이름이 없어요. 첫 번째 기사가 되어 보세요!"}</p>`;
+    : `<p class="rk-msg">${isWeek ? "이번 주에 새겨진 이름이 아직 없어요. 로그인하고 경험치를 모으면 첫 줄에 올라요!" : isJob ? "아직 알바 기록이 없어요. 등대에서 비콘 찾기 알바를 해 보세요!" : "아직 새겨진 이름이 없어요. 첫 번째 기사가 되어 보세요!"}</p>`;
   // 고른 기사의 모습 (옷·무기) — 내 기사 모델에 잠깐 입혀 미리보기로 돌린다
   const stage = overlay.querySelector(".rk-stage");
   const select = (e) => {
@@ -291,7 +295,7 @@ async function refreshRanking() {
     stage.hidden = false;
     for (const li of body.querySelectorAll("li")) li.classList.toggle("sel", li.dataset.i === String(entries.indexOf(e)));
     overlay.querySelector(".rk-who").innerHTML = `<span class="rk-who-rank">${["🥇", "🥈", "🥉"][e.idx] ?? `${e.idx + 1}위`}</span>
-      <b>${esc(e.name)}</b><span class="rk-who-lv">${isJob ? `📡 최고 ${e.jobBest ?? 0}점 (${grade(e)}) · ` : ""}Lv ${levelFromXp(e.xp).level} · ⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span>
+      <b>${esc(e.name)}</b>${e.champ ? `<span class="rk-who-champ">👑 지난주 ${e.champ}위</span>` : ""}<span class="rk-who-lv">${isWeek ? `🗓️ 이번 주 +${e.gain ?? 0} XP · ` : ""}${isJob ? `📡 최고 ${e.jobBest ?? 0}점 (${grade(e)}) · ` : ""}Lv ${levelFromXp(e.xp).level} · ⚔️ ${e.maxFloor}층 · 🎖️ ${e.badges}</span>
       <span class="rk-who-item"><img src="${itemImg(g.outfit.id)}" alt="" />${esc(g.outfit.name)}</span>
       <span class="rk-who-item"><img src="${itemImg(g.weapon.id)}" alt="" />${esc(g.weapon.name)}</span>`;
     hooks?.previewLook?.(g);
@@ -303,7 +307,7 @@ async function refreshRanking() {
     li.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
   });
   select(entries.find(isMe) ?? entries[0]);
-  const total = `<span class="rk-total">${isJob ? "알바한 기사" : "기사"} ${data.total}명</span>`;
+  const total = `<span class="rk-total">${isJob ? "알바한 기사" : isWeek ? "이번 주 기사" : "기사"} ${data.total}명</span>`;
   if (user) {
     foot.innerHTML = `${total}<span>☁️ ${esc(user.name)} 님 — 클라우드 저장 중</span><button type="button" class="rk-logout">로그아웃</button>`;
     foot.querySelector(".rk-logout").addEventListener("click", logout);
@@ -313,6 +317,16 @@ async function refreshRanking() {
   } else {
     foot.innerHTML = total;
   }
+}
+
+/** 🗓️ 주간 시즌 줄 (Stage 13.31): 남은 시간 + 지난주 명예의 전당(1~3위) */
+function renderSeason(season, isWeek) {
+  const box = overlay.querySelector(".rk-season");
+  if (!season) { box.innerHTML = ""; return; }
+  const left = Math.max(0, season.endsAt - Date.now()), d = Math.floor(left / 86400e3), h = Math.floor((left % 86400e3) / 3600e3);
+  const champs = (season.champions ?? []).map((c) => `<span>${["🥇", "🥈", "🥉"][c.rank - 1]} ${esc(c.name)} <small>+${c.gain}</small></span>`).join("");
+  box.innerHTML = `${isWeek ? `<div class="rk-season-left">🗓️ 이번 주 시즌 · ${d}일 ${h}시간 남음 <small>(월요일 0시에 새 시즌 · 오른 XP 순)</small></div>` : ""}
+    ${champs ? `<div class="rk-hall"><b>🏆 지난주 명예의 전당</b>${champs}</div>` : isWeek ? `<div class="rk-hall"><b>🏆 지난주 명예의 전당</b><span class="muted">아직 비어 있어요 — 이번 주 1~3위가 다음 주에 👑를 달아요</span></div>` : ""}`;
 }
 
 // ---------- 로그인 상태 표시 (Stage 13.1): 화면 오른쪽 위 계정 버튼 + 시작 화면 ----------

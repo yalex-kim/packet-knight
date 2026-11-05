@@ -91,3 +91,15 @@ export function rankFields(save) {
     badges: save?.quests?.done && typeof save.quests.done === "object" ? Math.min(Object.keys(save.quests.done).length, 100) : 0
   };
 }
+
+// ---------- 🗓️ 주간 시즌 (Stage 13.31) — 한국 시간 월요일 0시에 새 주 ----------
+const KST = 9 * 3600e3, WEEK = 7 * 86400e3;
+/** 그 시각이 속한 주의 월요일 0시(KST)를 UTC ms로 */
+export function weekStart(ms = Date.now()) {
+  const d = new Date(ms + KST);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7)) - KST;
+}
+/** 주 이름 = 그 주 월요일 날짜 (KST) "YYYY-MM-DD" */
+export const weekKey = (ms = Date.now()) => new Date(weekStart(ms) + KST).toISOString().slice(0, 10);
+export const weekEnd = (ms = Date.now()) => weekStart(ms) + WEEK;
+export const lastWeekKey = (ms = Date.now()) => weekKey(weekStart(ms) - 1);

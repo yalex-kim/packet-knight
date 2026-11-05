@@ -625,8 +625,11 @@ await page.route((url) => url.origin === ORIGIN, (r) => {
   if (rel === "api/feedback" && r.request().method() === "POST") { fbPosts.push(JSON.parse(r.request().postData() ?? "{}")); return r.fulfill({ contentType: "application/json", body: "{\"ok\":true}" }); }
   if (rel === "api/ranking" && new URL(r.request().url()).searchParams.get("board") === "job") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
     board: "job", top: [{ name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv", jobBest: 560, jobRuns: 12 }, { name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded", jobBest: 300, jobRuns: 4 }], me: null, total: 2 }) });
-  if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ board: "level",
-    top: [{ name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded" }, { name: "<b>해커</b>", xp: 300, maxFloor: 2, badges: 3, outfit: "x\"><img>", weapon: null }, { name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv" }], me: null, total: 3 }) });
+  const season = { week: "2026-11-02", endsAt: Date.now() + 2.5 * 86400e3, champions: [{ rank: 1, name: "윤배", gain: 500 }, { rank: 2, name: "민지", gain: 200 }] };
+  if (rel === "api/ranking" && new URL(r.request().url()).searchParams.get("board") === "week") return r.fulfill({ contentType: "application/json", body: JSON.stringify({
+    board: "week", top: [{ name: "민지", xp: 400, maxFloor: 2, badges: 3, outfit: "mesh", weapon: "extadv", gain: 300, champ: 2 }], me: null, total: 1, season }) });
+  if (rel === "api/ranking") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ board: "level", season,
+    top: [{ name: "윤배", xp: 900, maxFloor: 6, badges: 9, outfit: "gold", weapon: "coded", champ: 1 }, { name: "<b>해커</b>", xp: 300, maxFloor: 2, badges: 3, outfit: "x\"><img>", weapon: null }, { name: "민지", xp: 40, maxFloor: 0, badges: 1, outfit: "mesh", weapon: "extadv" }], me: null, total: 3 }) });
   const file = path.resolve(ROOT, rel);
   if (!file.startsWith(ROOT + path.sep) || !existsSync(file)) return r.fulfill({ status: 404, body: "not found" });
   return r.fulfill({ body: readFileSync(file), contentType: MIME[path.extname(file)] ?? "application/octet-stream" });
@@ -1986,7 +1989,15 @@ await page.waitForFunction(() => window.__PK);
     for (let i = 0; i < 40 && !document.querySelector("#ranking .rk-who b"); i++) await new Promise((res) => setTimeout(res, 50));
     await new Promise((res) => setTimeout(res, 300));
     r.reopen = !el.querySelector(".rk-stage").hidden;
+    for (let i = 0; i < 40 && !el.querySelector(".rk-list li .rk-crown"); i++) await new Promise((res) => setTimeout(res, 50));
+    r.lvCrown = Boolean(el.querySelector(".rk-list li .rk-crown")) && /명예의 전당/.test(el.querySelector(".rk-season").textContent);
     // 📡 비콘 알바 판 (Stage 13.8): 탭으로 바꾸면 알바 최고 점수 순
+    el.querySelector('.rk-tabs [data-board="job"]').click();
+    for (let i = 0; i < 40 && !/점/.test(el.querySelector(".rk-lv")?.textContent ?? ""); i++) await new Promise((res) => setTimeout(res, 50));
+    // 🗓️ 이번 주 판 (Stage 13.31): 오른 XP 순 + 남은 시간 + 지난주 👑
+    el.querySelector('.rk-tabs [data-board="week"]').click();
+    for (let i = 0; i < 40 && !/XP/.test(el.querySelector(".rk-lv")?.textContent ?? ""); i++) await new Promise((res) => setTimeout(res, 50));
+    r.week = { tab: el.querySelector(".rk-tabs .on")?.dataset.board, score: el.querySelector(".rk-lv")?.textContent, season: el.querySelector(".rk-season")?.textContent.replace(/\s+/g, " ").trim(), crown: el.querySelector(".rk-crown")?.title, total: el.querySelector(".rk-total")?.textContent };
     el.querySelector('.rk-tabs [data-board="job"]').click();
     for (let i = 0; i < 40 && !/점/.test(el.querySelector(".rk-lv")?.textContent ?? ""); i++) await new Promise((res) => setTimeout(res, 50));
     r.job = { tab: el.querySelector(".rk-tabs .on")?.dataset.board, first: el.querySelector(".rk-name")?.textContent, score: el.querySelector(".rk-lv")?.textContent, sub: el.querySelector(".rk-sub")?.textContent, total: el.querySelector(".rk-total")?.textContent };
@@ -2015,6 +2026,9 @@ await page.waitForFunction(() => window.__PK);
       && rk.who3 === "민지" && rk.items3.join() === "메시 숲지기,확장 광고 부채" && rk.reopen
       && rk.job.tab === "job" && rk.job.first === "민지" && rk.job.score === "560점" && /S등급/.test(rk.job.sub) && /알바한 기사 2명/.test(rk.job.total),
     JSON.stringify(rk));
+  check("🗓️ 주간 시즌: 이번 주 판은 오른 XP 순(+300 XP)·남은 시간·지난주 명예의 전당, 지난주 1~3위는 모든 판에서 👑",
+    rk.lvCrown && rk.week?.tab === "week" && rk.week.score === "+300 XP" && /2일 \d+시간 남음/.test(rk.week.season) && /🥇 윤배/.test(rk.week.season) && rk.week.crown === "지난주 2위" && /이번 주 기사 1명/.test(rk.week.total),
+    JSON.stringify(rk.week));
   check("📮 광고판 = 마을 게시판: 공지·이벤트 목록, 의견(종류 4가지·글자 수·입력 중 키는 게임으로 안 샘) 보내기 → 서버에 전달, 만든 사람은 맨 아래 작게, 관리자 칸은 숨김, Esc로 닫힌다",
     dc.open && dc.notes >= 3 && dc.cats === 4 && dc.credit === "https://home.yalex-k.com/" && dc.creditSmall && dc.adminHidden && dc.count === `${[..."던전 3층 전자레인지가 너무 세요"].length}/500` && dc.keyIsolated
       && /고마워요/.test(dc.status) && dc.cleared && dc.closed && fbPosts.length === 1 && fbPosts[0].category === "bug" && /전자레인지/.test(fbPosts[0].body), JSON.stringify({ ...dc, fbPosts }));
