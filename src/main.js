@@ -32,7 +32,8 @@ import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js
 import { drawOne } from "./core/specCards.js";
 import { makeTip, itemChapters } from "./core/villagerTips.js";
 import { itemById, takeItem, pickApple, ITEM_FX } from "./core/items.js";
-import { goalEvent, checkAchievements, todayKey, ensureDaily, missionById, missionDone, dailyDone, claimDaily, DAILY_REWARD } from "./core/goals.js";
+import { goalEvent, checkAchievements, todayKey, ensureDaily, missionById, claimDaily, DAILY_REWARD } from "./core/goals.js";
+import { initDaily, refreshDaily, openDaily, closeDaily, isDailyOpen } from "./ui/daily.js";
 import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -384,7 +385,6 @@ initLibrary({
 // ---------- 퀘스트 로그 (Stage 9) ----------
 questLog.initQuestLog({
   seed: TEST_MODE ? 5 : undefined,
-  dailyBlock: (el, button) => dailyBlock(el, button),
   getProgress: () => progress,
   chapterLink,
   guideTo: (id) => {
@@ -1244,7 +1244,7 @@ function goal(ev) {
   const g = progress.goals;
   const { completed, allDone } = goalEvent(g, ev);
   for (const id of completed) fx.showToast(`📅 오늘의 임무 완료 — ${missionById(id).text}`, 3);
-  if (allDone) { sfx("questComplete"); fx.showToast(`🎁 오늘의 임무 3개 완료! 퀘스트 로그(Q)에서 상자를 열어 🪙 ${DAILY_REWARD}개를 받으세요`, 5); }
+  if (allDone) { sfx("questComplete"); fx.showToast(`🎁 오늘의 임무 3개 완료! 퀘스트 버튼 위 🎁 버튼으로 상자를 열어 🪙 ${DAILY_REWARD}개를 받으세요`, 5); }
   for (const a of checkAchievements(progress, g)) {
     progress.cr2032 += a.reward;
     if (a.outfit && grantOutfit(progress, a.outfit)) fx.showToast(`🎁 업적 보상 옷 — ${outfitById(a.outfit).name} (가방에서 입기)`, 5);
@@ -1253,29 +1253,21 @@ function goal(ev) {
     hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
   }
   if (completed.length || allDone) persist();
+  refreshDaily();
 }
-/** 퀘스트 로그 맨 위 — 오늘의 임무 3줄 + 🎁 상자 */
-function dailyBlock(el, button) {
-  const d = ensureDaily(progress.goals);
-  const rows = d.ids.map((id) => {
-    const m = missionById(id), done = missionDone(d, id);
-    return el("li", { class: done ? "done" : "" }, `${done ? "✅" : "▫️"} ${m.text} `, el("small", { textContent: `${Math.min(d.prog[id] ?? 0, m.need)}/${m.need}` }));
-  });
-  const all = dailyDone(d);
-  const chest = d.claimed ? el("div", { class: "muted", textContent: "🎁 오늘 상자는 받았어요 — 내일 새 임무가 와요" })
-    : button(all ? `🎁 상자 열기 (🪙 ${DAILY_REWARD})` : `🎁 셋 다 하면 상자 (🪙 ${DAILY_REWARD})`, () => {
-      const n = claimDaily(progress.goals);
-      if (!n) return;
-      progress.cr2032 += n;
-      persist();
-      sfx("coin"); battleView.lootFly(motor.x, motor.y + 1, motor.z, 8, 0xffd76b);
-      hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
-      fx.showToast(`🎁 오늘의 상자 — 🪙 CR2032 +${n}`, 3);
-      questLog.openQuestLog(progress.quests.active);
-    }, `lib-btn${all ? " primary" : ""} daily-chest`);
-  if (!all && !d.claimed) chest.disabled = true;
-  return el("div", { class: "daily" }, el("h3", { textContent: "📅 오늘의 임무" }), el("ul", { class: "daily-list" }, rows), chest);
+/** 🎁 상자 열기 → 받은 개수 (Stage 13.23: 📅 오늘의 임무 창) */
+function claimDailyChest() {
+  const n = claimDaily(progress.goals);
+  if (!n) return 0;
+  progress.cr2032 += n;
+  persist();
+  sfx("coin"); battleView.lootFly(motor.x, motor.y + 1, motor.z, 8, 0xffd76b);
+  hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  fx.showToast(`🎁 오늘의 상자 — 🪙 CR2032 +${n}`, 3);
+  refreshDaily();
+  return n;
 }
+initDaily({ getDaily: () => ensureDaily(progress.goals), onClaim: claimDailyChest, onOpenChange: overlayChange });
 
 // ---------- 💡 주민이 들려주는 스펙 이야기 (Stage 13.14): 이벤트 → 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래 ----------
 /** 학습 보상 🪙 (💡 맞혀 보기·알바 2배) */
@@ -1385,7 +1377,7 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
-  goals: { event: (ev) => goal(ev), state: () => structuredClone(progress.goals) },
+  goals: { event: (ev) => goal(ev), state: () => structuredClone(progress.goals), open: openDaily, close: closeDaily, isOpen: isDailyOpen },
   tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },
   quests: {
     open: (id) => questLog.openQuestLog(id),

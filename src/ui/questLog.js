@@ -135,7 +135,6 @@ function render() {
         el("div", { class: "muted", textContent: `${qs.title ? `🏅 칭호: ${qs.title} · ` : ""}완료 ${Object.keys(qs.done).length}/${QUESTS.length}` })),
       el("button", { type: "button", class: "close", textContent: "×", "aria-label": "닫기", on: { click: closeQuestLog } })
     ),
-    hooks.dailyBlock?.(el, button),   // 📅 오늘의 임무 (Stage 13.20)
     list,
     el("div", { class: "q-detail" },
       el("h3", { textContent: `${quest.code} ${quest.title}` }),

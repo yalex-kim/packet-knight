@@ -502,8 +502,8 @@
   .pk-start:active { transform: translateY(5px); box-shadow: 0 1px 0 #b9770e, 0 6px 12px rgba(0, 0, 0, .3), inset 0 2px 0 rgba(255, 255, 255, .5); }
   #hud .hud-emblem { width: 26px; height: 26px; vertical-align: -8px; margin-right: 6px; object-fit: contain; }
   /* 시작 전에는 HUD를 숨기고, 착지하면 차례로 드러낸다 */
-  body.prestart :is(#corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
-  body.revealing :is(#corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
+  body.prestart :is(#btn-daily, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { opacity: 0; pointer-events: none; }
+  body.revealing :is(#btn-daily, #corner-emblem, #hud, #badge, #stats, #xpbar, #hp, #btn-me, #quest-tracker, #joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition: opacity .6s ease; }
   body.revealing :is(#hp, #stats, #badge, #btn-me) { transition-delay: .05s; }
   body.revealing :is(#quest-tracker, #hud) { transition-delay: .2s; }
   body.revealing :is(#joystick-zone, #btn-jump, #btn-fire, #btn-dash) { transition-delay: .35s; }
@@ -854,6 +854,21 @@
   .inv-it small { font-size: 11.5px; color: #9db4cc; }
   .inv-note { margin: 4px 0 10px; font-size: 13px; color: #ffe39a; }
   /* 📅 오늘의 임무 · 🏅 업적 (Stage 13.20) */
+  /* 📅 오늘의 임무 버튼·창 (Stage 13.23) — 퀘스트 트래커 바로 위, 왼쪽 맞춤 */
+  #btn-daily { position: fixed; left: 14px; bottom: 204px; z-index: 10; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 12.5px; font-weight: 800; color: #ffe39a; background: rgba(6, 16, 30, .85); border: 1px solid rgba(255, 215, 107, .5); box-shadow: 0 4px 14px rgba(0,0,0,.35); backdrop-filter: blur(8px); }
+  #btn-daily.claimed { color: #9db4cc; border-color: #2d4766; }
+  #btn-daily.ready { color: #3a2400; background: linear-gradient(100deg, #ffd76b, #ffb84d); border-color: transparent; animation: dailyPulse 1.4s ease-in-out infinite; }
+  @keyframes dailyPulse { 50% { box-shadow: 0 0 0 6px rgba(255, 215, 107, .25), 0 4px 14px rgba(0,0,0,.35); transform: scale(1.04); } }
+  @media (prefers-reduced-motion: reduce) { #btn-daily.ready { animation: none; } }
+  @media (max-width: 640px) { #btn-daily { left: 8px; bottom: 198px; font-size: 12px; padding: 5px 11px; } }
+  #daily .panel.dl { max-width: 420px; }
+  #daily .daily-list { padding: 0; margin: 4px 0 10px; display: grid; gap: 6px; }
+  #daily .daily-list li { display: grid; grid-template-columns: 24px 1fr auto; gap: 4px 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.2); }
+  #daily .daily-list li b { font-size: 14px; font-weight: 700; }
+  .daily-bar { grid-column: 2 / -1; display: block; height: 5px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .daily-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #ffd76b, #7dffb5); }
+  .daily-done { text-align: center; }
   .daily { margin: 4px 0 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 215, 107, .08); border: 1px solid rgba(255, 215, 107, .35); }
   .daily h3 { margin: 0 0 6px; color: #ffd76b; }
   .daily-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; font-size: 13px; }

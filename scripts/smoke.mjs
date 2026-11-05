@@ -2127,10 +2127,13 @@ await page.waitForFunction(() => window.__PK);
   });
   const gui = await page.evaluate(() => {
     const P = window.__PK;
-    P.quests.open();
-    const el = document.getElementById("quests");
-    const r = { daily: el.querySelectorAll(".daily-list li").length, chest: el.querySelector(".daily-chest")?.disabled ?? null };
-    P.quests.close();
+    const bt = document.getElementById("btn-daily"), tr = document.getElementById("quest-tracker").getBoundingClientRect(), bb = bt.getBoundingClientRect();
+    bt.click();
+    const el = document.getElementById("daily");
+    const r = { open: !el.hidden, daily: el.querySelectorAll(".daily-list li").length, chest: el.querySelector(".daily-chest")?.disabled ?? null,
+      above: bb.bottom <= tr.top && Math.abs(bb.left - tr.left) <= 1, label: bt.textContent.trim(), inLog: (() => { P.quests.open(); const n = document.querySelectorAll("#quests .daily-list").length; P.quests.close(); return n; })() };
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    r.closed = el.hidden;
     P.inventory.open("bag");
     r.ach = document.querySelectorAll(".inv-ach > div").length;
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -2158,7 +2161,8 @@ await page.waitForFunction(() => window.__PK);
   });
   check("무기점에 ⚔️ 무기 | 🧪 소모품 탭(소모품 4가지), 사과나무에서 🍎 하나 줍고 가방에서 먹으면 HP 절반 회복",
     itemUi.tabs === 2 && itemUi.items === 4 && itemUi.apples === 1 && itemUi.hpAfter > 10 && /사과/.test(itemUi.note) && itemUi.applesLeft === 0, JSON.stringify(itemUi));
-  check("퀘스트 로그 맨 위에 📅 오늘의 임무 3줄(다 하기 전엔 상자 잠김), 가방 › 소지품에 🏅 업적 8개", gui.daily === 3 && gui.chest === true && gui.ach === 8, JSON.stringify(gui));
+  check("📅 오늘의 임무 버튼이 퀘스트 트래커 바로 위(왼쪽 맞춤), 누르면 임무 창(3줄, 다 하기 전엔 상자 잠김)·Esc로 닫힘, 퀘스트 로그엔 없음 · 가방 › 소지품에 🏅 업적 8개",
+    gui.open && gui.daily === 3 && gui.chest === true && gui.above && /오늘의 임무/.test(gui.label) && gui.inLog === 0 && gui.closed && gui.ach === 8, JSON.stringify(gui));
   check("교과서 링크(?quest=Q7): 그 퀘스트를 퀘스트 로그로 연다 (없는 퀘스트는 무시)", dl.ok && !dl.bad && dl.open && /Q7/.test(dl.title), JSON.stringify(dl));
   check("💡 주민 이야기: 층 클리어 → 관련 장(호핑·공존·연결) 주민 머리 위 💡(한 번에 하나), 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래 정답 🪙+2, 들은 뒤 2분 쿨다운",
     ["hopping", "coexistence", "connection"].includes(sc.st.chapter) && sc.marker === sc.st.villagerId && sc.oneAtATime && sc.full.startsWith("💡") && sc.markerGone && sc.qbtn && sc.gain === 2 && sc.cooldown && sc.afterCooldown
