@@ -479,6 +479,20 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 🧪 소모품 · 새 옷 (Stage 13.22)
+  {
+    const I = await import(pathToFileURL(path.join(ROOT, "src/core/items.js")).href);
+    const Sh = await import(pathToFileURL(path.join(ROOT, "src/core/shop.js")).href);
+    const fp = { cr2032: 12, items: I.emptyItems(), shop: Sh.emptyShop() };
+    const b1 = I.buyItem(fp, "battery"), b2 = I.buyItem(fp, "ciPotion"), poor = I.buyItem(fp, "mic"), apple = I.buyItem(fp, "apple");
+    const t1 = I.takeItem(fp, "battery"), t2 = I.takeItem(fp, "battery");
+    const a1 = I.pickApple(fp, "2026-11-05"), a2 = I.pickApple(fp, "2026-11-05"), a3 = I.pickApple(fp, "2026-11-06");
+    const hunterBuy = Sh.buy({ shop: Sh.emptyShop(), cr2032: 999 }, "outfit", "hunter");
+    check("🧪 소모품: 사면 CR2032가 줄고 가방에 쌓임, 돈 모자라면 못 삼, 사과는 못 사고 사과나무에서 하루 한 번 · 업적 전용 옷(비콘 사냥꾼)은 살 수 없음 · 새 옷 4벌",
+      b1.ok && b2.ok && !poor.ok && poor.reason === "funds" && !apple.ok && fp.cr2032 === 0 && t1 && !t2 && a1 && !a2 && a3 && fp.items.bag.apple === 2
+        && !hunterBuy.ok && ["leaudio", "pawr", "retro", "aoa"].every((id) => Sh.OUTFITS.some((o) => o.id === id && o.price > 0)),
+      JSON.stringify(fp.items));
+  }
   // 던전 변주 (Stage 13.21): 층 특성(보스 층 제외)·특성 층엔 상자·광고 러시는 +2·폭풍은 Wi-Fi 공격 ×1.3
   {
     const D = await import(pathToFileURL(path.join(ROOT, "src/core/dungeon.js")).href);
@@ -2122,6 +2136,28 @@ await page.waitForFunction(() => window.__PK);
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     return r;
   });
+  const itemUi = await page.evaluate(() => {
+    const P = window.__PK;
+    const before = P.progress().cr2032;
+    P.shop.open("weapon");
+    const tabs = document.querySelectorAll(".shop-tabs button").length;
+    document.querySelector('.shop-tabs [data-id="item"]').click();
+    const items = document.querySelectorAll('[data-act="buyItem"]').length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    P.ranking.open(); P.ranking.close();   // 사과나무 → 🍎 하루 한 번
+    const apples = P.progress().items.bag.apple ?? 0;
+    P.battle.setHp(10);
+    P.inventory.open("bag");
+    const useBtn = document.querySelector('.inv-it [data-act="use"]');
+    useBtn?.click();
+    const hpAfter = P.battle.state().hp;
+    const note = document.querySelector(".inv-note")?.textContent ?? "";
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    P.battle.setHp(P.battle.state().maxHp);
+    return { before, tabs, items, apples, hpAfter, note, applesLeft: P.progress().items.bag.apple ?? 0 };
+  });
+  check("무기점에 ⚔️ 무기 | 🧪 소모품 탭(소모품 4가지), 사과나무에서 🍎 하나 줍고 가방에서 먹으면 HP 절반 회복",
+    itemUi.tabs === 2 && itemUi.items === 4 && itemUi.apples === 1 && itemUi.hpAfter > 10 && /사과/.test(itemUi.note) && itemUi.applesLeft === 0, JSON.stringify(itemUi));
   check("퀘스트 로그 맨 위에 📅 오늘의 임무 3줄(다 하기 전엔 상자 잠김), 가방 › 소지품에 🏅 업적 8개", gui.daily === 3 && gui.chest === true && gui.ach === 8, JSON.stringify(gui));
   check("교과서 링크(?quest=Q7): 그 퀘스트를 퀘스트 로그로 연다 (없는 퀘스트는 무시)", dl.ok && !dl.bad && dl.open && /Q7/.test(dl.title), JSON.stringify(dl));
   check("💡 주민 이야기: 층 클리어 → 관련 장(호핑·공존·연결) 주민 머리 위 💡(한 번에 하나), 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래 정답 🪙+2, 들은 뒤 2분 쿨다운",

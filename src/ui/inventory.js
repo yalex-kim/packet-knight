@@ -2,6 +2,7 @@
 // RF 부품 단계·능력치 + 소지품(CR2032·완독 배지·도감). 경제 영향 없음 — 장착은 core/shop.js equip
 import { WEAPONS, OUTFITS, equip, weaponById, outfitById } from "../core/shop.js";
 import { ACHIEVEMENTS } from "../core/goals.js";
+import { ITEMS } from "../core/items.js";
 import { GEAR, STAT_META, MONSTERS, COMBAT } from "../core/balance.js";
 import { badges } from "../core/quests.js";
 import { CHAPTERS } from "../core/chapters.data.js";
@@ -29,7 +30,8 @@ function build() {
     if (!b) return;
     const { act, kind, id } = b.dataset;
     if (act === "close") return closeInventory();
-    if (act === "tab") { tab = id; return render(); }
+    if (act === "tab") { tab = id; itemNote = ""; return render(); }
+    if (act === "use") { itemNote = hooks.onUseItem?.(id) ?? ""; return render(); }
     if (act === "equip") { if (equip(hooks.getProgress(), kind, id)) { hooks.onChange(); render(true); } }
   });
   window.addEventListener("keydown", (e) => {
@@ -71,6 +73,18 @@ function rfTab(p, stats) {
     ${p.statPoints ? `<p class="inv-note">✨ 분배하지 않은 스탯 포인트 ${p.statPoints}점 — 패킷 대장간 RF 랩에서</p>` : ""}`;
 }
 
+/** 🧪 소모품 (Stage 13.22) — 가진 것만, 누르면 쓴다 */
+function itemsHtml(p) {
+  const bag = p.items?.bag ?? {};
+  const have = ITEMS.filter((it) => bag[it.id] > 0);
+  return `<h3>🧪 소모품 <small>${have.reduce((n, it) => n + bag[it.id], 0)}개</small></h3>
+    ${have.length ? `<div class="inv-items">${have.map((it) => `<div class="inv-it"><span>${it.icon}</span><div><b>${esc(it.name)} ×${bag[it.id]}</b><small>${esc(it.desc)}</small></div>
+      <button type="button" class="lib-btn" data-act="use" data-id="${it.id}">쓰기</button></div>`).join("")}</div>`
+      : `<p class="muted">무기점의 🧪 소모품 칸에서 살 수 있어요. 🍎 사과는 비밀의 사과나무에서 하루 한 번.</p>`}
+    ${itemNote ? `<p class="inv-note">${esc(itemNote)}</p>` : ""}`;
+}
+let itemNote = "";
+
 /** 🏅 업적 (Stage 13.20) */
 function achievementsHtml(p) {
   const got = p.goals?.ach ?? {};
@@ -84,6 +98,7 @@ function bagTab(p) {
   const scanned = Object.keys(p.bestiary ?? {});
   return `
     <div class="inv-coins"><span>🪙</span><div><b>CR2032 ${p.cr2032}개</b><small>던전 입장료·RF 강화·상점에 쓴다. 등대 알바·던전에서 번다.</small></div></div>
+    ${itemsHtml(p)}
     ${achievementsHtml(p)}
     <h3>📖 완독 배지 <small>${got.size}/${CHAPTERS.length}</small></h3>
     <div class="inv-badges">${CHAPTERS.map((c) => `<span class="${got.has(c.id) ? "on" : ""}" title="${esc(c.title)}">${got.has(c.id) ? "📖" : "▫️"} ${esc(c.title.split(":")[0])}</span>`).join("")}</div>

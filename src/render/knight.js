@@ -201,7 +201,8 @@ function cape(g, mat, trimMat) {
     coin(p, sx * 0.02, 0.1, 0, 0.1, 0);
   }
 }
-const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"], magnetron: ["gold"] };   // 마그네트론 갑옷 = 금빛 갑옷 모양 + 주황·크롬 색 (Stage 13.19)
+const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"], magnetron: ["gold"],
+  leaudio: ["auracast"], pawr: ["sig"], retro: ["classic"], aoa: ["gold"], hunter: ["mesh", "meshHood"] };   // Stage 13.22: 기존 옷 틀 + 새 색   // 마그네트론 갑옷 = 금빛 갑옷 모양 + 주황·크롬 색 (Stage 13.19)
 
 // ---------- 무기 ----------
 const shieldParts = [];
@@ -324,7 +325,7 @@ export function setOutfit(o) {
   antenna.visible = antennaTip.visible = true;
   MAT.plume.color.setHex(o.plume);
   MAT.tabard.color.setHex(o.tabard);                                 // 방패 색도 옷을 따른다
-  MAT.steel.color.setHex(o.id === "gold" ? 0xf2c14e : 0xd3dce6);    // 황금 갑옷이면 투구도 금빛
+  MAT.steel.color.setHex(o.id === "gold" ? 0xf2c14e : ["magnetron", "leaudio", "pawr", "retro", "aoa", "hunter"].includes(o.id) ? o.steel : 0xd3dce6);    // 황금 갑옷이면 투구도 금빛, 새 옷은 제 쇠 색
 }
 setOutfit({ id: "classic", plume: 0xd8443c, tabard: 0xd8443c });
 

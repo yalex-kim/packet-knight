@@ -31,7 +31,8 @@ import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
 import { drawOne } from "./core/specCards.js";
 import { makeTip, itemChapters } from "./core/villagerTips.js";
-import { goalEvent, checkAchievements, ensureDaily, missionById, missionDone, dailyDone, claimDaily, DAILY_REWARD } from "./core/goals.js";
+import { itemById, takeItem, pickApple, ITEM_FX } from "./core/items.js";
+import { goalEvent, checkAchievements, todayKey, ensureDaily, missionById, missionDone, dailyDone, claimDaily, DAILY_REWARD } from "./core/goals.js";
 import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -334,6 +335,7 @@ function handleTap(clientX, clientY) {
 }
 
 function openSecretTree(board = "level") {
+  if (pickApple(progress, todayKey())) { persist(); sfx("pickup"); fx.showToast("🍎 사과나무에서 빨간 사과를 하나 주웠다 — 가방 › 소지품 (HP 절반 회복)", 4); }   // 하루 한 번 (Stage 13.22)
   hud.hideModal();
   clearMoveTarget();
   setInputEnabled(false);
@@ -436,7 +438,7 @@ function performFire(target = null) {
   const perks = progress.quests.perks;
   const wpn = weaponById(progress.shop.weapon);   // 상점 무기 (Stage 12.2)
   const shot = fireAdvPacket(activeBattle(), motor, target, {
-    cooldownMul: ciIntervalMul(effectiveStats(progress).ci) * wpn.cooldownMul,   // CI 스탯 (Stage 11.15) × 무기
+    cooldownMul: ciIntervalMul(effectiveStats(progress).ci) * wpn.cooldownMul * (ciBuffT > 0 ? ITEM_FX.CI_MUL : 1),   // CI 스탯 (Stage 11.15) × 무기 × ⏱️ 연결 갱신 물약
     spread: wpn.spread,
     style: wpn.blade.kind,
     rangeMul: (perks.dle ? PERKS.dle.rangeMul : 1) * wpn.rangeMul,
@@ -516,6 +518,7 @@ function handleBattleEvents(events) {
         sfx("dodge");
         break;
       case "shieldBlock":
+        if (run?.micLeft > 0) run.micLeft--;
         fx.floatText(motor.x, motor.y + 0.9, motor.z, "🛡️ MIC 실패 — 위조 패킷 폐기", "dodge");
         sfx("shield");
         break;
@@ -648,6 +651,7 @@ initShop({
 applyLooks();
 initInventory({
   getProgress: () => progress,
+  onUseItem: (id) => useItem(id),
   getStats: () => effectiveStats(progress),
   onChange: () => { persist(); applyLooks(); sfx("select"); },
   onOpenChange: (open) => { setInputEnabled(!open); inputLocked = open; if (open) { clearMoveTarget(); hud.hideModal(); } }
@@ -1114,7 +1118,7 @@ function simulate(dt) {
     handleBattleEvents(stepBattle(activeBattle(), dt, {
       player: motor, stats: effectiveStats(progress), rng: battleRng, interference,
       invulnerable: dash.t > 0,
-      shieldBlock: progress.quests.perks.aesShield ? QUEST_SKILLS.AES_SHIELD.blockChance : 0
+      shieldBlock: run?.micLeft > 0 ? 1 : progress.quests.perks.aesShield ? QUEST_SKILLS.AES_SHIELD.blockChance : 0   // 🛡️ MIC 두루마리 (Stage 13.22)
     }));
   }
   if (run) {
@@ -1196,6 +1200,44 @@ function openDeepLink(id, quiet = false) {
   return true;
 }
 
+// ---------- 🧪 소모품 (Stage 13.22) ----------
+let ciBuffT = 0;   // ⏱️ 연결 갱신 물약 남은 초
+/** 가방에서 쓰기 → 안내 문구 (쓸 수 없으면 이유) */
+function useItem(id) {
+  const it = itemById(id);
+  if (!it || !(progress.items.bag[id] > 0)) return "가진 게 없어요.";
+  const inCombat = run && run.phase === "combat";
+  if (it.dungeonOnly && !inCombat) return `${it.icon} ${it.name}은(는) 던전 전투 중에만 쓸 수 있어요.`;
+  if (it.perFloor && run && run.usedItems?.has(id)) return `${it.icon} ${it.name}은(는) 이 층에서 이미 썼어요 (한 층에 하나).`;
+  let msg;
+  if (id === "battery") {
+    const c = jobChargesAt(progress, now());
+    if (c.count >= RSSI_JOB.CHARGES_MAX) return "🔋 측정기 배터리가 이미 가득해요.";
+    progress.job.charges = { stored: c.count + 1, since: now() };
+    msg = `🔋 측정기 배터리 한 칸 충전 (${c.count + 1}/${RSSI_JOB.CHARGES_MAX})`;
+  } else if (id === "afhCharm") {
+    if (!run.battle.monsters.some((m) => m.state !== "dead" && m.revealed && hasBand(m))) return "📶 아직 드러난 간섭 대역이 없어요 — 쏴서 대역을 찾은 뒤에 쓰세요.";
+    applyAfh(run.link, run.battle); sfx("afh");
+    msg = `📶 AFH 부적 — 드러난 간섭 대역을 채널맵에서 뺐어요 (이벤트 #${run.link.pending?.instant ?? "?"}부터)`;
+  } else if (id === "mic") {
+    run.micLeft = ITEM_FX.MIC_BLOCKS;
+    msg = `🛡️ MIC 두루마리 — 다음 공격 ${ITEM_FX.MIC_BLOCKS}번을 위조 패킷으로 버려요`;
+  } else if (id === "ciPotion") {
+    ciBuffT = ITEM_FX.CI_SEC;
+    msg = `⏱️ 연결 갱신 물약 — ${ITEM_FX.CI_SEC}초 동안 쿨타임 ×${ITEM_FX.CI_MUL}`;
+  } else if (id === "apple") {
+    if (battle.player.hp >= battle.player.maxHp) return "🍎 HP가 이미 가득해요.";
+    battle.player.hp = Math.min(battle.player.maxHp, battle.player.hp + Math.round(battle.player.maxHp * ITEM_FX.APPLE_HEAL));
+    msg = `🍎 사과를 먹었다 — HP ${battle.player.hp}/${battle.player.maxHp}`;
+  } else return "쓸 수 없는 물건이에요.";
+  takeItem(progress, id);
+  if (it.perFloor && run) (run.usedItems ??= new Set()).add(id);
+  persist();
+  sfx("pickup");
+  fx.showToast(msg, 3);
+  return `✓ ${msg}`;
+}
+
 // ---------- 📅 오늘의 임무 · 🏅 업적 (Stage 13.20) ----------
 /** 게임 이벤트 → 임무 진행·업적 확인 (안내만 하고 저장은 부르는 쪽 흐름의 persist에 맡기되, 업적 보상은 바로 저장) */
 function goal(ev) {
@@ -1205,6 +1247,7 @@ function goal(ev) {
   if (allDone) { sfx("questComplete"); fx.showToast(`🎁 오늘의 임무 3개 완료! 퀘스트 로그(Q)에서 상자를 열어 🪙 ${DAILY_REWARD}개를 받으세요`, 5); }
   for (const a of checkAchievements(progress, g)) {
     progress.cr2032 += a.reward;
+    if (a.outfit && grantOutfit(progress, a.outfit)) fx.showToast(`🎁 업적 보상 옷 — ${outfitById(a.outfit).name} (가방에서 입기)`, 5);
     sfx("perfect");
     fx.showToast(`🏅 업적 달성 — ${a.icon} ${a.title} (🪙 +${a.reward}) · 가방 › 소지품에서 보기`, 5);
     hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
@@ -1271,6 +1314,7 @@ function animate() {
   adaptQuality(raw);
 
   simulate(dt);
+  if (ciBuffT > 0) ciBuffT = Math.max(0, ciBuffT - dt);
   const t = clock.elapsedTime;
   renderFrame(t, dt);
   world.animateWorld(t);

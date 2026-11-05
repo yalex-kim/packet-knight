@@ -3,6 +3,7 @@
 
 import { emptyShop, validShop } from "./shop.js";
 import { emptyGoals, validGoals } from "./goals.js";
+import { emptyItems, validItems } from "./items.js";
 import {
   PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
   GEAR, UPGRADE, STAT_POINT_GAIN, STAT_CAPS, ALLOCATABLE_STATS, RSSI_JOB, CONN_INTERVAL } from "./balance.js";
@@ -50,6 +51,7 @@ export function createProgress() {
     alloc: emptyAlloc(),
     shop: emptyShop(),   // Stage 12.2 상점가 — 옛 세이브는 기본값으로 (버전 그대로)
     goals: emptyGoals(), // Stage 13.20 오늘의 임무·업적 — 옛 세이브는 기본값으로 (버전 그대로)
+    items: emptyItems(), // Stage 13.22 소모품 — 옛 세이브는 기본값으로 (버전 그대로)
     lab: { tries: 0, success: 0, spent: 0 },
     quests: createQuestState(),
     metrics: { quizAttempts: {}, quizPerfect: {}, chapterOpens: {} }
@@ -110,6 +112,7 @@ function validate(raw) {
     alloc: { ...emptyAlloc(), ...raw.alloc },
     shop: validShop(raw.shop),
     goals: validGoals(raw.goals),
+    items: validItems(raw.items),
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
     quests: { active: q.active, progress: structuredClone(q.progress), done: { ...q.done }, title: typeof q.title === "string" ? q.title : null, perks: { ...(q.perks ?? {}) }, claimed: { ...(q.claimed ?? {}) } },
     bestiary: Object.fromEntries(Object.entries(raw.bestiary).map(([k, v]) => [k, { kills: Number.isInteger(v?.kills) ? v.kills : 0, firstScan: String(v?.firstScan ?? "") }])),

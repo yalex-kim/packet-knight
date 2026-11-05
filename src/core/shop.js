@@ -31,6 +31,13 @@ export const OUTFITS = Object.freeze([
   { id: "mesh", name: "메시 숲지기", icon: "🟩", price: 25, desc: "릴레이 노드처럼 숲에 녹아드는 초록 옷.", tabard: 0x2f8f5a, tabardDark: 0x22704a, plume: 0x7dffb5, steel: 0xc8d6cc },
   { id: "stealth", name: "RPA 그림자", icon: "⬛", price: 30, desc: "15분마다 주소를 바꾸는 추적 방지 망토 — 흑색.", tabard: 0x2a2f3a, tabardDark: 0x1a1d24, plume: 0x39d0ff, steel: 0x8e9aa8 },
   { id: "gold", name: "황금 CR2032", icon: "🟨", price: 40, desc: "코인 전지를 모아 두른 금빛 갑옷 (자랑용).", tabard: 0xf2c14e, tabardDark: 0xc9962a, plume: 0xffe9a8, steel: 0xf6e7b5 },
+  // Stage 13.22 새 옷 — 모양은 기존 옷 틀(knight.js OUTFIT_SET) + 새 색
+  { id: "leaudio", name: "LE 오디오 망토", icon: "🎧", price: 35, desc: "등시성 채널처럼 박자를 맞추는 청록·검정 망토.", tabard: 0x0f8f8a, tabardDark: 0x0a5f5c, plume: 0x2ff0e0, steel: 0x3a4250 },
+  { id: "pawr", name: "PAwR 가격표 갑옷", icon: "🏷️", price: 35, desc: "전자 가격표 수천 개를 깨우는 흰·빨강 제복.", tabard: 0xf2f4f7, tabardDark: 0xd23a3a, plume: 0xff5a5a, steel: 0xe2e6ec },
+  { id: "retro", name: "BR/EDR 레트로 기사복", icon: "📻", price: 30, desc: "1999년 1.0 시절 느낌의 갈색 가죽 기사복.", tabard: 0x8a5a2e, tabardDark: 0x6a4220, plume: 0xe8cf9a, steel: 0xb8a58a },
+  { id: "aoa", name: "AoA 안테나 갑옷", icon: "📐", price: 45, desc: "어깨에 안테나 배열을 단 은빛 갑옷 — 방향을 읽는 기사.", tabard: 0xc9d3de, tabardDark: 0x8e9aa8, plume: 0x39d0ff, steel: 0xe8eef5 },
+  // 업적 전용 (Stage 13.22): 업적 「비콘 사냥꾼」(알바 S등급 10번)으로만 받는다
+  { id: "hunter", name: "비콘 사냥꾼 망토", icon: "🎯", price: null, achOnly: "jobS10", desc: "비콘 알바 S등급 10번을 해낸 기사의 초록 망토.", tabard: 0x1f6a3a, tabardDark: 0x14482a, plume: 0xffd76b, steel: 0xc8d6cc },
   // 보스 전용 (Stage 13.19): 살 수 없고 5층 보스 전자레인지 오븐을 처음 쓰러뜨리면 받는다
   { id: "magnetron", name: "마그네트론 갑옷", icon: "🟧", price: null, bossOnly: true, desc: "전자레인지 오븐을 쓰러뜨린 기사의 증표 — 주황·크롬 갑옷.", tabard: 0xff7a1a, tabardDark: 0xc95a0a, plume: 0xffb050, steel: 0xe8ecf0 }
 ]);
@@ -59,7 +66,7 @@ export function validShop(raw) {
 export function buy(progress, kind, id) {
   const list = kind === "weapon" ? WEAPONS : OUTFITS;
   const item = list.find((x) => x.id === id);
-  if (!item || item.bossOnly) return { ok: false, reason: "unknown" };   // 보스 전용은 살 수 없다
+  if (!item || item.bossOnly || item.achOnly) return { ok: false, reason: "unknown" };   // 보스·업적 전용은 살 수 없다
   const shop = progress.shop;
   const owned = kind === "weapon" ? shop.weapons : shop.outfits;
   if (owned.includes(id)) return { ok: false, reason: "owned" };
