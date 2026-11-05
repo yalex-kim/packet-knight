@@ -479,6 +479,26 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 📡 보스 (Stage 13.19): 5층마다 전자레인지 오븐, 체력 절반 아래면 폭주 → 대역이 넓어진다, 처치하면 보스 전용 옷 (살 수 없음)
+  {
+    const D = await import(pathToFileURL(path.join(ROOT, "src/core/dungeon.js")).href);
+    const Bl = await import(pathToFileURL(path.join(ROOT, "src/core/balance.js")).href);
+    const Sh = await import(pathToFileURL(path.join(ROOT, "src/core/shop.js")).href);
+    const plan5 = Bl.floorPlan(5), plan10 = Bl.floorPlan(10), plan6 = Bl.floorPlan(6);
+    const layout = D.generateFloor(5, () => 0.3);
+    const fb = D.createFloorBattle(layout);
+    const boss = fb.monsters.find((m) => m.type === "ovenBoss");
+    const before = boss ? [...boss.band].length : 0;
+    let rage = [];
+    if (boss) { boss.hp = Math.floor(boss.maxHp / 2) - 1; rage = D.stepMicrowaves(fb, 1 / 60).filter((e) => e.type === "bossRage"); }
+    const fake = { shop: Sh.emptyShop(), cr2032: 999 };
+    const buyTry = Sh.buy(fake, "outfit", "magnetron");
+    const g1 = Sh.grantOutfit(fake, "magnetron"), g2 = Sh.grantOutfit(fake, "magnetron");
+    check("📡 보스: 5·10층은 전자레인지 오븐(6층은 아님), 체력 절반 아래면 폭주해 잡음 대역이 넓어진다, 보스 전용 옷은 살 수 없고 처음 처치 때 한 번 받는다",
+      plan5.boss && plan10.boss && !plan6.boss && boss && rage.length === 1 && [...boss.band].length > before && boss.enraged
+        && !buyTry.ok && g1 && !g2 && fake.shop.outfits.includes("magnetron") && Sh.validShop(fake.shop).outfits.includes("magnetron"),
+      `대역 ${before} → ${boss ? [...boss.band].length : "?"}채널 · 체력 ${boss?.maxHp}`);
+  }
   // 근접 블로킹 (Stage 13.11): 대역 밖 채널(interference.playerHit=false)이어도 전자레인지 2 m 안이면 40% 피해, 3 m면 0
   const mwStrike = (dist) => {
     const b = B.createBattle([[0, 0]], "microwave");
@@ -894,11 +914,12 @@ await reset();
     const wrong = [...box.querySelectorAll(".sq-opt")].find((b, i) => i !== q.answer);
     wrong.click();
     r.again = [...box.querySelectorAll(".sq-opt")].every((b) => b.disabled);
+    r.book = box.querySelector("a.sq-ch")?.getAttribute("href") ?? "";
     r.cr = window.__PK.progress().cr2032;
     return r;
   });
-  check("🎓 알바 2배 받기: 정산 화면 버튼 → 전체 장에서 문제, 틀리면 기본 보수 그대로·다시 못 고름",
-    dbl.btn && /2배 받기/.test(dbl.label) && dbl.q && typeof dbl.chapter === "string" && dbl.again && dbl.cr === result.reward, JSON.stringify(dbl));
+  check("🎓 알바 2배 받기: 정산 화면 버튼 → 전체 장에서 문제, 틀리면 기본 보수 그대로·다시 못 고름·그 장 교과서 링크",
+    dbl.btn && /2배 받기/.test(dbl.label) && dbl.q && typeof dbl.chapter === "string" && dbl.again && dbl.book.includes(`/${dbl.chapter}.html`) && dbl.cr === result.reward, JSON.stringify(dbl));
 
   // 두 번째 판은 도중에 그만두면 보수 없음
   await page.locator("#job-panel .lib-btn.primary").click(); // 한 번 더

@@ -30,7 +30,9 @@ export const OUTFITS = Object.freeze([
   { id: "auracast", name: "오라캐스트 보라", icon: "🟪", price: 25, desc: "방송을 듣는 사람들을 위한 보랏빛 망토.", tabard: 0x7a5cc9, tabardDark: 0x5a3fa3, plume: 0xb49bff, steel: 0xd9d2e8 },
   { id: "mesh", name: "메시 숲지기", icon: "🟩", price: 25, desc: "릴레이 노드처럼 숲에 녹아드는 초록 옷.", tabard: 0x2f8f5a, tabardDark: 0x22704a, plume: 0x7dffb5, steel: 0xc8d6cc },
   { id: "stealth", name: "RPA 그림자", icon: "⬛", price: 30, desc: "15분마다 주소를 바꾸는 추적 방지 망토 — 흑색.", tabard: 0x2a2f3a, tabardDark: 0x1a1d24, plume: 0x39d0ff, steel: 0x8e9aa8 },
-  { id: "gold", name: "황금 CR2032", icon: "🟨", price: 40, desc: "코인 전지를 모아 두른 금빛 갑옷 (자랑용).", tabard: 0xf2c14e, tabardDark: 0xc9962a, plume: 0xffe9a8, steel: 0xf6e7b5 }
+  { id: "gold", name: "황금 CR2032", icon: "🟨", price: 40, desc: "코인 전지를 모아 두른 금빛 갑옷 (자랑용).", tabard: 0xf2c14e, tabardDark: 0xc9962a, plume: 0xffe9a8, steel: 0xf6e7b5 },
+  // 보스 전용 (Stage 13.19): 살 수 없고 5층 보스 전자레인지 오븐을 처음 쓰러뜨리면 받는다
+  { id: "magnetron", name: "마그네트론 갑옷", icon: "🟧", price: null, bossOnly: true, desc: "전자레인지 오븐을 쓰러뜨린 기사의 증표 — 주황·크롬 갑옷.", tabard: 0xff7a1a, tabardDark: 0xc95a0a, plume: 0xffb050, steel: 0xe8ecf0 }
 ]);
 
 export const weaponById = (id) => WEAPONS.find((w) => w.id === id) ?? WEAPONS[0];
@@ -57,7 +59,7 @@ export function validShop(raw) {
 export function buy(progress, kind, id) {
   const list = kind === "weapon" ? WEAPONS : OUTFITS;
   const item = list.find((x) => x.id === id);
-  if (!item) return { ok: false, reason: "unknown" };
+  if (!item || item.bossOnly) return { ok: false, reason: "unknown" };   // 보스 전용은 살 수 없다
   const shop = progress.shop;
   const owned = kind === "weapon" ? shop.weapons : shop.outfits;
   if (owned.includes(id)) return { ok: false, reason: "owned" };
@@ -73,4 +75,12 @@ export function equip(progress, kind, id) {
   if (kind === "weapon" && shop.weapons.includes(id)) { shop.weapon = id; return true; }
   if (kind === "outfit" && shop.outfits.includes(id)) { shop.outfit = id; return true; }
   return false;
+}
+
+/** 보스 전용 옷 받기 (Stage 13.19) — 처음이면 true */
+export function grantOutfit(progress, id) {
+  const shop = progress.shop;
+  if (shop.outfits.includes(id) || !OUTFITS.some((o) => o.id === id)) return false;
+  shop.outfits.push(id);
+  return true;
 }

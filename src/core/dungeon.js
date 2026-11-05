@@ -99,24 +99,29 @@ export function createFloorBattle(layout) {
     m.revealed = false;
     if (m.type === "wifiInterferer") m.wifi = layout.monsterWifi[i];
     if (m.type === "microwave") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.microwave.duty.on * (0.4 + 0.6 * ((i * 0.37) % 1)); }
+    if (m.type === "ovenBoss") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.ovenBoss.duty.on; m.enraged = false; }
   });
   return battle;
 }
 
+const bandChannels = ({ fromMhz, toMhz }) => { const s = new Set(); for (let c = 0; c < 37; c++) { const f = dataChannelFreq(c); if (f >= fromMhz && f <= toMhz) s.add(c); } return s; };
 /** 전자레인지가 덮는 LE 채널 (2442~2466 MHz) */
-export const MICROWAVE_BAND = (() => {
-  const { fromMhz, toMhz } = MONSTERS.microwave.band;
-  const s = new Set();
-  for (let c = 0; c < 37; c++) { const f = dataChannelFreq(c); if (f >= fromMhz && f <= toMhz) s.add(c); }
-  return s;
-})();
+export const MICROWAVE_BAND = bandChannels(MONSTERS.microwave.band);
+/** 오븐 보스가 폭주하면 덮는 LE 채널 (2430~2478 MHz, Stage 13.19) */
+export const OVEN_RAGE_BAND = bandChannels(MONSTERS.ovenBoss.rageBand);
 
 /** 전자레인지 켜짐/꺼짐 박자 (Stage 12.1) — 바뀔 때 이벤트 */
 export function stepMicrowaves(battle, dt) {
   const events = [];
-  const { on, off } = MONSTERS.microwave.duty;
   for (const m of battle.monsters) {
-    if (m.type !== "microwave" || m.state === "dead") continue;
+    if ((m.type !== "microwave" && m.type !== "ovenBoss") || m.state === "dead") continue;
+    const { on, off } = MONSTERS[m.type].duty;
+    if (m.type === "ovenBoss" && !m.enraged && m.hp <= m.maxHp / 2) {   // 마그네트론 폭주 — 대역이 넓어진다
+      m.enraged = true;
+      m.band = OVEN_RAGE_BAND;
+      m.revealed = true;   // 폭주하면 누구나 안다 — 넓어진 대역이 채널 기둥에 바로 보인다
+      events.push({ type: "bossRage", monster: m });
+    }
     m.dutyT -= dt;
     if (m.dutyT > 0) continue;
     m.on = !m.on;

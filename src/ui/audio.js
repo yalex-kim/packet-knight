@@ -170,6 +170,11 @@ const SFX = {
     // 조리 완료 '땡!!' 선명한 벨소리
     tone(t + 0.15, { f: 1568, dur: 0.6, type: "sine", gain: 0.25, attack: 0.002 });
   }, // 2.45GHz 마그네트론 고주파 파동 + 콰앙 + 끝에 울리는 '땡!'
+  // 📡 보스 전자레인지 오븐 (Stage 13.19): 전자레인지 소리를 한 옥타브 낮게 겹치고 더 길게
+  windup_ovenBoss: (t) => { SFX.windup_microwave(t); tone(t, { f: 55, to: 110, dur: 1.2, type: "sawtooth", gain: 0.12, attack: 0.3 }); },
+  atk_ovenBoss: (t) => { SFX.atk_microwave(t); tone(t, { f: 90, to: 28, dur: 0.6, type: "sine", gain: 0.3 }); noise(t + 0.05, { dur: 0.4, f: 900, to: 120, q: 0.7, gain: 0.2, type: "lowpass" }); },
+  bossRage: (t) => { for (let i = 0; i < 3; i++) tone(t + i * 0.18, { f: 220 * (i + 1), to: 330 * (i + 1), dur: 0.25, type: "square", gain: 0.06 }); noise(t, { dur: 0.6, f: 300, to: 3000, q: 2, gain: 0.15 }); },
+  bossDown: (t) => { arp(t, [392, 523, 659, 784, 1047, 1319], 0.08, { dur: 0.25, type: "triangle", gain: 0.11 }); tone(t + 0.5, { f: 1568, dur: 0.9, type: "sine", gain: 0.08 }); },
   windup_sniffer: (t) => tone(t, { f: 400, to: 3200, dur: 0.75, type: "sine", gain: 0.04, attack: 0.4 }),                          // 레이저 충전
   atk_sniffer: (t) => {
     tone(t, { f: 3600, to: 440, dur: 0.12, type: "square", gain: 0.1 });

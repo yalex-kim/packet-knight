@@ -2,6 +2,7 @@
 // (13.12의 "8분마다 뜨는 스펙 카드" 창은 13.14에서 주민 이야기로 바뀌어 없앴다)
 
 import { CHAPTERS } from "../core/chapters.data.js";
+import { chapterUrl } from "../core/book.js";
 
 const SEEN_KEY = "packetKnight.specSeen";
 /** 이미 들은 스펙 카드 id (같은 이야기가 되풀이되지 않게) */
@@ -10,6 +11,8 @@ export function markSeen(id) { const s = loadSeen(); s.add(id); try { localStora
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const chapterTitle = (id) => CHAPTERS.find((c) => c.id === id)?.title ?? id;
+/** 문제의 장 제목 = 교과서 그 장 링크 (Stage 13.19 — 틀렸을 때 바로 읽으러 가게) */
+const chapterHref = (id) => { const ch = CHAPTERS.find((c) => c.id === id); return ch ? chapterUrl(ch.file) : "#"; };
 
 /**
  * 문제 하나를 box 안에 그린다. 답을 고르면 정답·해설을 보여 주고 onDone(correct) — 한 번만 고를 수 있다.
@@ -17,7 +20,7 @@ const chapterTitle = (id) => CHAPTERS.find((c) => c.id === id)?.title ?? id;
  */
 export function askQuestion(box, q, onDone) {
   box.innerHTML = `<div class="sq">
-    ${q.chapter ? `<span class="sq-ch">📖 ${esc(chapterTitle(q.chapter))}</span>` : ""}
+    ${q.chapter ? `<a class="sq-ch" href="${esc(chapterHref(q.chapter))}" target="_blank" rel="noopener" title="교과서에서 이 장 열기 (새 탭)">📖 ${esc(chapterTitle(q.chapter))} ↗</a>` : ""}
     <p class="sq-q">${esc(q.q)}</p>
     <div class="sq-opts">${q.options.map((o, i) => `<button type="button" class="sq-opt" data-i="${i}">${esc(o)}</button>`).join("")}</div>
     <p class="sq-explain" hidden></p>

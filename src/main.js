@@ -34,7 +34,7 @@ import { makeTip, itemChapters } from "./core/villagerTips.js";
 import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
-import { weaponById, outfitById } from "./core/shop.js";
+import { weaponById, outfitById, grantOutfit } from "./core/shop.js";
 import { initInventory, openInventory, closeInventory, isInventoryOpen } from "./ui/inventory.js";
 splash.setStatus("🧱 스펙트럼 대륙을 짓는 중…");
 import { initInput, readMoveInput, setInputEnabled } from "./ui/input.js";
@@ -470,6 +470,13 @@ function handleBattleEvents(events) {
         const m = e.monster;
         battleView.burstAt(m.x, m.y, m.z);
         battleView.lootFly(m.x, m.y, m.z, 3, 0x7de3ff);   // XP 구슬이 기사에게
+        if (MONSTERS[m.type].boss) {   // 📡 보스 처치 (Stage 13.19): 큰 연출 + 처음이면 마그네트론 갑옷
+          battleView.burstAt(m.x, m.y + 0.8, m.z, 0xffd76b); battleView.lootFly(m.x, m.y, m.z, 10, 0xffd76b);
+          sfx("bossDown"); shake(0.4, 0.5); hitStop(0.2);
+          const first = grantOutfit(progress, "magnetron");
+          fx.showToast(first ? "👑 보스 처치! 전자레인지 오븐이 식었다 — 🟧 마그네트론 갑옷을 얻었다 (가방에서 입기)" : "👑 보스 처치! 전자레인지 오븐이 식었다", 5);
+          dirty = true;
+        }
         shake(0.14, 0.18); hitStop(0.07);
         sfx("kill");
         const { level, leveledUp } = applyKill(progress, m.type, e.xp);
@@ -1057,6 +1064,12 @@ function simulate(dt) {
   if (run?.phase === "combat") {
     stepLink(run.link, dt);
     for (const e of stepMicrowaves(run.battle, dt)) {
+      if (e.type === "bossRage") {   // 📡 보스 폭주 (Stage 13.19)
+        fx.showToast("📡 마그네트론 폭주! 잡음 대역이 2430~2478 MHz로 넓어졌다 — 채널맵에서 더 빼야 한다", 4.5);
+        fx.floatText(e.monster.x, e.monster.y + 2.8, e.monster.z, "⚠ 폭주!", "crit");
+        sfx("bossRage"); shake(0.3, 0.4); hitStop(0.12);
+        continue;
+      }
       if (e.monster.revealed) fx.floatText(e.monster.x, e.monster.y + 1.6, e.monster.z, e.on ? "📶 잡음 ON" : "잡음 OFF — 틈!", e.on ? "crit" : "dodge");
     }
     for (const e of stepAcs(run.battle, run.floor, dt, dungeonRng)) {

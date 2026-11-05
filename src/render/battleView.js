@@ -290,11 +290,26 @@ function makeSniffer(g) {
 
 function makeMonster(m) {
   const g = new THREE.Group();
-  if (m.type === "advFlooder" || m.type === "microwave" || m.type === "sniffer") {
-    const parts = m.type === "advFlooder" ? makeFlooder(g) : m.type === "microwave" ? makeMicrowave(g) : makeSniffer(g);
-    const bar = makeBar(g, m.type === "microwave" ? 1.5 : m.type === "sniffer" ? 1.9 : 1.05);
+  if (m.type === "advFlooder" || m.type === "microwave" || m.type === "sniffer" || m.type === "ovenBoss") {
+    const oven = m.type === "microwave" || m.type === "ovenBoss";
+    const parts = m.type === "advFlooder" ? makeFlooder(g) : oven ? makeMicrowave(g) : makeSniffer(g);
+    if (m.type === "ovenBoss") {   // 📡 보스 (Stage 13.19): 1.75배 크기, 크롬·금빛 테, 머리 위 왕관(마그네트론)
+      parts.rig.scale.setScalar(1.75);
+      parts.bodyMat.color.setHex(0xd0d6de);
+      const crown = new THREE.Group();
+      const gold = new THREE.MeshLambertMaterial({ color: 0xf2c14e, emissive: 0x3a2a00 });
+      for (let i = 0; i < 5; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.16), gold); const a = (i / 5) * Math.PI * 2; sp.position.set(Math.cos(a) * 0.45, 0, Math.sin(a) * 0.3); crown.add(sp); }
+      crown.add(new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.12, 0.75), gold));
+      crown.position.y = 1.18;           // 몸 위에 얹는다 (rig 안 — 몸과 같이 1.75배)
+      crown.scale.setScalar(0.62);
+      parts.rig.add(crown);
+      parts.crown = crown;
+      Object.assign(parts, makeAoe(g, MONSTERS.ovenBoss.attackRange));   // 보스 사거리(4.5 m)로 다시 그린 공격 예고 원
+    }
+    const bar = makeBar(g, m.type === "ovenBoss" ? 2.75 : m.type === "microwave" ? 1.5 : m.type === "sniffer" ? 1.9 : 1.05);
+    if (m.type === "ovenBoss") bar.bar.scale.set(2, 1.6, 1);
     let tag = null;
-    if (m.type === "microwave") {
+    if (oven) {
       tag = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
       tag.scale.set(1.3, 0.34, 1); tag.position.y = 1.85; tag.visible = false; tag.renderOrder = 11; g.add(tag);
     }
@@ -489,7 +504,8 @@ export function syncBattle(battle, camera, t, dt) {
       legs.forEach((l, i) => { l.rotation.x = Math.sin(ph * 3 + i * Math.PI) * 0.6; });
       antennas.forEach((a, i) => { a.scale.setScalar(Math.floor(t * 9 + m.id) % 3 === i ? 1.4 : 1); });
       if (!windup) ledMat.color.setHex(Math.sin(t * 20) > 0 ? 0xfff1a8 : 0xff9a3c);
-    } else if (m.type === "microwave") {               // 켜지면 문 창이 주황으로 빛나고 잡음 고리가 퍼진다
+    } else if (m.type === "microwave" || m.type === "ovenBoss") {   // 켜지면 문 창이 주황으로 빛나고 잡음 고리가 퍼진다
+      if (g.userData.crown) { g.userData.crown.rotation.y = t * (m.enraged ? 3 : 0.8); g.userData.crown.position.y = 1.18 + Math.sin(t * 3) * 0.03; }
       const on = m.on !== false;
       if (!windup) ledMat.color.setHex(on ? (Math.sin(t * 30) > 0 ? 0xffb050 : 0xff7a1a) : 0x2a1a10);
       g.userData.dial.rotation.z = t * (on ? 4 : 0.3);

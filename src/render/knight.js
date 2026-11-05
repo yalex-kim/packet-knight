@@ -201,7 +201,7 @@ function cape(g, mat, trimMat) {
     coin(p, sx * 0.02, 0.1, 0, 0.1, 0);
   }
 }
-const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"] };
+const OUTFIT_SET = { classic: ["classic"], sig: ["sig"], auracast: ["auracast"], mesh: ["mesh", "meshHood"], stealth: ["stealth", "stealthHood"], gold: ["gold"], magnetron: ["gold"] };   // 마그네트론 갑옷 = 금빛 갑옷 모양 + 주황·크롬 색 (Stage 13.19)
 
 // ---------- 무기 ----------
 const shieldParts = [];

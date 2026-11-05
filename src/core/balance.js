@@ -197,6 +197,28 @@ export const MONSTERS = Object.freeze({
     band: Object.freeze({ fromMhz: 2442, toMhz: 2466 }),
     duty: Object.freeze({ on: 3.0, off: 2.0 })
   }),
+  // 📡 보스 — 전자레인지 오븐 (Stage 13.19, PRD §4.3.4 보스): 5층마다. 전자레인지의 큰형 — 켜졌다 꺼지는 잡음, 광역, 근접 블로킹.
+  // 체력이 절반 아래로 떨어지면 마그네트론 폭주: 잡음 대역이 RAGE_BAND로 넓어진다 → 채널맵을 다시 짜야 한다
+  ovenBoss: Object.freeze({
+    id: "ovenBoss",
+    name: "전자레인지 오븐 (보스)",
+    hp: 600, atk: 38, sec: 6,
+    speed: 1.4, aggro: 20, leash: 40,
+    attackRange: 4.5, aoe: true, windup: 1.4, cooldown: 2.0,
+    blocking: Object.freeze({ range: 2.5, mul: 0.4 }),
+    respawn: Infinity,
+    xp: 200,
+    drops: Object.freeze([{ item: "cr2032", count: 15, chance: 1 }]),
+    boss: true,
+    role: "보스 · 광대역 잡음원",
+    pdu: "2.45 GHz 마그네트론 × 2 — 폭주하면 대역이 넓어진다",
+    scan: "전자레인지 재머의 큰형. 켜졌다 꺼지는 잡음이 2442~2466 MHz를 덮다가, 체력이 반 아래로 떨어지면 2430~2478 MHz까지 넓어진다.",
+    lore: "잡음 대역이 넓어지면 채널맵에서 더 많은 채널을 빼야 한다. LE 채널맵은 최소 2채널만 남으면 되므로 끝까지 도약할 수 있다.",
+    chapter: "coexistence.html",
+    band: Object.freeze({ fromMhz: 2442, toMhz: 2466 }),
+    rageBand: Object.freeze({ fromMhz: 2430, toMhz: 2478 }),
+    duty: Object.freeze({ on: 3.5, off: 1.5 })
+  }),
   // 중간자 스니퍼: 멀리서 위조 패킷을 쏜다. 예고(빨간 조준선) 동안 사거리 밖으로 빠지거나 RX로 피한다
   sniffer: Object.freeze({
     id: "sniffer",
@@ -220,7 +242,8 @@ export const MONSTERS = Object.freeze({
  * @returns {{ theme: string, name: string, roster: string[] }}
  */
 export function floorPlan(floor) {
-  const W = "wifiInterferer", F = "advFlooder", M = "microwave", S = "sniffer";
+  const W = "wifiInterferer", F = "advFlooder", M = "microwave", S = "sniffer", B = "ovenBoss";
+  if (floor % 5 === 0) return { theme: "kitchen", name: "오븐의 심장 — 보스: 전자레인지 오븐", roster: [B, W, W], boss: true };   // Stage 13.19
   if (floor === 1) return { theme: "router", name: "공유기 지하실", roster: [W, W, W] };
   if (floor === 2) return { theme: "router", name: "광고가 넘치는 복도", roster: [W, W, W, F, F] };
   if (floor === 3) return { theme: "kitchen", name: "부엌 아래 — 전자레인지가 깨어났다", roster: [W, W, M, F, F] };

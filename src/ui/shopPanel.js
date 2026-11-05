@@ -59,6 +59,7 @@ function render() {
       const have = owned.includes(it.id), on = current === it.id;
       const btn = on ? `<button type="button" class="lib-btn" disabled>✓ 장착 중</button>`
         : have ? `<button type="button" class="lib-btn" data-act="equip" data-id="${it.id}">장착</button>`
+        : it.bossOnly ? `<button type="button" class="lib-btn" disabled>🔒 5층 보스 처치 보상</button>`
         : `<button type="button" class="lib-btn primary" data-act="buy" data-id="${it.id}" ${p.cr2032 < it.price ? "disabled" : ""}>🪙 ${it.price} 사기</button>`;
       const swatch = isW ? "" : `<span class="shop-swatch" style="background:#${it.tabard.toString(16).padStart(6, "0")};border-color:#${it.plume.toString(16).padStart(6, "0")}"></span>`;
       return `<div class="shop-item${on ? " on" : ""}" data-id="${it.id}">
