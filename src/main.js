@@ -678,8 +678,7 @@ function taskFor(v) {
 function talkTo(v) {
   hud.hideModal();
   clearMoveTarget();
-  const task = taskFor(v);
-  if (task) { openTalk(v, null, task); return; }
+  const task = taskFor(v);   // 📜 실습 의뢰 버튼은 💡 이야기와 함께 뜰 수 있다 (둘 다 있으면 둘 다)
   if (tip && tip.villagerId === v.id) {   // 💡 이야기 (Stage 13.14) — 들으면 💡는 사라지고 쿨다운
     const t = tip;
     tip = null;
@@ -687,10 +686,10 @@ function talkTo(v) {
     setTipVillager(null);
     markSpecSeen(t.card.id);
     openTalk(v, { card: t.card, question: drawOne([t.card.chapter]), reward: VILLAGER_TIP.QUIZ_REWARD,
-      onAnswer: (ok) => { if (ok) { grantLearnReward(VILLAGER_TIP.QUIZ_REWARD); goal({ type: "tipRight" }); } sfx(ok ? "correct" : "wrong"); } });
+      onAnswer: (ok) => { if (ok) { grantLearnReward(VILLAGER_TIP.QUIZ_REWARD); goal({ type: "tipRight" }); } sfx(ok ? "correct" : "wrong"); } }, task);
     return;
   }
-  openTalk(v);
+  openTalk(v, null, task);
 }
 initTalk({
   onOpen: (v) => { holdVillager(v.id, motor); setInputEnabled(false); inputLocked = true; sfx("open"); },
@@ -1426,7 +1425,8 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
-  talent: { open: () => openTalent(), isOpen: isTalentOpen, pending: () => pendingTalents(progress), refresh: () => refreshTalent() },
+  talent: { open: () => openTalent(), isOpen: isTalentOpen, pending: () => pendingTalents(progress), refresh: () => refreshTalent(),
+    set: (xp, talents) => { progress.xp = xp; progress.talents = [...talents]; refreshTalent(); } },   // 테스트용
   trial: { open: (id) => openTrial(id), isOpen: isTrialOpen, state: trialState, taskFor: (vid) => Boolean(taskFor(VILLAGERS.find((v) => v.id === vid))) },
   goals: { event: (ev) => goal(ev), state: () => structuredClone(progress.goals), open: openDaily, close: closeDaily, isOpen: isDailyOpen },
   tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },

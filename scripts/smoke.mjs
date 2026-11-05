@@ -2228,8 +2228,7 @@ await page.waitForFunction(() => window.__PK);
     const P = window.__PK, p = P.progress();
     const save = { xp: p.xp, talents: [...p.talents] };
     const r = { before: P.talent.pending(), btnHidden0: document.getElementById("btn-talent").hidden };
-    p.xp = 1000; p.talents = [];   // Lv 5 (누적 851 XP 이상)
-    P.talent.refresh();
+    P.talent.set(1000, []);   // Lv 5 (누적 851 XP 이상)
     r.pending = P.talent.pending(); r.btn = !document.getElementById("btn-talent").hidden;
     const hp0 = P.stats().hp;
     P.talent.open();
@@ -2237,7 +2236,7 @@ await page.waitForFunction(() => window.__PK);
     document.querySelector('#talent .tl-card[data-id="coded"]').click();
     r.hpGain = P.stats().hp - hp0; r.closed = !P.talent.isOpen(); r.btnAfter = document.getElementById("btn-talent").hidden;
     r.saved = JSON.parse(localStorage.getItem("packetKnight.save")).talents;
-    p.xp = save.xp; p.talents = save.talents; P.talent.refresh();
+    P.talent.set(save.xp, save.talents);
     return r;
   });
   {
