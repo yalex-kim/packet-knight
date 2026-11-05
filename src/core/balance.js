@@ -35,7 +35,7 @@ export const SKILL_REWARDS = Object.freeze({
  * 퀴즈 만점 보너스 크기 (PRD §8.4 "퀴즈 만점 보너스" 열) — 강좌 하나 = 장비 강화 1단계와 같은 가치.
  * (Stage 6.5 시뮬레이션: 원안 HP+5·TX+1·RX+1·PWR+5로는 퀴즈를 건너뛰고 알바한 쪽이 더 빨리 성장했다 — PRD §8.7)
  */
-export const QUIZ_BONUS = Object.freeze({ hp: 15, tx: 6, rx: 3, hop: 0.3, sec: 3, pwr: 10 });   // Stage 12.1: TX 5 → 6 (새 몬스터로 층이 섞이며 퀴즈 이득이 1.17배로 내려가 1.2배 기준에 맞춤)
+export const QUIZ_BONUS = Object.freeze({ hp: 18, tx: 6, rx: 3, hop: 0.3, sec: 3, pwr: 10 });   // Stage 12.1: TX 5 → 6 (새 몬스터로 층이 섞이며 퀴즈 이득이 1.17배로 내려가 1.2배 기준에 맞춤) · Stage 13.21: HP 15 → 18 (입장료 4로 퀴즈 이득이 1.19배로 내려가 맞춤)
 
 export const QUIZ = Object.freeze({
   QUESTIONS_PER_QUIZ: 3,   // PRD §4.1 "레슨 후 3문제 퀴즈"
@@ -303,7 +303,7 @@ export const TIMEOUT_PENALTY = 0.1;
  * HP 0이면 실패(타임아웃). 클리어하면 다음 층이 열린다 (PRD §7 Stage 7 DoD). 입장 1회 = 한 층 도전.
  * (층마다 몬스터 +1마리는 장비 1단계로 메울 수 없는 절벽이었다 — PRD §8.7)
  */
-export const DUNGEON = Object.freeze({ ENTRY_FEE: 3, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.18, TIME_LIMIT: 180 });
+export const DUNGEON = Object.freeze({ ENTRY_FEE: 4, FLOOR_MONSTERS: 3, FLOOR_HP_SCALE: 0.15, FLOOR_ATK_SCALE: 0.18, TIME_LIMIT: 180 });
 export const floorHpScale = (floor) => 1 + DUNGEON.FLOOR_HP_SCALE * (floor - 1);
 /** 층마다 공격력도 오른다 — 체력만 오르면 방어(SEC)만 올려 깊은 층이 무의미해진다 (Stage 7.5 시뮬레이션) */
 export const floorAtkScale = (floor) => 1 + DUNGEON.FLOOR_ATK_SCALE * (floor - 1);
@@ -327,3 +327,16 @@ export const JOB_DOUBLE = Object.freeze({ MULT: 2 });
  * 시뮬레이션 가정: 중간 플레이어 정답률 ACCURACY, 문제 하나에 QUIZ_SEC 초
  */
 export const LEARN_REWARD_SIM = Object.freeze({ ACCURACY: 0.6, QUIZ_SEC: 10, TIPS_PER_HOUR: 6, TIP_SEC: 25 });   // 💡: 1시간에 약 6번(이벤트·쿨다운·찾아가기), 걸어가 듣고 맞히는 데 25초
+
+/**
+ * 던전 변주 (Stage 13.21) — 층 특성(보스 층 제외)·보물 상자·무피해 보너스
+ *   storm: Wi-Fi 몬스터 공격 ×WIFI_ATK · rush: 광고 폭주 비콘 +EXTRA · fog: 시야가 좁아진다(던전 안개)
+ *   특성이 붙은 층은 상자가 꼭 있고 동전이 ×MOD_CHEST_MUL. 상자는 층 구석, 다가가면 열린다
+ */
+export const FLOOR_MODS = Object.freeze({
+  none:  { id: "none",  name: null, weight: 3 },
+  storm: { id: "storm", name: "📶 Wi-Fi 폭풍", desc: "Wi-Fi 몬스터 공격 ×1.3 — 대신 상자가 더 두둑하다", weight: 1, WIFI_ATK: 1.3 },
+  rush:  { id: "rush",  name: "📣 광고 러시", desc: "광고 폭주 비콘 둘이 더 몰려온다 — 대신 상자가 더 두둑하다", weight: 1, EXTRA: 2 },
+  fog:   { id: "fog",   name: "🌫️ Coded 안개", desc: "안개가 짙어 멀리 안 보인다 — 대신 상자가 더 두둑하다", weight: 1 }
+});
+export const FLOOR_CHEST = Object.freeze({ CHANCE: 0, MIN: 2, MAX: 4, MOD_CHEST_MUL: 1.5, PICK_R: 1.4, NO_DAMAGE_BONUS: 1 });

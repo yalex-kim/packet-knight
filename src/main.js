@@ -15,7 +15,7 @@ import { groundHeightAt, isDungeonCell } from "./core/terrain.js";
 import { SPAWN_POS, landmark, JOB_AREA, LANDMARKS, VILLAGERS } from "./core/layout.js";
 import * as prisonUi from "./ui/prison.js";
 import * as cryptUi from "./ui/crypt.js";
-import { QUEST_SKILLS, RSSI_JOB, COMBAT, ciIntervalMul } from "./core/balance.js";
+import { QUEST_SKILLS, RSSI_JOB, COMBAT, ciIntervalMul, FLOOR_MODS, FLOOR_CHEST } from "./core/balance.js";
 import { isBlocked, supportHeightAt } from "./core/collision.js";
 import { createMotor, resetMotor, jump, stepMotor, seekIntent } from "./core/motor.js";
 import * as world from "./render/world.js";
@@ -504,6 +504,7 @@ function handleBattleEvents(events) {
       case "playerHit":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, e.blocking ? `📵 근접 블로킹 -${e.amount}` : `-${e.amount}`, "hurt");
         shake(0.22, 0.22); hurtFlash();
+        if (run) run.hurt = true;
         if (e.blocking && !blockingExplained) {   // 처음 한 번만 왜 맞았는지 (Stage 13.11)
           blockingExplained = true;
           fx.showToast("📵 근접 블로킹 — 채널을 바꿔도 전자레인지 바로 옆에선 센 잡음이 수신기를 포화시켜요. 2 m 밖으로 떨어지면 대역 밖 채널은 안전!", 5);
@@ -582,6 +583,7 @@ function setAmbience(underground) {
   scene.fog.color.copy(underground ? DUNGEON_SKY : VILLAGE_FOG);
   scene.fog.near = underground ? 24 : 70;
   scene.fog.far = underground ? 70 : 190;
+  applyDungeonFog();
   dungeonFill.visible = underground;
   world.root.visible = !underground;
   lifeRoot.visible = !underground;
@@ -599,6 +601,14 @@ function placeAtCheckpoint() {
   clearMoveTarget();
 }
 
+/** 🌫️ Coded 안개 층이면 던전 안개를 짙게 (Stage 13.21) */
+function applyDungeonFog() {
+  if (!run) return;
+  const fog = run.layout.mod === "fog";
+  scene.fog.near = fog ? 4 : 24;
+  scene.fog.far = fog ? 16 : 70;
+}
+
 function startFloor(floor) {
   const layout = generateFloor(floor, (dungeonSeedBase += 7919));
   run = { floor, layout, battle: null, link: null, puzzle: createLinkPuzzle(layout), phase: "combat", observing: true, rollbacks: 0 };
@@ -607,7 +617,9 @@ function startFloor(floor) {
   setAmbience(true);
   hud.hideModal();
   hud.setBadge(`⚔️ 호핑 던전 ${floor}층`);
-  fx.showToast(`⚔️ ${floor}층 전투 시작! — ${b.monsters.length}마리 (브리핑대로)`, 2.5);   // 자세한 구성은 입장 브리핑에 (Stage 12.3)
+  const mod = FLOOR_MODS[layout.mod];
+  fx.showToast(`⚔️ ${floor}층 전투 시작! — ${b.monsters.length}마리${mod?.name ? `\n${mod.name}: ${mod.desc}` : ""}${layout.chest ? " · 🎁 상자가 어딘가에" : ""}`, mod?.name ? 4.5 : 2.5);   // 자세한 구성은 입장 브리핑에 (Stage 12.3)
+  applyDungeonFog();
   dungeonView.setTheme(run.layout.theme);
   if (!TEST_MODE && !hopGuideSeen()) showHopGuide();   // 처음 들어오면 호핑·간섭 설명 (Stage 11.12)
 }
@@ -805,6 +817,10 @@ dungeonUi.initDungeonPanel({
       applyFloorClear(progress, run.floor, result.stars);
       persist();
       tipEvent("floorClear");
+      if (!run.hurt && FLOOR_CHEST.NO_DAMAGE_BONUS) {   // 🛡️ 무피해 클리어 (Stage 13.21)
+        progress.cr2032 += FLOOR_CHEST.NO_DAMAGE_BONUS;
+        fx.showToast(`🛡️ 무피해 클리어! 🪙 +${FLOOR_CHEST.NO_DAMAGE_BONUS}`, 3);
+      }
       goal({ type: "floorClear" });
       fx.showToast(`🌀 ${run.floor}층 클리어! 남쪽 포털로 다음 층에 갈 수 있습니다`, 4);
     }
@@ -1084,6 +1100,16 @@ function simulate(dt) {
     }
     interference = interferenceFor(run.link);
   }
+  // 🎁 보물 상자 (Stage 13.21): 다가가면 열린다 (층마다 한 번)
+  const ch = run?.layout.chest;
+  if (ch && !run.chestOpened && Math.hypot(motor.x - ch.x, motor.z - ch.z) < FLOOR_CHEST.PICK_R) {
+    run.chestOpened = true;
+    progress.cr2032 += ch.coins;
+    persist();
+    sfx("coin"); battleView.lootFly(ch.x, motor.y, ch.z, Math.min(8, ch.coins + 2), 0xffd76b); shake(0.08, 0.15);
+    fx.floatText(ch.x, motor.y + 1, ch.z, `🎁 🪙 +${ch.coins}`, "loot");
+    hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  }
   if (run?.phase !== "timeout") {
     handleBattleEvents(stepBattle(activeBattle(), dt, {
       player: motor, stats: effectiveStats(progress), rng: battleRng, interference,
@@ -1359,6 +1385,7 @@ window.__PK = {
     enter: enterNextFloor,
     leave: () => leaveDungeon(false),
     openConsole: openLinkConsole,
+    layout: () => run && { mod: run.layout.mod, chest: run.layout.chest && { ...run.layout.chest }, opened: Boolean(run.chestOpened), hurt: Boolean(run.hurt) },
     /** 테스트용 관찰: 진행 중인 층 (정답인 막힌 채널 포함) */
     rollback: rollbackToCheckpoint,
     link: () => run?.link && { event: run.link.event, channel: run.link.channel, map: [...run.link.map], pending: run.link.pending && { instant: run.link.pending.instant, map: [...run.link.pending.map] } },

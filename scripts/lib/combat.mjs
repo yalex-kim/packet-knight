@@ -1,5 +1,5 @@
 // 전투 봇 — 게임과 같은 core/battle.js를 돌린다 (훈련장 · 던전 층)
-import { MONSTERS, TRAINING_GROUND, DUNGEON } from "../../src/core/balance.js";
+import { MONSTERS, TRAINING_GROUND, DUNGEON, FLOOR_CHEST } from "../../src/core/balance.js";
 import { createBattle, syncPlayerHp, stepBattle, fireAdvPacket } from "../../src/core/battle.js";
 import { createMotor, stepMotor } from "../../src/core/motor.js";
 import { DUNGEON_ROOM, generateFloor, createFloorBattle, stepAcs, stepMicrowaves } from "../../src/core/dungeon.js";
@@ -78,6 +78,8 @@ export const AFH_DELAY = Object.freeze({ button: 1.5, manual: 6 });
  * @param {{ afh?: false|"button"|"manual", fire?: { rangeMul?: number, coef?: number } }} opts
  *   afh: 스캔한 몬스터 대역을 채널맵에서 빼는가, 어떻게 (Stage 8) · fire: 퀘스트 보상 (Stage 9)
  */
+/** 상자까지 걸어가는 시간 (초, 대표값) */
+const CHEST_WALK_SEC = 4;
 export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush" ? false : "button", fire = {} } = {}) {
   const layout = generateFloor(floor, Math.floor(rng() * 2 ** 31));
   const battle = createFloorBattle(layout);
@@ -108,7 +110,13 @@ export function dungeonFloor(mode, stats, rng, floor = 1, { afh = mode === "rush
       if (e.type === "kill") { r.kills++; r.xp += e.xp; r.cr2032 += e.drops.reduce((k, d) => k + (d.item === "cr2032" ? d.count : 0), 0); }
       if (e.type === "ko") { r.ko = true; r.time = t; return r; }
     }
-    if (r.kills === battle.monsters.length) { r.cleared = true; r.time = t; r.hpLeft = battle.player.hp; return r; }
+    if (r.kills === battle.monsters.length) {
+      r.cleared = true; r.time = t; r.hpLeft = battle.player.hp;
+      // 던전 변주 (Stage 13.21): 깨면 상자를 줍고(있으면), 맞지 않았으면 무피해 보너스
+      if (layout.chest) { r.cr2032 += layout.chest.coins; r.time += CHEST_WALK_SEC; }
+      if (r.damage === 0) r.cr2032 += FLOOR_CHEST.NO_DAMAGE_BONUS;
+      return r;
+    }
   }
   r.time = DUNGEON.TIME_LIMIT;
   return r;

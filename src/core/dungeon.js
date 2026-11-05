@@ -4,7 +4,7 @@
 // 층마다 시드로 hopIncrement·숨은 Wi-Fi 간섭원·몬스터 배치가 달라진다 ("매번 다른 채널 배치").
 // 전투 수치는 Stage 6.5 시뮬레이션의 던전 가정치 그대로 (balance.js DUNGEON, PRD §8.7).
 
-import { DUNGEON, floorHpScale, floorAtkScale, floorPlan, MONSTERS } from "./balance.js";
+import { DUNGEON, floorHpScale, floorAtkScale, floorPlan, MONSTERS, FLOOR_MODS, FLOOR_CHEST } from "./balance.js";
 import { createRng } from "./quiz.js";
 import { createArena } from "./arena.js";
 import { createBattle } from "./battle.js";
@@ -50,11 +50,23 @@ export function pickWifiChannels(count, rng) {
  * @returns {{ floor: number, seed: number, hopIncrement: number, wifi: number[], blocked: Set<number>,
  *   spawns: Array<[number, number]>, monsterWifi: number[], hpScale: number, atkScale: number }}
  */
+/** 층 특성 고르기 (가중치) */
+function pickMod(rng) {
+  const list = Object.values(FLOOR_MODS), total = list.reduce((n, m) => n + m.weight, 0);
+  let r = rng() * total;
+  for (const m of list) { r -= m.weight; if (r < 0) return m; }
+  return FLOOR_MODS.none;
+}
+
 export function generateFloor(floor, seed) {
   const rng = createRng((seed ^ Math.imul(floor, 0x9e3779b1)) >>> 0);
   const hopIncrement = HOP_MIN + Math.floor(rng() * (HOP_MAX - HOP_MIN + 1));
   const wifi = pickWifiChannels(wifiCountFor(floor), rng);
-  const n = floorPlan(floor).roster.length;   // Stage 12.1: 층마다 마릿수가 다르다
+  // 층 특성 (Stage 13.21): 보스 층은 없음. 광고 러시면 광고 폭주 비콘이 더 온다
+  const plan0 = floorPlan(floor);
+  const mod = plan0.boss || floor === 1 ? FLOOR_MODS.none : pickMod(rng);   // 1층(처음)·보스 층은 특성 없음
+  const roster = mod.id === "rush" ? [...plan0.roster, ...Array(mod.EXTRA).fill("advFlooder")] : plan0.roster;
+  const n = roster.length;   // Stage 12.1: 층마다 마릿수가 다르다
   const base = rng() * Math.PI * 2;
   const spawns = Array.from({ length: n }, (_, i) => {
     const a = base + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.5;
@@ -62,9 +74,13 @@ export function generateFloor(floor, seed) {
   });
   // 몬스터마다 자기 Wi-Fi 채널 (전투 중 간섭 대역 — Stage 8). 벽 속 숨은 공유기(wifi)와는 별개
   const monsterWifi = spawns.map(() => 1 + Math.floor(rng() * 13));
-  const plan = floorPlan(floor);
+  const plan = plan0;
+  // 보물 상자 (Stage 13.21): 특성 층은 꼭, 아니면 CHANCE 확률. 방 가장자리 쪽 한 곳
+  const hasChest = mod.id !== "none" || rng() < FLOOR_CHEST.CHANCE;
+  const ca = rng() * Math.PI * 2, coins0 = FLOOR_CHEST.MIN + Math.floor(rng() * (FLOOR_CHEST.MAX - FLOOR_CHEST.MIN + 1));
+  const chest = hasChest ? { x: DUNGEON_ROOM.cx + Math.cos(ca) * 9.2, z: DUNGEON_ROOM.cz + Math.sin(ca) * 9.2, coins: Math.round(coins0 * (mod.id === "none" ? 1 : FLOOR_CHEST.MOD_CHEST_MUL)) } : null;
   return { floor, seed, hopIncrement, wifi, monsterWifi, blocked: wifiBlockedChannels(wifi), spawns, hpScale: floorHpScale(floor), atkScale: floorAtkScale(floor),
-    roster: plan.roster, theme: plan.theme, name: plan.name };
+    roster, theme: plan.theme, name: plan.name, mod: mod.id, chest };
 }
 
 /**
@@ -100,6 +116,7 @@ export function createFloorBattle(layout) {
     if (m.type === "wifiInterferer") m.wifi = layout.monsterWifi[i];
     if (m.type === "microwave") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.microwave.duty.on * (0.4 + 0.6 * ((i * 0.37) % 1)); }
     if (m.type === "ovenBoss") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.ovenBoss.duty.on; m.enraged = false; }
+    if (layout.mod === "storm" && m.type === "wifiInterferer") m.atk = Math.round(m.atk * FLOOR_MODS.storm.WIFI_ATK);   // 📶 Wi-Fi 폭풍
   });
   return battle;
 }

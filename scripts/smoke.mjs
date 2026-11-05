@@ -479,6 +479,21 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 던전 변주 (Stage 13.21): 층 특성(보스 층 제외)·특성 층엔 상자·광고 러시는 +2·폭풍은 Wi-Fi 공격 ×1.3
+  {
+    const D = await import(pathToFileURL(path.join(ROOT, "src/core/dungeon.js")).href);
+    const counts = {}; let chestOk = true, rushOk = true, bossNone = true, stormOk = true;
+    for (let seed = 1; seed <= 200; seed++) for (const fl of [2, 3, 4, 5]) {
+      const L = D.generateFloor(fl, seed);
+      counts[L.mod] = (counts[L.mod] ?? 0) + 1;
+      if ((L.mod !== "none") !== Boolean(L.chest)) chestOk = false;
+      if (L.mod === "rush" && L.roster.filter((t) => t === "advFlooder").length < 2) rushOk = false;
+      if (fl === 5 && L.mod !== "none") bossNone = false;
+      if (L.mod === "storm" && seed < 20) { const b = D.createFloorBattle(L); const w = b.monsters.find((m) => m.type === "wifiInterferer"); const plain = D.createFloorBattle({ ...L, mod: "none" }).monsters.find((m) => m.type === "wifiInterferer"); if (w && !(w.atk > plain.atk)) stormOk = false; }
+    }
+    check("던전 변주: 층마다 특성(📶 폭풍·📣 러시·🌫️ 안개·없음)이 섞이고, 특성 층엔 🎁 상자, 러시는 광고 폭주 +2, 폭풍은 Wi-Fi 공격 ↑, 보스 층은 특성 없음",
+      ["none", "storm", "rush", "fog"].every((k) => counts[k] > 0) && chestOk && rushOk && bossNone && stormOk, JSON.stringify(counts));
+  }
   // 📅 오늘의 임무 · 🏅 업적 (Stage 13.20)
   {
     const G = await import(pathToFileURL(path.join(ROOT, "src/core/goals.js")).href);
@@ -1117,7 +1132,7 @@ await reset();
   const s1 = await dState();
   const cr1 = (await page.evaluate(() => window.__PK.progress())).cr2032;
   const hudText = await page.locator("#dungeon-hud .dh-text").textContent();
-  check("입장료를 내고 1층(지하 방)에 들어간다", s1?.floor === 1 && s1.phase === "combat" && cr1 === 27 && hudText.includes("1층"), `${hudText} · CR2032 ${cr1}`);
+  check("입장료를 내고 1층(지하 방)에 들어간다", s1?.floor === 1 && s1.phase === "combat" && cr1 === 30 - 4 && hudText.includes("1층"), `${hudText} · CR2032 ${cr1}`);
 
   // 간섭 몬스터 소탕 (강한 기사로 흐름만 검증)
   await page.evaluate(() => { const pk = window.__PK; for (let i = 0; i < 300 && pk.dungeon.state().phase === "combat"; i++) { pk.battle.fire(); pk.tick(0.1); } });

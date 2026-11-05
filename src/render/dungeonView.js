@@ -84,6 +84,23 @@ export const portalMesh = new THREE.Group();
   dungeonRoot.add(portalMesh);
 }
 
+// ---------- 🎁 보물 상자 (Stage 13.21) — 특성 층 구석 ----------
+export const chestMesh = new THREE.Group();
+{
+  const wood = new THREE.MeshLambertMaterial({ color: 0x8a5a2e }), gold = new THREE.MeshLambertMaterial({ color: 0xf2c14e, emissive: 0x3a2a00 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.6), wood); base.position.y = 0.25;
+  const lid = new THREE.Group(); lid.position.set(0, 0.5, -0.3);
+  const lidBox = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.22, 0.62), wood); lidBox.position.set(0, 0.11, 0.3); lid.add(lidBox);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.08, 0.64), gold); band.position.y = 0.3;
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.05), gold); lock.position.set(0, 0.42, 0.32);
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.02, 24), new THREE.MeshBasicMaterial({ color: 0xffd76b, transparent: true, opacity: 0.35 }));
+  glow.position.y = 0.01;
+  chestMesh.add(base, lid, band, lock, glow);
+  chestMesh.userData = { lid, glow };
+  chestMesh.visible = false;
+  dungeonRoot.add(chestMesh);
+}
+
 /** 클릭 대상 (콘솔·포털) */
 export const dungeonTargets = [consoleMesh, portalMesh];
 
@@ -94,6 +111,15 @@ export const dungeonTargets = [consoleMesh, portalMesh];
 export function syncDungeon(run, t) {
   dungeonRoot.visible = Boolean(run);
   if (!run) return;
+  const ch = run.layout.chest;
+  chestMesh.visible = Boolean(ch);
+  if (ch) {
+    chestMesh.position.set(ch.x, floorY, ch.z);
+    chestMesh.rotation.y = Math.atan2(cx - ch.x, cz - ch.z);   // 방 가운데를 본다
+    const open = Boolean(run.chestOpened);
+    chestMesh.userData.lid.rotation.x = open ? -1.9 : -Math.abs(Math.sin(t * 2)) * 0.08;
+    chestMesh.userData.glow.material.opacity = open ? 0 : 0.25 + 0.2 * Math.sin(t * 3);
+  }
   // 전투 중: 기둥 = 기사 링크 (지금 채널·뺀 채널·드러난 Wi-Fi 대역) — Stage 8
   if (run.phase === "combat" && run.link) {
     const band = new Set();
