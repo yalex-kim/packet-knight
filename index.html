@@ -842,6 +842,11 @@
     background: rgba(57, 208, 255, .1); border: 1.5px solid rgba(57, 208, 255, .45); color: #e2f1ff; font-size: 15px; }
   #cloud-choose button span { font-size: 12.5px; color: #9db4cc; }
   #cloud-choose button:hover, #cloud-choose button:focus-visible { background: rgba(57, 208, 255, .22); outline: none; }
+  /* 🗺️ 던전 층 고르기 (Stage 13.24) */
+  .dg-floors { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; max-height: 120px; overflow-y: auto; }
+  .dg-floors .dg-floor { min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 13px; }
+  .dg-floors .dg-floor.boss { border-color: rgba(255, 215, 107, .6); color: #ffe39a; }
+  .dg-floors .dg-floor.on { background: rgba(57, 208, 255, .28); border-color: #39d0ff; color: #fff; }
   /* 🧪 소모품 (Stage 13.22) — 무기점 탭, 가방 › 소지품 */
   .shop-tabs { display: flex; gap: 6px; margin: 0 0 10px; }
   .shop-tabs button { flex: 1; min-height: 36px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 800; background: rgba(0,0,0,.2); color: #9db4cc; border: 1px solid #23476e; }

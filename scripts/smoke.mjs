@@ -479,6 +479,14 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 🗺️ 다시 도전 (Stage 13.24): 이미 깬 보스 층은 보스 동전 ×0.2
+  {
+    const D = await import(pathToFileURL(path.join(ROOT, "src/core/dungeon.js")).href);
+    const L = D.generateFloor(5, 3); L.replay = true; L.chest = null;
+    const boss = D.createFloorBattle(L).monsters.find((m) => m.type === "ovenBoss");
+    const fresh = D.createFloorBattle(D.generateFloor(5, 3)).monsters.find((m) => m.type === "ovenBoss");
+    check("다시 도전한 보스 층은 보스 동전이 줄고(×0.2) 상자가 없다 — 처음 깨는 층은 그대로", boss.dropMul === 0.2 && fresh.dropMul === undefined && L.chest === null, `${boss.dropMul}`);
+  }
   // 🧪 소모품 · 새 옷 (Stage 13.22)
   {
     const I = await import(pathToFileURL(path.join(ROOT, "src/core/items.js")).href);

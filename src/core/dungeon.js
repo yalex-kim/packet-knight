@@ -4,7 +4,7 @@
 // 층마다 시드로 hopIncrement·숨은 Wi-Fi 간섭원·몬스터 배치가 달라진다 ("매번 다른 채널 배치").
 // 전투 수치는 Stage 6.5 시뮬레이션의 던전 가정치 그대로 (balance.js DUNGEON, PRD §8.7).
 
-import { DUNGEON, floorHpScale, floorAtkScale, floorPlan, MONSTERS, FLOOR_MODS, FLOOR_CHEST } from "./balance.js";
+import { DUNGEON, floorHpScale, floorAtkScale, floorPlan, MONSTERS, FLOOR_MODS, FLOOR_CHEST, REPLAY } from "./balance.js";
 import { createRng } from "./quiz.js";
 import { createArena } from "./arena.js";
 import { createBattle } from "./battle.js";
@@ -116,6 +116,7 @@ export function createFloorBattle(layout) {
     if (m.type === "wifiInterferer") m.wifi = layout.monsterWifi[i];
     if (m.type === "microwave") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.microwave.duty.on * (0.4 + 0.6 * ((i * 0.37) % 1)); }
     if (m.type === "ovenBoss") { m.band = MICROWAVE_BAND; m.on = true; m.dutyT = MONSTERS.ovenBoss.duty.on; m.enraged = false; }
+    if (layout.replay && MONSTERS[m.type].boss) m.dropMul = REPLAY.BOSS_DROP_MUL;   // 다시 도전한 보스 층
     if (layout.mod === "storm" && m.type === "wifiInterferer") m.atk = Math.round(m.atk * FLOOR_MODS.storm.WIFI_ATK);   // 📶 Wi-Fi 폭풍
   });
   return battle;

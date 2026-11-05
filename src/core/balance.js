@@ -339,4 +339,6 @@ export const FLOOR_MODS = Object.freeze({
   rush:  { id: "rush",  name: "📣 광고 러시", desc: "광고 폭주 비콘 둘이 더 몰려온다 — 대신 상자가 더 두둑하다", weight: 1, EXTRA: 2 },
   fog:   { id: "fog",   name: "🌫️ Coded 안개", desc: "안개가 짙어 멀리 안 보인다 — 대신 상자가 더 두둑하다", weight: 1 }
 });
+/** 이미 깬 층 다시 도전 (Stage 13.24): 상자 없음, 보스 동전 ×BOSS_DROP_MUL (첫 처치 옷·업적은 그대로) — 쉬운 층 반복 벌이를 막는다 */
+export const REPLAY = Object.freeze({ BOSS_DROP_MUL: 0.2 });
 export const FLOOR_CHEST = Object.freeze({ CHANCE: 0, MIN: 2, MAX: 4, MOD_CHEST_MUL: 1.5, PICK_R: 1.4, NO_DAMAGE_BONUS: 1 });

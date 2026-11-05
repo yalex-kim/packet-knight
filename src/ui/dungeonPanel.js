@@ -55,7 +55,16 @@ export function openEntry({ floor, fromPortal }) {
   const canPay = p.cr2032 >= DUNGEON.ENTRY_FEE;
   const best = p.dungeon.maxFloor;
   const stars = p.dungeon.stars[String(floor)] ?? 0;
-  const enter = button(canPay ? `⚔️ 확인 — ${floor}층 전투 시작 (CR2032 ${DUNGEON.ENTRY_FEE})` : `🪙 CR2032가 모자랍니다 (${p.cr2032}/${DUNGEON.ENTRY_FEE})`, () => hooks.onEnter(), "lib-btn primary dungeon-enter");
+  const replay = floor <= best;
+  const enter = button(canPay ? `⚔️ 확인 — ${floor}층 ${replay ? "다시 도전" : "전투 시작"} (CR2032 ${DUNGEON.ENTRY_FEE})` : `🪙 CR2032가 모자랍니다 (${p.cr2032}/${DUNGEON.ENTRY_FEE})`, () => hooks.onEnter(floor), "lib-btn primary dungeon-enter");
+  // 층 고르기 (Stage 13.24): 입구에서만 — 1층 ~ 최고 기록 + 1층, 보스 층 👑, 깬 층 ★
+  const picker = fromPortal ? null : el("div", { class: "dg-floors", role: "radiogroup", "aria-label": "층 고르기" },
+    Array.from({ length: best + 1 }, (_, i) => i + 1).map((f) => {
+      const st = p.dungeon.stars[String(f)] ?? 0, boss = floorPlan(f).boss;
+      const b = button(`${boss ? "👑 " : ""}${f}층${st ? ` ★${st}` : f === best + 1 ? " 🆕" : ""}`, () => openEntry({ floor: f, fromPortal: false }), `dg-floor${f === floor ? " on" : ""}${boss ? " boss" : ""}`);
+      b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(f === floor));
+      return b;
+    }));
   enter.disabled = !canPay;
   // 몬스터 브리핑 (Stage 12.3): 이번 층에 나오는 종류·마릿수·레벨(= 층)·체력·공격·대처법
   const plan = floorPlan(floor);
@@ -65,7 +74,8 @@ export function openEntry({ floor, fromPortal }) {
     wifiInterferer: "광역 — 바닥 빨간 원 밖으로. 대역 채널을 채널맵에서 빼면 피해 0",
     advFlooder: "빠른 근접 떼 — 회피(RX)로 피할 수 있다. 채널과 상관없이 맞는다",
     microwave: "켜졌다 꺼졌다 하는 잡음 — 켜진 동안 그 대역에서 패킷이 깨진다. 광역 공격도 대역 밖이면 피해 0",
-    sniffer: "원거리 6 m — 빨간 조준선이 차오르면 사거리 밖으로 빠지거나 회피"
+    sniffer: "원거리 6 m — 빨간 조준선이 차오르면 사거리 밖으로 빠지거나 회피",
+    ovenBoss: "👑 보스 — 광역 4.5 m·근접 블로킹. 체력 절반 아래면 잡음 대역이 넓어진다: 채널맵을 다시 짜자"
   };
   const hpMul = floorHpScale(floor), atkMul = floorAtkScale(floor);
   const brief = el("div", { class: "dg-brief" }, [...counts].map(([t, n]) => {
@@ -80,7 +90,9 @@ export function openEntry({ floor, fromPortal }) {
   }));
   render(
     header(fromPortal ? "🌀 다음 층 포털" : "⚔️ 37채널 호핑 던전", `${floor}층 · ${plan.name}${fromPortal ? ` — ${floor - 1}층 클리어!` : ` · 최고 기록 ${best}층`}`),
-    el("h3", { class: "dg-brief-title", textContent: `📋 몬스터 브리핑 — ${plan.roster.length}마리` }),
+    picker && el("h3", { class: "dg-brief-title", textContent: "🗺️ 층 고르기 — 깬 층은 다시 도전할 수 있어요 (상자 없음 · 보스 동전 적게)" }),
+    picker,
+    el("h3", { class: "dg-brief-title", textContent: `📋 몬스터 브리핑 — ${plan.roster.length}마리${replay ? " · 다시 도전" : ""}` }),
     brief,
     el("ul", { class: "dg-rules" },
       el("li", { textContent: `숨은 Wi-Fi 공유기 ${wifiCountFor(floor)}대 · 다 쓰러뜨리면 링크 콘솔에서 채널맵을 고쳐 다음 층으로` }),

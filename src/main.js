@@ -612,8 +612,9 @@ function applyDungeonFog() {
   scene.fog.far = fog ? 16 : 70;
 }
 
-function startFloor(floor) {
+function startFloor(floor, replay = false) {
   const layout = generateFloor(floor, (dungeonSeedBase += 7919));
+  if (replay) { layout.replay = true; layout.chest = null; }   // 다시 도전: 상자 없음 (보스 동전은 createFloorBattle에서 적게)
   run = { floor, layout, battle: null, link: null, puzzle: createLinkPuzzle(layout), phase: "combat", observing: true, rollbacks: 0 };
   placeAtCheckpoint();
   const b = run.battle;
@@ -700,14 +701,15 @@ function showHopGuide() {
 }
 
 /** 관문/포털에서 다음 층 도전 (입장료) */
-function enterNextFloor() {
-  const floor = nextFloor(progress);
+/** 층 고르기 (Stage 13.24): 1층 ~ (최고 기록 + 1)층. 이미 깬 층은 다시 도전 — 상자 없음·보스 동전 적게 */
+function enterNextFloor(pick) {
+  const floor = Math.max(1, Math.min(nextFloor(progress), Number.isInteger(pick) ? pick : nextFloor(progress)));
   if (!payDungeonEntry(progress)) return;
   persist();
   hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
   dungeonUi.closeDungeonPanel();
   sfx("portal");
-  startFloor(floor);
+  startFloor(floor, floor <= progress.dungeon.maxFloor);
 }
 
 function leaveDungeon(ko = false) {
@@ -758,7 +760,7 @@ function checkDungeonProximity(dt) {
     setInputEnabled(false);
     inputLocked = true;
     clearMoveTarget();
-    dungeonUi.openEntry({ floor: nextFloor(progress), fromPortal: true });
+    dungeonUi.openEntry({ floor: Math.min(run.floor + 1, nextFloor(progress)), fromPortal: true });   // 다시 도전 중이면 그다음 층
   }
 }
 

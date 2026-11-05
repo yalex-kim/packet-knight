@@ -123,7 +123,7 @@ function damageMonster(battle, m, ctx, events, coef = COMBAT.SKILL_COEF.advPacke
     const drops = [];
     for (const d of def.drops) {
       if (ctx.rng() < d.chance) {
-        const drop = { id: nextId++, item: d.item, count: d.count, x: m.x, y: m.y + 0.3, z: m.z, age: 0 };
+        const drop = { id: nextId++, item: d.item, count: Math.max(1, Math.round(d.count * (m.dropMul ?? 1))), x: m.x, y: m.y + 0.3, z: m.z, age: 0 };   // dropMul: 다시 도전한 보스 층 (Stage 13.24)
         battle.drops.push(drop);
         drops.push(drop);
       }
