@@ -613,7 +613,7 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
 const browser = await chromium.launch({ args: ["--use-gl=swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
 const errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
+page.on("pageerror", (e) => { if (!/pk-smoke-/.test(e.message)) errors.push(e.message); });   // 오류 수집 검사가 일부러 던진 것은 제외
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
 // 저장소 루트를 정적 서버처럼 제공 (index.html + src/*.js 모듈)
@@ -2202,6 +2202,17 @@ await page.waitForFunction(() => window.__PK);
     itemUi.tabs === 2 && itemUi.items === 4 && itemUi.apples === 1 && itemUi.hpAfter > 10 && /사과/.test(itemUi.note) && itemUi.applesLeft === 0, JSON.stringify(itemUi));
   check("📅 오늘의 임무 버튼이 퀘스트 트래커 바로 위(왼쪽 맞춤), 누르면 임무 창(3줄, 다 하기 전엔 상자 잠김)·Esc로 닫힘, 퀘스트 로그엔 없음 · 가방 › 소지품에 🏅 업적 8개",
     gui.open && gui.daily === 3 && gui.chest === true && gui.above && /오늘의 임무/.test(gui.label) && gui.inLog === 0 && gui.closed && gui.ach === 8, JSON.stringify(gui));
+  // 🐞 오류 수집 (Stage 13.29): 처리 안 된 오류·promise 거절을 경로·버전과 함께 모으고, 같은 오류는 한 번만 (로컬은 보내지 않음)
+  const errs = await page.evaluate(async () => {
+    const n0 = window.__pkErrors.length;
+    for (let i = 0; i < 2; i++) setTimeout(() => { throw new Error("pk-smoke-boom"); }, 0);
+    Promise.reject(new Error("pk-smoke-reject"));
+    await new Promise((r) => setTimeout(r, 100));
+    return window.__pkErrors.slice(n0).map((e) => ({ m: e.message, s: e.source, v: e.version, ua: e.ua }));
+  });
+  check("🐞 오류 수집: 처리 안 된 오류·promise 거절을 모으고 같은 오류는 한 번만 (파일 경로·버전·브라우저 요약)",
+    errs.length === 2 && /pk-smoke-boom/.test(errs[0].m) && /^\/.*:\d+:\d+$/.test(errs[0].s) && errs[0].v === "dev" && /·/.test(errs[0].ua) && /\(promise\) pk-smoke-reject/.test(errs[1].m),
+    JSON.stringify(errs));
   // 📜 실습 의뢰 UI: Q9가 진행 중이고 강좌를 이수했으면 QA 엔지니어에게 의뢰 버튼 → 4라운드 → 통과하면 단계 완료
   const tri = await page.evaluate(async () => {
     const P = window.__PK;

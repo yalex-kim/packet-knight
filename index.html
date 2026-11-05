@@ -964,6 +964,10 @@
   .bd-status { min-height: 18px; margin: 6px 0 0; font-size: 13px; color: #ffe39a; }
   .bd-fbi { display: grid; grid-template-columns: auto auto 1fr; gap: 2px 8px; align-items: baseline; padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; background: rgba(0,0,0,.25); font-size: 12px; color: #9db4cc; }
   .bd-fbi b { color: #fff; justify-self: end; }
+  .bd-err { padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; background: rgba(80,0,0,.28); font-size: 12px; color: #ffcfcf; }
+  .bd-err b { color: #fff; word-break: break-word; } .bd-err small { display: block; color: #c99; margin-top: 2px; }
+  .bd-err details pre { white-space: pre-wrap; word-break: break-all; font-size: 11px; color: #e8bcbc; margin: 4px 0 0; max-height: 160px; overflow: auto; }
+  .bd-err-clear { float: right; font-size: 12px; }
   .bd-fbi p { grid-column: 1 / -1; margin: 2px 0 0; font-size: 13px; color: #e2f1ff; white-space: pre-wrap; }
   .bd-credit { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; font-size: 11.5px; color: #7fa6c6; text-decoration: none; border-top: 1px solid rgba(57, 208, 255, .15); background: rgba(0,0,0,.18); }
   .bd-credit img { width: 20px; height: 20px; border-radius: 50%; }
@@ -1127,12 +1131,46 @@
   <div class="pk-hint"><span class="pk-keys">WASD · 클릭으로 이동 &nbsp;·&nbsp; 스페이스 점프 &nbsp;·&nbsp; F 발사 &nbsp;·&nbsp; Q 퀘스트</span><span class="pk-touch">조이스틱으로 이동 &nbsp;·&nbsp; 버튼으로 점프·발사 &nbsp;·&nbsp; 화면을 끌어 시점 회전</span></div>
 </div>
 <script>
+  // 🐞 오류 수집 (Stage 13.29) — 플레이 중 난 JS 오류를 모아 /api/errors 로 (같은 오류는 한 번만, 한 세션 최대 10개).
+  // 배포본(packetknight.yalex-k.com)에서만 보낸다 — 로컬·스모크에서는 window.__pkErrors 에 쌓기만.
+  (function () {
+    var seen = {}, queue = [], sent = 0, live = /(^|\.)yalex-k\.com$/.test(location.hostname);
+    var list = window.__pkErrors = [];
+    var ver = function () { var m = /\/v\/([0-9a-f]{7,})\//.exec((document.querySelector("script[type=module][src]") || {}).src || ""); return m ? m[1] : "dev"; };
+    var path = function (u) { try { var x = new URL(u, location.href); return x.origin === location.origin ? x.pathname : x.host + x.pathname; } catch (_) { return String(u || "").slice(0, 120); } };
+    var ua = function () { var u = navigator.userAgent; var b = /(Edg|Chrome|CriOS|Firefox|FxiOS|Version)\/(\d+)/.exec(u); var o = /Android|iPhone|iPad|Mac OS X|Windows|Linux/.exec(u); return (o ? o[0] : "?") + " · " + (b ? (b[1] === "Version" ? "Safari" : b[1]) + " " + b[2] : "?") + (window.matchMedia && matchMedia("(pointer: coarse)").matches ? " · touch" : ""); };
+    function flush() {
+      if (!queue.length || !live) { queue = []; return; }
+      var body = JSON.stringify({ errors: queue.splice(0, 5) });
+      try { if (!(navigator.sendBeacon && navigator.sendBeacon("/api/errors", new Blob([body], { type: "application/json" })))) fetch("/api/errors", { method: "POST", body: body, keepalive: true }); } catch (_) {}
+    }
+    function report(message, source, stack) {
+      message = String(message || "").slice(0, 300);
+      if (!message || /^Script error\.?$/.test(message) || sent >= 10) return;
+      var key = message + "|" + source;
+      if (seen[key]) return;
+      seen[key] = 1; sent++;
+      var e = { message: message, source: source, stack: String(stack || "").replace(/https?:\/\/[^\s)]+/g, path).slice(0, 1200), version: ver(), ua: ua() };
+      list.push(e); queue.push(e);
+      setTimeout(flush, 2000);
+    }
+    window.addEventListener("error", function (e) {
+      if (!e.message) return;   // 그림·소리 로딩 실패(리소스 오류)는 제외
+      report(e.message, path(e.filename) + ":" + e.lineno + ":" + e.colno, e.error && e.error.stack);
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      var r = e.reason; report("(promise) " + (r && r.message || String(r)), "", r && r.stack);
+    });
+    addEventListener("pagehide", flush);
+  })();
+</script>
+<script>
   // 테스트 모드(?test)는 시작 화면 없이 바로. 모듈 로딩이 실패하거나 20초 넘게 걸리면 안내를 띄운다 (2026-11-02 빈 화면 사고)
   (function () {
     var sp = document.getElementById("splash");
     if (/[?&]test\b/.test(location.search)) { sp.remove(); document.body.classList.remove("prestart"); return; }
     var fail = window.__pkFail = function () { if (!sp.classList.contains("ready")) { sp.classList.add("failed"); document.getElementById("splash-status").textContent = "⚠️ 연결 실패"; } };
-    window.addEventListener("error", function (e) { if (!e.filename || /\/src\//.test(e.filename) || /module|import|export/i.test(String(e.message))) fail(); });
+    window.addEventListener("error", function (e) { if (!e.filename || /\/src\/|\/v\/[0-9a-f]+\/pk\.js/.test(e.filename) || /module|import|export/i.test(String(e.message))) fail(); });
     // 20초가 지나면 '느린 연결' 안내만 (실패로 단정하지 않는다 — 느린 폰에서 실제로는 불러오는 중이었다), 60초면 실패
     window.__pkSplashTimer = setTimeout(function () { if (!sp.classList.contains("ready")) document.getElementById("splash-status").textContent = "🐢 연결이 느려요 — 계속 불러오는 중…"; window.__pkSplashTimer = setTimeout(fail, 40000); }, 20000);
   })();

@@ -33,6 +33,7 @@ function build() {
       </section>
       <section class="bd-sec"><h3>📢 공지 · 이벤트</h3><div class="bd-notices"></div></section>
       <section class="bd-sec bd-admin" hidden><h3>🔒 받은 의견 (관리자)</h3><div class="bd-inbox"></div></section>
+      <section class="bd-sec bd-admin bd-errsec" hidden><h3>🐞 플레이어 오류 기록 (관리자) <button type="button" class="lib-btn bd-err-clear">모두 지우기</button></h3><div class="bd-errors"></div></section>
     </div>
     <a class="bd-credit" href="https://home.yalex-k.com/" target="_blank" rel="noopener">
       <img src="./src/assets/yalex-mark-v1.webp" alt="" width="20" height="20" />만든 사람 <b>y.AI.ex</b> · home.yalex-k.com ↗</a>
@@ -47,6 +48,11 @@ function build() {
   // 입력 중 키(WASD·M·I 등)가 게임으로 새지 않게
   ta.addEventListener("keydown", (e) => { if (e.key !== "Escape") e.stopPropagation(); });
   overlay.querySelector(".bd-send").addEventListener("click", send);
+  overlay.querySelector(".bd-err-clear").addEventListener("click", async () => {
+    if (!confirm("오류 기록을 모두 지울까요? (고친 뒤 새로 모을 때)")) return;
+    await fetch("/api/errors", { method: "DELETE", credentials: "same-origin" }).catch(() => {});
+    refreshErrors();
+  });
 }
 function renderCats() {
   overlay.querySelectorAll(".bd-cats button").forEach((b) => { const on = b.dataset.cat === cat; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
@@ -76,7 +82,26 @@ async function send() {
     st.textContent = "지금은 보낼 수 없어요. 잠시 뒤에 다시 해 주세요.";
   } finally { btn.disabled = false; }
 }
+const when = (t) => new Date(t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+/** 🐞 플레이어 브라우저에서 모은 오류 (Stage 13.29, /api/errors) — 같은 오류는 한 줄 + 횟수 */
+async function refreshErrors() {
+  const sec = overlay.querySelector(".bd-errsec");
+  if (!accountInfo().admin) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const box = overlay.querySelector(".bd-errors");
+  try {
+    const r = await fetch("/api/errors", { credentials: "same-origin" });
+    if (!r.ok) throw new Error(r.status);
+    const { items, note } = await r.json();
+    box.innerHTML = note === "table_missing" ? `<p class="bd-hint">오류 표가 아직 없어요 — Infra 워크플로로 마이그레이션을 적용해 주세요.</p>`
+      : items.length ? items.map((e) => `<div class="bd-err"><b>${esc(e.message)}</b> ×${e.count}
+        <small>${esc(e.source ?? "")} · ${esc(e.version ?? "?")} · ${esc(e.ua ?? "")} · 처음 ${when(e.first)} · 마지막 ${when(e.last)}</small>
+        ${e.stack ? `<details><summary>스택</summary><pre>${esc(e.stack)}</pre></details>` : ""}</div>`).join("")
+      : `<p class="bd-hint">모인 오류가 없어요 👍</p>`;
+  } catch { box.innerHTML = `<p class="bd-hint">불러오지 못했어요.</p>`; }
+}
 async function refreshInbox() {
+  refreshErrors();
   const sec = overlay.querySelector(".bd-admin");
   if (!accountInfo().admin) { sec.hidden = true; return; }
   sec.hidden = false;
