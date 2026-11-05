@@ -1251,6 +1251,13 @@ await reset();
   const scanned = await page.evaluate(() => window.__PK.dungeon.monsters());
   const bandCells = await page.locator("#chmap .cm.band").count();
   check("몬스터를 맞히면(스캔) 그 Wi-Fi 대역이 채널맵에 표시된다", scanned.some((m) => m.revealed && m.wifi) && bandCells >= 9, `대역 칸 ${bandCells}개`);
+  // 색각 친화 (Stage 13.30): 간섭 대역·지금 채널은 색만이 아니라 기호(≈·▼)와 빗금으로도 구분된다
+  const cvd = await page.evaluate(() => {
+    const band = document.querySelector("#chmap .cm.band"), now = document.querySelector("#chmap .cm.now");
+    const after = band && getComputedStyle(band, "::after").content, img = band && getComputedStyle(band).backgroundImage;
+    return { after, hatched: /repeating-linear-gradient/.test(img ?? ""), nowMark: now && getComputedStyle(now, "::before").content, legend: document.querySelectorAll("#chmap .cm-legend i").length };
+  });
+  check("🎨 채널맵은 색만으로 구분하지 않는다: 간섭 대역 = 빗금 + ≈, 지금 채널 = ▼, 범례 3종", cvd.after === '"≈"' && cvd.hatched && cvd.nowMark === '"▼"' && cvd.legend === 3, JSON.stringify(cvd));
 
   // AFH 버튼 (퀘스트 Q4 보상) → 6 이벤트 뒤에 적용, 이후 드러난 대역으로 도약하지 않는다
   const afhLocked = await page.locator("#chmap .cm-afh").isDisabled();

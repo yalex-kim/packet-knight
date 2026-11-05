@@ -297,17 +297,18 @@
     font: inherit; font-size: 11px; cursor: pointer; overflow: hidden; padding: 2px 0 0;
   }
   .ch-n { position: relative; z-index: 1; }
-  .ch-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(255, 59, 48, 0.75); transition: height 0.2s; }
+  .ch-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(230, 110, 30, 0.8) repeating-linear-gradient(-45deg, rgba(0,0,0,0.35) 0 3px, transparent 3px 7px); transition: height 0.2s; }
   .ch.off { background: #0b0f16; border-color: #2a2f3a; color: #5d6b7c; text-decoration: line-through; }
   .ch.off .ch-bar { opacity: 0.18; }
   .ch.off::after { content: "✕"; position: absolute; left: 0; right: 0; bottom: 3px; font-size: 13px; color: #8b97a8; text-decoration: none; }
-  .ch.bad { border-color: #ff5a4e; }
-  .ch.now { outline: 2px solid #7dffb5; outline-offset: 1px; }
+  .ch.bad { border: 2px dashed #ffb36b; }
+  .ch.bad:not(.off)::before { content: "⚠"; position: absolute; top: 1px; right: 2px; font-size: 9px; z-index: 1; }
+  .ch.now { outline: 2px solid #fff; outline-offset: 1px; }
   .ch-legend { font-size: 11.5px; color: #8fb3d6; }
   .ch-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .ch-ticker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; font-size: 11px; min-height: 22px; }
   .tk { padding: 1px 5px; border-radius: 4px; background: rgba(14, 90, 60, 0.55); }
-  .tk.lost { background: rgba(110, 24, 20, 0.7); }
+  .tk.lost { background: rgba(140, 60, 10, 0.75); text-decoration: underline wavy; }
   .ch-status { margin-top: 8px; font-size: 12.5px; min-height: 18px; }
   .ch-status.ok { color: #7dffb5; }
   .ch-status.bad { color: #ff9a90; }
@@ -336,12 +337,23 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.45); font-size: 11.5px;
   }
   #chmap .cm-cells { display: grid; grid-template-columns: repeat(37, 1fr); gap: 2px; }
-  #chmap .cm { height: 22px; padding: 0; border: 1px solid #2d6fb3; border-radius: 3px; background: #1b4777; cursor: pointer; touch-action: none; }
-  #chmap .cm.band { background: #a8261d; border-color: #ff5a4e; }
-  #chmap .cm.off { background: #0b0f16; border-color: #2a2f3a; }
-  #chmap .cm.off.band { background: #3a1210; }
-  #chmap .cm.pend { background-image: repeating-linear-gradient(45deg, rgba(255,215,107,0.55) 0 3px, transparent 3px 6px); }
-  #chmap .cm.now { outline: 2px solid #7dffb5; outline-offset: 1px; position: relative; z-index: 1; }
+  /* 색각 친화 (Stage 13.30): 색만으로 구분하지 않는다 — 간섭 대역 = 주황 + 사선 빗금 + ≈, 뺀 채널 = 검정 + ✕, 지금 채널 = 흰 테두리 + ▼, 갱신 대기 = 노랑 점선 테두리.
+     빨강·초록 대신 파랑/주황(색각 이상에서도 갈리는 쌍) */
+  #chmap .cm { position: relative; height: 22px; padding: 0; border: 1px solid #2d6fb3; border-radius: 3px; background: #1b4777; cursor: pointer; touch-action: none;
+    color: #fff; font: 700 10px/1 system-ui, sans-serif; display: flex; align-items: center; justify-content: center; overflow: visible; }
+  #chmap .cm.band { background-color: #c75a12; border-color: #ffb36b; background-image: repeating-linear-gradient(-45deg, rgba(0,0,0,0.42) 0 2px, transparent 2px 5px); }
+  #chmap .cm.band::after { content: "≈"; text-shadow: 0 0 2px #000; }
+  #chmap .cm.off { background-color: #0b0f16; border-color: #2a2f3a; background-image: none; }
+  #chmap .cm.off::after { content: "✕"; color: #8b97a8; text-shadow: none; }
+  #chmap .cm.off.band { background-color: #3a1f0c; }
+  #chmap .cm.pend { border: 1px dashed #ffd76b; }
+  #chmap .cm.now { outline: 2px solid #fff; outline-offset: 1px; z-index: 1; }
+  #chmap .cm.now::before { content: "▼"; position: absolute; top: -11px; left: 50%; transform: translateX(-50%); font-size: 8px; color: #fff; text-shadow: 0 0 2px #000; }
+  #chmap .cm-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 10.5px; color: #9db4cc; margin-top: 3px; }
+  #chmap .cm-legend i { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 3px; font: 700 8px/10px system-ui; text-align: center; font-style: normal; color: #fff; }
+  #chmap .cm-legend .lg-band { background: #c75a12 repeating-linear-gradient(-45deg, rgba(0,0,0,0.42) 0 2px, transparent 2px 5px); }
+  #chmap .cm-legend .lg-off { background: #0b0f16; border: 1px solid #2a2f3a; color: #8b97a8; }
+  #chmap .cm-legend .lg-now { background: #1b4777; outline: 2px solid #fff; }
   #chmap .cm-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
   #chmap .cm-info { flex: 1; min-width: 200px; }
   #chmap .cm-info.danger { color: #ff9a90; }
@@ -544,7 +556,8 @@
     #dungeon-hud .dh-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #dungeon-hud .dh-leave { padding: 2px 8px; font-size: 11px; }
     #chmap { top: 104px; bottom: auto; left: 8px; right: 8px; width: auto; transform: none; padding: 4px 5px; font-size: 10px; }
-    #chmap .cm { height: 16px; border-radius: 2px; }
+    #chmap .cm { height: 16px; border-radius: 2px; font-size: 8px; }
+    #chmap .cm-legend { display: none; }
     #chmap .cm-cells { gap: 1px; }
     #chmap .cm-row { margin-top: 3px; flex-wrap: nowrap; gap: 4px; }
     #chmap .cm-info { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1260,6 +1273,7 @@
 <div id="dungeon-hud" hidden><span class="dh-text"></span><button type="button" class="dh-help" aria-label="호핑·간섭 설명 다시 보기">❔</button><button type="button" class="dh-leave">🏃 귀환</button></div>
 <div id="chmap" hidden aria-label="실시간 채널맵 (칸을 눌러 채널맵에서 빼기/넣기)">
   <div class="cm-cells"></div>
+  <div class="cm-legend" aria-hidden="true"><span><i class="lg-band">≈</i>Wi-Fi 간섭</span><span><i class="lg-off">✕</i>뺀 채널</span><span><i class="lg-now"></i>지금 채널 ▼</span><span>노랑 점선 = 갱신 대기</span></div>
   <div class="cm-row"><span class="cm-info"></span><span><button type="button" class="cm-btn cm-reset">↩ 전체 사용</button> <button type="button" class="cm-btn cm-afh"></button></span></div>
 </div>
 
