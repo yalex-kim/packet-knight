@@ -1465,7 +1465,7 @@ window.__PK = {
   life: () => { stepLife(1 / 60, 0, motor); return lifeState(); },
   villagerCircles,
   sayNow,
-  audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES },
+  audio: { log: audio.soundLog, clear: audio.clearSoundLog, state: audio.audioState, names: audio.SFX_NAMES, measure: audio.measureSfx },
   chargeCfg: () => chargeCfg(progress),
   dungeon: {
     openEntry: openDungeonEntry,

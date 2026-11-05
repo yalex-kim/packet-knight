@@ -14,7 +14,16 @@ let master = null;
 let sfxBus = null;
 let bgmBus = null;
 let noiseBuf = null;
-let settings = { muted: false, volume: 0.7, bgm: true };
+let settings = { muted: false, volume: 0.7, bgm: true, music: 1, effects: 1 };
+let duckGain = null;
+// ---------- 🎚️ 소리 밸런스 (Stage 13.33) — measureSfx 로 잰 값으로 맞춘다 ----------
+// · 가장 큰 소리 = 보스 오븐 > 전자레인지 공격 (화면 밖에서도 "피해!"가 들리게). 다른 효과음은 그보다 2 dB 이상 작게
+// · 배경음악은 효과음 아래: 곡 평균이 약 -31 dBFS (효과음 대부분 -25~-35) — 곡마다 음원 크기가 달라 따로 맞춘다
+// · 큰 공격·보스 처치 때는 음악을 잠깐 낮춘다(덕킹), 효과음은 리미터로 겹쳐도 깨지지 않게
+const SFX_TRIM_DB = Object.freeze({ atk_ovenBoss: 4, windup_ovenBoss: 2, atk_microwave: 4, windup_microwave: 2, dudung: -3, fire: -2, fire_bow: -2 });
+export const BGM_LEVEL = Object.freeze({ village: 0.24, dungeon: 0.24 });
+const DUCK = Object.freeze({ atk_microwave: 0.6, atk_ovenBoss: 0.9, bossDown: 1.2 });   // 초
+const DUCK_TO = 0.35;
 const log = [];
 const LOG_MAX = 400;
 
@@ -34,11 +43,15 @@ function ensureCtx() {
     ctx = new AC();
     master = ctx.createGain();
     master.connect(ctx.destination);
+    const limiter = ctx.createDynamicsCompressor();   // 효과음이 겹쳐도 찢어지지 않게
+    limiter.threshold.value = -6; limiter.knee.value = 6; limiter.ratio.value = 8; limiter.attack.value = 0.003; limiter.release.value = 0.2;
+    limiter.connect(master);
     sfxBus = ctx.createGain();
-    sfxBus.connect(master);
+    sfxBus.connect(limiter);
+    duckGain = ctx.createGain();
+    duckGain.connect(master);
     bgmBus = ctx.createGain();
-    bgmBus.gain.value = 0.3;
-    bgmBus.connect(master);
+    bgmBus.connect(duckGain);
     applyVolume();
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -49,6 +62,8 @@ function ensureCtx() {
 }
 function applyVolume() {
   if (master) master.gain.value = settings.muted ? 0 : settings.volume;
+  if (sfxBus) sfxBus.gain.value = settings.effects;
+  if (bgmBus) bgmBus.gain.value = settings.music;
 }
 
 // ---------- 합성 원소 ----------
@@ -210,6 +225,49 @@ const SFX = {
 };
 export const SFX_NAMES = Object.freeze(Object.keys(SFX));
 
+/** 트림(dB)이 있으면 잠깐 그 크기의 게인을 거치게 해서 재생 (합성 원소가 전역 sfxBus 로 이어지므로 바꿔 끼운다) */
+function playTrimmed(name, t) {
+  const db = SFX_TRIM_DB[name];
+  if (!db) return SFX[name](t);
+  const g = ctx.createGain();
+  g.gain.value = 10 ** (db / 20);
+  g.connect(sfxBus);
+  const bus = sfxBus;
+  try { sfxBus = g; SFX[name](t); } finally { sfxBus = bus; }
+  setTimeout(() => g.disconnect(), 3000);
+}
+
+/**
+ * 효과음 크기 재기 (Stage 13.33 소리 밸런스) — 오프라인으로 그려서 최대 순간 크기(50 ms 창 RMS, dBFS)와 최고점.
+ * 합성 원소가 전역 ctx·sfxBus·noiseBuf를 쓰므로 잠깐 바꿔 끼우고, 예약이 끝나면 바로 되돌린다 (렌더는 그 뒤).
+ * @returns {Promise<{ loud: number, peak: number }>}
+ */
+export async function measureSfx(name, dur = 2) {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!SFX[name] || !OAC) return null;
+  const off = new OAC(1, Math.round(44100 * dur), 44100);
+  const nb = off.createBuffer(1, off.sampleRate * 0.5, off.sampleRate);
+  const d = nb.getChannelData(0);
+  let seed = 1;
+  for (let i = 0; i < d.length; i++) { seed = (seed * 16807) % 2147483647; d[i] = seed / 1073741823.5 - 1; }
+  const saved = [ctx, sfxBus, noiseBuf];
+  try {
+    ctx = off; sfxBus = off.destination; noiseBuf = nb;
+    playTrimmed(name, 0.01);
+  } finally { [ctx, sfxBus, noiseBuf] = saved; }
+  const buf = (await off.startRendering()).getChannelData(0);
+  const win = Math.round(off.sampleRate * 0.05);
+  let peak = 0, loud = 0, acc = 0;
+  for (let i = 0; i < buf.length; i++) {
+    peak = Math.max(peak, Math.abs(buf[i]));
+    acc += buf[i] * buf[i];
+    if (i >= win) acc -= buf[i - win] * buf[i - win];
+    if (i >= win - 1) loud = Math.max(loud, acc / win);
+  }
+  const db = (x) => +(20 * Math.log10(Math.max(x, 1e-6))).toFixed(1);
+  return { loud: db(Math.sqrt(loud)), peak: db(peak) };
+}
+
 // 같은 소리가 한 프레임에 여러 번 겹치면 귀가 아프다 — 이름별 최소 간격
 const lastAt = new Map();
 const MIN_GAP = 0.03;
@@ -225,7 +283,11 @@ export function sfx(name) {
   const t = ctx.currentTime;
   if (t - (lastAt.get(name) ?? -1) < MIN_GAP) return;
   lastAt.set(name, t);
-  try { SFX[name](t + 0.005); } catch { /* 합성 실패는 무시 (게임 진행에 영향 없음) */ }
+  try { playTrimmed(name, t + 0.005); } catch { /* 합성 실패는 무시 (게임 진행에 영향 없음) */ }
+  if (DUCK[name] && duckGain) {   // 큰 소리 동안 음악을 잠깐 낮춘다
+    const g = duckGain.gain;
+    g.cancelScheduledValues(t); g.setTargetAtTime(DUCK_TO, t, 0.03); g.setTargetAtTime(1, t + DUCK[name], 0.25);
+  }
 }
 
 // ---------- BGM 음원 (Stage 12.9: 마을 = 잔잔한 통기타 "Peaceful Days", 던전 = 빠른 8비트 "Battle 1", CC0) ----------
@@ -279,7 +341,7 @@ function syncBgm() {
     const tr = on ? bgmTrack(mode) : bgmTracks[mode];
     if (!tr) continue;
     tr.gain.gain.cancelScheduledValues(now);
-    tr.gain.gain.setTargetAtTime(on ? 1 : 0, now, on ? 0.5 : 0.25);
+    tr.gain.gain.setTargetAtTime(on ? BGM_LEVEL[mode] : 0, now, on ? 0.5 : 0.25);
     clearTimeout(tr.timer);
     if (on) {
       startTrack(tr);
@@ -312,7 +374,14 @@ export function setVolume(v) {
   applyVolume();
   saveSettings();
 }
-export const audioState = () => ({ ctx: ctx?.state ?? "none", muted: settings.muted, bgm: bgmMode, volume: settings.volume, playing: Object.keys(bgmTracks).filter((m) => bgmTracks[m].src) });
+/** 🎵 음악 · 🔔 효과음 크기 0~1 (설정 창, Stage 13.33) */
+export function setMix(kind, v) {
+  if (kind !== "music" && kind !== "effects") return;
+  settings[kind] = Math.min(1, Math.max(0, Number(v) || 0));
+  applyVolume();
+  saveSettings();
+}
+export const audioState = () => ({ ctx: ctx?.state ?? "none", muted: settings.muted, bgm: bgmMode, volume: settings.volume, music: settings.music, effects: settings.effects, playing: Object.keys(bgmTracks).filter((m) => bgmTracks[m].src) });
 /** 테스트 훅: 최근 효과음 이름들 (since 이후) */
 export const soundLog = () => [...log];
 export const clearSoundLog = () => { log.length = 0; };

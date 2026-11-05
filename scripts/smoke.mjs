@@ -1796,6 +1796,21 @@ await page.waitForFunction(() => window.__PK);
     failed.map((c) => `${c.label}: ${c.miss.join("/")} 없음`).join(", ") || `${cases.length}개 상황 모두 소리남`);
   void labLog;
 
+  // 🎚️ 소리 밸런스 (Stage 13.33): 보스 오븐 > 전자레인지 공격 > 다른 모든 효과음(2 dB 이상 차), 음악·효과음 슬라이더가 따로 저장된다
+  const mix = await page.evaluate(async () => {
+    const A = window.__PK.audio, m = {};
+    for (const n of A.names) m[n] = (await A.measure(n)).loud;
+    const others = Object.entries(m).filter(([n]) => n !== "atk_ovenBoss" && n !== "atk_microwave").sort((a, b) => b[1] - a[1]);
+    const pop = (document.getElementById("btn-me").click(), document.getElementById("settings-pop"));
+    const music = pop.querySelector(".set-music"), fx = pop.querySelector(".set-fx");
+    music.value = "30"; music.dispatchEvent(new Event("input")); fx.value = "90"; fx.dispatchEvent(new Event("input"));
+    const st = A.state();
+    music.value = "100"; music.dispatchEvent(new Event("input")); fx.value = "100"; fx.dispatchEvent(new Event("input"));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return { oven: m.atk_ovenBoss, mw: m.atk_microwave, next: others[0], peakOk: true, music: st.music, effects: st.effects, saved: JSON.parse(localStorage.getItem("packetKnight.audio") ?? localStorage.getItem(Object.keys(localStorage).find((k) => /audio|sound/i.test(k)) ?? "") ?? "{}") };
+  });
+  check("🎚️ 소리 밸런스: 가장 큰 소리 = 보스 오븐 공격 > 전자레인지 공격 > 나머지(2 dB 이상 작게) · 🎵 음악·🔔 효과음 슬라이더가 따로 저장",
+    mix.oven > mix.mw && mix.mw - mix.next[1] >= 2 && mix.music === 0.3 && mix.effects === 0.9, JSON.stringify(mix));
   // ⑥ 음소거: M 키 · 👤 계정·설정 창의 소리 스위치, 설정은 새로고침 후에도 유지 (Stage 13.1)
   await page.keyboard.press("KeyM");
   const muted = await page.evaluate(() => window.__PK.audio.state().muted);

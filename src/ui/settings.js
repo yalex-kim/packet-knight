@@ -30,7 +30,9 @@ function build() {
     <div class="set-sec set-acc"></div>
     <div class="set-sec set-sound">
       <label class="set-row"><span>🔊 소리 <small>(M)</small></span><input type="checkbox" class="set-mute" role="switch" /></label>
-      <label class="set-row"><span>🎚️ 볼륨</span><input type="range" class="set-vol" min="0" max="100" step="5" /></label>
+      <label class="set-row"><span>🎚️ 전체</span><input type="range" class="set-vol" min="0" max="100" step="5" /></label>
+      <label class="set-row"><span>🎵 음악</span><input type="range" class="set-music" min="0" max="100" step="5" /></label>
+      <label class="set-row"><span>🔔 효과음</span><input type="range" class="set-fx" min="0" max="100" step="5" /></label>
     </div>
     <div class="set-btns">
       <button type="button" class="set-guide" data-action="tutorial">📘 설명서 다시 보기</button>
@@ -39,6 +41,8 @@ function build() {
   document.body.append(pop);
   pop.querySelector(".set-mute").addEventListener("change", (e) => { audio.setMuted(!e.target.checked); renderButton(); });
   pop.querySelector(".set-vol").addEventListener("input", (e) => audio.setVolume(e.target.value / 100));
+  pop.querySelector(".set-music").addEventListener("input", (e) => audio.setMix("music", e.target.value / 100));
+  pop.querySelector(".set-fx").addEventListener("input", (e) => audio.setMix("effects", e.target.value / 100));
   pop.querySelector(".set-guide").addEventListener("click", closeSettings);
   pop.querySelector(".set-bag").addEventListener("click", () => { closeSettings(); openInventory(); });
   document.addEventListener("pointerdown", (e) => {
@@ -48,7 +52,10 @@ function build() {
 }
 function fillSound() {
   pop.querySelector(".set-mute").checked = !audio.isMuted();
-  pop.querySelector(".set-vol").value = Math.round(audio.audioState().volume * 100);
+  const st = audio.audioState();
+  pop.querySelector(".set-vol").value = Math.round(st.volume * 100);
+  pop.querySelector(".set-music").value = Math.round(st.music * 100);
+  pop.querySelector(".set-fx").value = Math.round(st.effects * 100);
 }
 
 export function openSettings() {
