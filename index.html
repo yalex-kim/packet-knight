@@ -9,6 +9,11 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 132%22%3E%3Cpath d=%22M60 6 L108 22 V62 C108 94 88 116 60 126 C32 116 12 94 12 62 V22 Z%22 fill=%22%23071426%22 stroke=%22%2339d0ff%22 stroke-width=%228%22/%3E%3Ccircle cx=%2260%22 cy=%2296%22 r=%228%22 fill=%22%23ffd76b%22/%3E%3Cpath d=%22M44 82 A22 22 0 0 1 76 82 M34 70 A36 36 0 0 1 86 70%22 fill=%22none%22 stroke=%22%2339d0ff%22 stroke-width=%228%22 stroke-linecap=%22round%22/%3E%3C/svg%3E" />
 <meta name="theme-color" content="#071426" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/src/assets/icon-192-v1.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" crossorigin="anonymous" />
 <link rel="preload" as="image" href="./src/assets/emblem-v1.webp" />
 <meta property="og:title" content="Packet Knight · 블루투스 LE 복셀 RPG" />
 <meta property="og:description" content="패킷 기사가 되어 블루투스 저전력(BLE)을 몸으로 배우는 3D 복셀 RPG" />
@@ -1247,5 +1252,10 @@
 </script>
 
 <script type="module" src="./src/main.js" onerror="window.__pkFail && window.__pkFail()"></script>
+<script>
+  // 📲 서비스 워커 (Stage 13.28) — 배포본(/v/<sha>/ 로 찍힌 진입 모듈)에서만. 로컬 실행·스모크는 등록하지 않는다
+  if ("serviceWorker" in navigator && /\/v\/[0-9a-f]{7,}\//.test(document.querySelector("script[type=module][src]")?.src ?? ""))
+    addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+</script>
 </body>
 </html>

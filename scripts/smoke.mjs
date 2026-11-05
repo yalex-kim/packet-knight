@@ -479,6 +479,17 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 📲 PWA (Stage 13.28): manifest 아이콘이 실제 파일이고, 서비스 워커는 /api 를 건드리지 않으며 버전 자리표시가 있다
+  {
+    const fs = await import("node:fs");
+    const man = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.webmanifest"), "utf8"));
+    const iconsOk = man.icons.every((i) => fs.existsSync(path.join(ROOT, i.src.replace(/^\//, ""))));
+    const sw = fs.readFileSync(path.join(ROOT, "sw.js"), "utf8");
+    const build = fs.readFileSync(path.join(ROOT, "tools/build_site.sh"), "utf8");
+    check("📲 PWA: manifest 아이콘 3개가 있고(maskable 포함), 서비스 워커는 sha 로 캐시를 나누며 배포 빌드가 모듈을 하나로 묶는다",
+      iconsOk && man.icons.some((i) => i.purpose === "maskable") && man.start_url === "/" && /^const VERSION = "dev";/m.test(sw) && !/\/api\//.test(sw.replace(/^\/\/.*$/gm, ""))
+        && /esbuild/.test(build) && /sw\.js/.test(build), `아이콘 ${man.icons.length}개`);
+  }
   // 📜 퀘스트 Q9~Q13 (Stage 13.27): 남은 다섯 장, 실습 의뢰, Q8을 끝낸 세이브는 Q9로 이어 간다, 메시 퍼즐은 한도 안에서 풀린다
   {
     const Qs = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).href);

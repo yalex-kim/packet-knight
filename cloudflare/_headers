@@ -5,3 +5,9 @@
 # 배포마다 sha 가 바뀌는 주소라 길게 캐시해도 옛 모듈과 섞이지 않는다 (tools/stamp_assets.py)
 /v/*
   Cache-Control: public, max-age=31536000, immutable
+
+# 서비스 워커·manifest 는 늘 새로 (Stage 13.28)
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Content-Type: application/manifest+json

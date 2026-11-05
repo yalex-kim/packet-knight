@@ -234,8 +234,9 @@ export function sfx(name) {
 // 파일을 받아 Web Audio 버퍼로 풀고(decodeAudioData) AudioBufferSourceNode로 반복한다. 게임 효과음처럼 취급돼 알림이 없다.
 // BGM 버스로 이어 음소거·볼륨을 따르고, 장면이 바뀌면 교차 페이드 + 멈춘 자리 기억. 테스트 모드는 불러오지 않는다.
 const BGM_FILES = {
-  village: new URL("../assets/bgm/bgm-village.mp3", import.meta.url).href,
-  dungeon: new URL("../assets/bgm/bgm-dungeon.mp3", import.meta.url).href
+  // 문서 기준 주소 — 배포본은 모듈을 하나로 묶어(import.meta.url 이 달라짐) 다른 그림들처럼 ./src/assets 로 (Stage 13.28)
+  village: new URL("./src/assets/bgm/bgm-village.mp3", document.baseURI).href,
+  dungeon: new URL("./src/assets/bgm/bgm-dungeon.mp3", document.baseURI).href
 };
 let bgmMode = null;
 let bgmEnabled = false;

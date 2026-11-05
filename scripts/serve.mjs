@@ -12,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.PORT) || 5173;
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
-  ".json": "application/json", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".md": "text/markdown; charset=utf-8"
+  ".json": "application/json", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".md": "text/markdown; charset=utf-8", ".webp": "image/webp", ".mp3": "audio/mpeg", ".webmanifest": "application/manifest+json"
 };
 
 createServer(async (req, res) => {

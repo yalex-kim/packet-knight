@@ -1,0 +1,17 @@
+{
+  "name": "Packet Knight — 블루투스 LE 복셀 RPG",
+  "short_name": "Packet Knight",
+  "description": "2.4GHz RF 세계를 탐험하며 배우는 3D 무선통신 RPG",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#071426",
+  "theme_color": "#071426",
+  "icons": [
+    { "src": "/src/assets/icon-192-v1.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/src/assets/icon-512-v1.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/src/assets/icon-512-maskable-v1.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

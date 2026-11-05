@@ -8,10 +8,16 @@ cd "$(dirname "$0")/.."
 SHA=$(git rev-parse --short=7 "${1:-HEAD}")
 rm -rf _site
 mkdir -p _site/tools "_site/v/$SHA"
-git archive "$SHA" index.html src | tar -x -C _site
+git archive "$SHA" index.html src sw.js manifest.webmanifest | tar -x -C _site
 cp tools/stamp_assets.py _site/tools/
 python3 -I _site/tools/stamp_assets.py "$SHA"     # _site/index.html 을 고친다
 rm -r _site/tools
 cp -R _site/src "_site/v/$SHA/src"
+# 진입 모듈을 하나로 묶는다 (Stage 13.28) — 모듈 60여 개를 차례로 받던 폭포를 요청 하나로. three 는 importmap(CDN) 그대로.
+# 나머지 v/<sha>/src/*.js 는 남겨 둔다 (옛 주소 호환). 실패하면 배포를 멈춘다 (set -e).
+npx --yes esbuild@0.24.0 _site/src/main.js --bundle --format=esm --external:three --minify --target=es2022 \
+  --legal-comments=none --log-level=warning --outfile="_site/v/$SHA/src/main.js" --allow-overwrite
+sed -i "s/^const VERSION = \"dev\";/const VERSION = \"$SHA\";/" _site/sw.js
+grep -q "const VERSION = \"$SHA\";" _site/sw.js
 cp cloudflare/_headers cloudflare/_redirects cloudflare/404.html _site/
 echo "built _site @ $SHA ($(find _site -type f | wc -l) files)"
