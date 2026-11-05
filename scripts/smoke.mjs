@@ -479,6 +479,26 @@ const Q9 = await import(pathToFileURL(path.join(ROOT, "src/core/quests.js")).hre
     const ev = B.stepBattle(b, 1 / 60, { player, stats: { hp: 100, tx: 10, rx: 0, sec: 0, hop: 6.4 }, ...ctx });
     return { types: ev.map((e) => e.type), hp: b.player.hp, dash: ev.some((e) => e.dash) };
   };
+  // 📅 오늘의 임무 · 🏅 업적 (Stage 13.20)
+  {
+    const G = await import(pathToFileURL(path.join(ROOT, "src/core/goals.js")).href);
+    const g = G.emptyGoals();
+    const ids = G.pickDaily("2026-11-05"), ids2 = G.pickDaily("2026-11-06");
+    const d = G.ensureDaily(g, "2026-11-05");
+    const early = G.claimDaily(g, "2026-11-05");
+    // 오늘 임무를 모두 끝낼 만큼 이벤트를 넣는다
+    let all = false;
+    for (let i = 0; i < 12; i++) for (const ev of [{ type: "job", grade: "S" }, { type: "floorClear" }, { type: "kill" }, { type: "tipRight" }, { type: "doubleWin" }, { type: "libQuiz" }]) all = G.goalEvent(g, ev, "2026-11-05").allDone || all;
+    const got = G.claimDaily(g, "2026-11-05"), again = G.claimDaily(g, "2026-11-05");
+    const next = G.ensureDaily(g, "2026-11-06");
+    const fp = { dungeon: { maxFloor: 10 }, bestiary: {}, quests: { done: {} }, shop: { outfits: ["classic"] } };
+    const ach = G.checkAchievements(fp, g, "2026-11-05").map((a) => a.id), ach2 = G.checkAchievements(fp, g, "2026-11-05");
+    check("📅 오늘의 임무: 날짜마다 같은 3개(날마다 바뀜), 다 하기 전엔 상자 0, 다 하면 🪙10 한 번만, 다음 날 새로 · 🏅 업적은 처음 한 번만(S등급 12번·10층)",
+      ids.length === 3 && new Set(ids).size === 3 && G.pickDaily("2026-11-05").join() === ids.join() && ids.join() !== ids2.join() && d.ids.join() === ids.join()
+        && early === 0 && all && got === G.DAILY_REWARD && again === 0 && next.ids.join() === ids2.join() && !next.claimed
+        && ach.includes("floor10") && ach.includes("jobS10") && ach2.length === 0 && G.validGoals(JSON.parse(JSON.stringify(g))).ach.floor10 === "2026-11-05",
+      `${ids.join(",")} → ${ids2.join(",")} · 업적 ${ach.join(",")}`);
+  }
   // 📡 보스 (Stage 13.19): 5층마다 전자레인지 오븐, 체력 절반 아래면 폭주 → 대역이 넓어진다, 처치하면 보스 전용 옷 (살 수 없음)
   {
     const D = await import(pathToFileURL(path.join(ROOT, "src/core/dungeon.js")).href);
@@ -2076,6 +2096,18 @@ await page.waitForFunction(() => window.__PK);
     el?.querySelector(".close")?.click();
     return r;
   });
+  const gui = await page.evaluate(() => {
+    const P = window.__PK;
+    P.quests.open();
+    const el = document.getElementById("quests");
+    const r = { daily: el.querySelectorAll(".daily-list li").length, chest: el.querySelector(".daily-chest")?.disabled ?? null };
+    P.quests.close();
+    P.inventory.open("bag");
+    r.ach = document.querySelectorAll(".inv-ach > div").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    return r;
+  });
+  check("퀘스트 로그 맨 위에 📅 오늘의 임무 3줄(다 하기 전엔 상자 잠김), 가방 › 소지품에 🏅 업적 8개", gui.daily === 3 && gui.chest === true && gui.ach === 8, JSON.stringify(gui));
   check("교과서 링크(?quest=Q7): 그 퀘스트를 퀘스트 로그로 연다 (없는 퀘스트는 무시)", dl.ok && !dl.bad && dl.open && /Q7/.test(dl.title), JSON.stringify(dl));
   check("💡 주민 이야기: 층 클리어 → 관련 장(호핑·공존·연결) 주민 머리 위 💡(한 번에 하나), 말을 걸면 스펙 한 조각 + 🎯 맞혀 볼래 정답 🪙+2, 들은 뒤 2분 쿨다운",
     ["hopping", "coexistence", "connection"].includes(sc.st.chapter) && sc.marker === sc.st.villagerId && sc.oneAtATime && sc.full.startsWith("💡") && sc.markerGone && sc.qbtn && sc.gain === 2 && sc.cooldown && sc.afterCooldown

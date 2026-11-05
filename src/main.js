@@ -31,6 +31,7 @@ import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
 import { drawOne } from "./core/specCards.js";
 import { makeTip, itemChapters } from "./core/villagerTips.js";
+import { goalEvent, checkAchievements, ensureDaily, missionById, missionDone, dailyDone, claimDaily, DAILY_REWARD } from "./core/goals.js";
 import { VILLAGER_TIP } from "./core/balance.js";
 import { initCloud, promptLogin, markDirty, openRanking, isRankingOpen, closeRanking, cloudState } from "./ui/cloud.js";
 import { initShop, openShop, closeShop, isShopOpen } from "./ui/shopPanel.js";
@@ -361,6 +362,7 @@ initLibrary({
   getStats: () => effectiveStats(progress),
   onQuizFinished: (chapterId, perfect) => {
     const outcome = applyQuizResult(progress, chapterId, perfect);
+    goal({ type: "libQuiz" });
     persist();
     if (outcome.reward) {
       const changed = [outcome.reward.stat, ...(outcome.reward.slotUnlocked ? ["slots"] : [])];
@@ -380,6 +382,7 @@ initLibrary({
 // ---------- 퀘스트 로그 (Stage 9) ----------
 questLog.initQuestLog({
   seed: TEST_MODE ? 5 : undefined,
+  dailyBlock: (el, button) => dailyBlock(el, button),
   getProgress: () => progress,
   chapterLink,
   guideTo: (id) => {
@@ -470,6 +473,8 @@ function handleBattleEvents(events) {
         const m = e.monster;
         battleView.burstAt(m.x, m.y, m.z);
         battleView.lootFly(m.x, m.y, m.z, 3, 0x7de3ff);   // XP 구슬이 기사에게
+        goal({ type: MONSTERS[m.type].boss ? "bossKill" : "kill" });
+        if (MONSTERS[m.type].boss) goal({ type: "kill" });
         if (MONSTERS[m.type].boss) {   // 📡 보스 처치 (Stage 13.19): 큰 연출 + 처음이면 마그네트론 갑옷
           battleView.burstAt(m.x, m.y + 0.8, m.z, 0xffd76b); battleView.lootFly(m.x, m.y, m.z, 10, 0xffd76b);
           sfx("bossDown"); shake(0.4, 0.5); hitStop(0.2);
@@ -646,7 +651,7 @@ function talkTo(v) {
     setTipVillager(null);
     markSpecSeen(t.card.id);
     openTalk(v, { card: t.card, question: drawOne([t.card.chapter]), reward: VILLAGER_TIP.QUIZ_REWARD,
-      onAnswer: (ok) => { if (ok) grantLearnReward(VILLAGER_TIP.QUIZ_REWARD); sfx(ok ? "correct" : "wrong"); } });
+      onAnswer: (ok) => { if (ok) { grantLearnReward(VILLAGER_TIP.QUIZ_REWARD); goal({ type: "tipRight" }); } sfx(ok ? "correct" : "wrong"); } });
     return;
   }
   openTalk(v);
@@ -800,6 +805,7 @@ dungeonUi.initDungeonPanel({
       applyFloorClear(progress, run.floor, result.stars);
       persist();
       tipEvent("floorClear");
+      goal({ type: "floorClear" });
       fx.showToast(`🌀 ${run.floor}층 클리어! 남쪽 포털로 다음 층에 갈 수 있습니다`, 4);
     }
     dungeonUi.showTestResult(result, run);
@@ -839,6 +845,7 @@ function onJobDone() {
   endHunt();
   const paid = applyJobResult(progress, job.result);
   questEvent(progress.quests, { type: "job", grade: job.result.grade });
+  goal({ type: "job", grade: job.result.grade });
   persist();
   hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
   sfx(paid > 0 ? "coin" : "wrong");
@@ -848,7 +855,7 @@ function onJobDone() {
 jobPanel.initJobPanel({
   getProgress: () => progress,
   drawDoubleQuestion: () => drawOne(CHAPTERS.map((c) => c.id)),   // 🎓 2배 받기: 전체 장에서 (Stage 13.13 — 처음엔 퀘스트 장만이라 같은 문제가 반복됐다)
-  onDouble: (n) => grantLearnReward(n),
+  onDouble: (n) => { const b = grantLearnReward(n); goal({ type: "doubleWin" }); return b; },
   getCharges: () => jobChargesAt(progress, now()),
   getRechargeSec: () => chargeCfg(progress).RECHARGE_SEC,
   onStart: () => {
@@ -1163,6 +1170,44 @@ function openDeepLink(id, quiet = false) {
   return true;
 }
 
+// ---------- 📅 오늘의 임무 · 🏅 업적 (Stage 13.20) ----------
+/** 게임 이벤트 → 임무 진행·업적 확인 (안내만 하고 저장은 부르는 쪽 흐름의 persist에 맡기되, 업적 보상은 바로 저장) */
+function goal(ev) {
+  const g = progress.goals;
+  const { completed, allDone } = goalEvent(g, ev);
+  for (const id of completed) fx.showToast(`📅 오늘의 임무 완료 — ${missionById(id).text}`, 3);
+  if (allDone) { sfx("questComplete"); fx.showToast(`🎁 오늘의 임무 3개 완료! 퀘스트 로그(Q)에서 상자를 열어 🪙 ${DAILY_REWARD}개를 받으세요`, 5); }
+  for (const a of checkAchievements(progress, g)) {
+    progress.cr2032 += a.reward;
+    sfx("perfect");
+    fx.showToast(`🏅 업적 달성 — ${a.icon} ${a.title} (🪙 +${a.reward}) · 가방 › 소지품에서 보기`, 5);
+    hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+  }
+  if (completed.length || allDone) persist();
+}
+/** 퀘스트 로그 맨 위 — 오늘의 임무 3줄 + 🎁 상자 */
+function dailyBlock(el, button) {
+  const d = ensureDaily(progress.goals);
+  const rows = d.ids.map((id) => {
+    const m = missionById(id), done = missionDone(d, id);
+    return el("li", { class: done ? "done" : "" }, `${done ? "✅" : "▫️"} ${m.text} `, el("small", { textContent: `${Math.min(d.prog[id] ?? 0, m.need)}/${m.need}` }));
+  });
+  const all = dailyDone(d);
+  const chest = d.claimed ? el("div", { class: "muted", textContent: "🎁 오늘 상자는 받았어요 — 내일 새 임무가 와요" })
+    : button(all ? `🎁 상자 열기 (🪙 ${DAILY_REWARD})` : `🎁 셋 다 하면 상자 (🪙 ${DAILY_REWARD})`, () => {
+      const n = claimDaily(progress.goals);
+      if (!n) return;
+      progress.cr2032 += n;
+      persist();
+      sfx("coin"); battleView.lootFly(motor.x, motor.y + 1, motor.z, 8, 0xffd76b);
+      hud.renderStats(effectiveStats(progress), wallet(), ["cr2032"]);
+      fx.showToast(`🎁 오늘의 상자 — 🪙 CR2032 +${n}`, 3);
+      questLog.openQuestLog(progress.quests.active);
+    }, `lib-btn${all ? " primary" : ""} daily-chest`);
+  if (!all && !d.claimed) chest.disabled = true;
+  return el("div", { class: "daily" }, el("h3", { textContent: "📅 오늘의 임무" }), el("ul", { class: "daily-list" }, rows), chest);
+}
+
 // ---------- 💡 주민이 들려주는 스펙 이야기 (Stage 13.14): 이벤트 → 주민 머리 위 💡 → 말을 걸면 이야기 + 맞혀 볼래 ----------
 /** 학습 보상 🪙 (💡 맞혀 보기·알바 2배) */
 function grantLearnReward(n) {
@@ -1270,6 +1315,7 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
+  goals: { event: (ev) => goal(ev), state: () => structuredClone(progress.goals) },
   tip: { event: (e, extra) => tipEvent(e, extra), state: () => tip && { villagerId: tip.villagerId, chapter: tip.card.chapter, event: tip.event }, marker: () => tipVillager(), skipCooldown: () => { tipClockOffset += VILLAGER_TIP.COOLDOWN_SEC + 1; }, talk: (id) => talkTo(VILLAGERS.find((v) => v.id === id)) },
   quests: {
     open: (id) => questLog.openQuestLog(id),
