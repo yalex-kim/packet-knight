@@ -4,6 +4,7 @@
 import { emptyShop, validShop } from "./shop.js";
 import { emptyGoals, validGoals } from "./goals.js";
 import { emptyItems, validItems } from "./items.js";
+import { defaultLook, validLook } from "./look.js";
 import { validTalents, talentStats } from "./talents.js";
 import {
   PLAYER_BASE, QUIZ_BONUS, QUIZ, LIBRARY_COURSES, STAT_POINTS_PER_LEVEL, DUNGEON, TIMEOUT_PENALTY,
@@ -53,6 +54,7 @@ export function createProgress() {
     shop: emptyShop(),   // Stage 12.2 상점가 — 옛 세이브는 기본값으로 (버전 그대로)
     goals: emptyGoals(), // Stage 13.20 오늘의 임무·업적 — 옛 세이브는 기본값으로 (버전 그대로)
     items: emptyItems(), // Stage 13.22 소모품 — 옛 세이브는 기본값으로 (버전 그대로)
+    look: defaultLook(), // 🪞 Stage 13.34 닉네임·성별 — 옛 세이브는 기본값(made=false → 처음 한 번 만들기 창)
     talents: [], // 🌟 Stage 13.32 특성 (고른 순서)
     lab: { tries: 0, success: 0, spent: 0 },
     quests: createQuestState(),
@@ -115,6 +117,7 @@ function validate(raw) {
     shop: validShop(raw.shop),
     goals: validGoals(raw.goals),
     items: validItems(raw.items),
+    look: validLook(raw.look),
     talents: validTalents(raw.talents),
     lab: { tries: raw.lab.tries, success: raw.lab.success, spent: raw.lab.spent },
     // Stage 13.27: Q8까지 끝내 active가 null이던 세이브는 새 퀘스트(Q9~)의 첫 미완료로 이어 간다

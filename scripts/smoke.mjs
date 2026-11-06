@@ -636,6 +636,8 @@ await page.route((url) => url.origin === ORIGIN, (r) => {
 });
 if (existsSync(LOCAL_THREE)) {
   await page.route("**/three.module.js", (r) => r.fulfill({ body: readFileSync(LOCAL_THREE), contentType: "application/javascript" }));
+  // three/addons (GLTFLoader·SkeletonUtils — 사람 아바타, Stage 13.34)도 로컬 사본으로
+  await page.route("**/npm/three@0.170.0/examples/jsm/**", (r) => { const rel = new URL(r.request().url()).pathname.split("/examples/jsm/")[1]; const f = path.join(ROOT, "node_modules/three/examples/jsm", rel); return existsSync(f) ? r.fulfill({ body: readFileSync(f), contentType: "application/javascript" }) : r.fulfill({ status: 404, body: "" }); });
 }
 
 await page.goto(`${ORIGIN}/?test`);
@@ -2266,6 +2268,39 @@ await page.waitForFunction(() => window.__PK);
         && !wrong && right?.id === "lna" && !again && Pg.effectiveStats(p).rx === Pg.effectiveStats(Pg.createProgress()).rx + 3
         && Math.abs(fx.xpMul - 1.21) < 1e-9 && fx.healOnKill === 4 && fx.crChance === 0.25 && kept.join() === "lna",
       JSON.stringify(tal));
+  }
+  // 🧑‍🎤 사람 기사 아바타 (Stage 13.34): GLB 모델 + Mixamo 동작, 공격하면 무기별 동작, 🪞 만들기 창에서 여자 기사·닉네임 → 저장
+  const av = await page.evaluate(async () => {
+    const P = window.__PK;
+    await P.avatar.ready();
+    const r = { first: P.avatar.state() };
+    P.battle.fire(); P.tick(0.05);
+    r.attack = P.avatar.state();
+    P.tick(0.8);
+    r.after = P.avatar.state();
+    P.avatar.maker.open();
+    r.open = P.avatar.maker.isOpen();
+    document.querySelector('#maker [data-gender="f"]').click();
+    for (let i = 0; i < 100 && P.avatar.state()?.gender !== "f"; i++) await new Promise((res) => setTimeout(res, 100));
+    const inp = document.querySelector("#maker .mk-name");
+    inp.value = "a"; document.querySelector("#maker .mk-done").click(); r.badKept = P.avatar.maker.isOpen() && /닉네임/.test(document.querySelector("#maker .mk-err").textContent);
+    inp.value = "  패킷   용사 "; document.querySelector("#maker .mk-done").click();
+    r.closed = !P.avatar.maker.isOpen();
+    r.look = P.progress().look; r.gender = P.avatar.state()?.gender;
+    r.saved = JSON.parse(localStorage.getItem("packetKnight.save")).look;
+    // 되돌리기 (뒤 검사들은 남자 기사 기준)
+    P.avatar.maker.open(); document.querySelector('#maker [data-gender="m"]').click();
+    for (let i = 0; i < 100 && P.avatar.state()?.gender !== "m"; i++) await new Promise((res) => setTimeout(res, 100));
+    document.querySelector("#maker .mk-done").click();
+    return r;
+  });
+  {
+    const Lk = await import(pathToFileURL(path.join(ROOT, "src/core/look.js")).href);
+    check("🧑‍🎤 사람 기사: 남자 모델이 대기 동작으로 서 있다가 발사하면 무기별 공격 동작, 끝나면 다시 대기 · 🪞 만들기 창에서 여자 기사 + 닉네임(공백 정리, 너무 짧으면 거부) → 저장 · 닉네임 검사",
+      av.first?.gender === "m" && av.first.base === "idle" && /^(attack_slash|attack_dualwield|bow_fire|attack_combo)$/.test(av.attack?.oneShot ?? "") && av.after?.oneShot === null && av.open && av.badKept && av.closed
+        && av.look.name === "패킷 용사" && av.look.gender === "f" && av.look.made && av.gender === "f" && av.saved?.name === "패킷 용사"
+        && Lk.cleanName("a") === "" && Lk.cleanName("<b>용사</b>") === "b용사/b" && Lk.cleanName("가".repeat(20)).length === 12 && Lk.cleanName("시발놈") === "" && Lk.validLook({ gender: "x", name: 3 }).gender === "m",
+      JSON.stringify(av));
   }
   // 🐞 오류 수집 (Stage 13.29): 처리 안 된 오류·promise 거절을 경로·버전과 함께 모으고, 같은 오류는 한 번만 (로컬은 보내지 않음)
   const errs = await page.evaluate(async () => {

@@ -8,7 +8,7 @@ const BOARDS = {
   week: { from: "weekly w JOIN saves s ON s.user_id = w.user_id", key: "(w.xp_now - w.xp_start)", tie: "s.xp", where: "w.week = ?1 AND w.xp_now > w.xp_start" }
 };
 const COLS = (b) => `s.user_id AS uid, u.name, s.xp, s.max_floor AS maxFloor, s.badges,
-  json_extract(s.data, '$.shop.outfit') AS outfit, json_extract(s.data, '$.shop.weapon') AS weapon,
+  json_extract(s.data, '$.shop.outfit') AS outfit, json_extract(s.data, '$.shop.weapon') AS weapon, json_extract(s.data, '$.look.gender') AS gender,
   json_extract(s.data, '$.job.bestScore') AS jobBest, json_extract(s.data, '$.job.runs') AS jobRuns, ${b.key} AS k, ${b.tie} AS t`;
 
 /** 지난주 1~3위 { uid → 순위 } + 이름 (표가 없으면 빈 값) */

@@ -28,6 +28,8 @@ import { lifeRoot, stepLife, lifeState, villagerTargets, holdVillager, villagerC
 import { initTalk, openTalk, closeTalk, isTalkOpen, talkState, talkMore } from "./ui/talk.js";
 import { openBoard, isBoardOpen } from "./ui/board.js";
 import { initSettings, isSettingsOpen } from "./ui/settings.js";
+import { createAvatar } from "./render/avatar.js";
+import { initAvatarMaker, openAvatarMaker, isAvatarMakerOpen, makerState } from "./ui/avatarMaker.js";
 import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
 import { drawOne } from "./core/specCards.js";
 import { makeTip, itemChapters } from "./core/villagerTips.js";
@@ -252,6 +254,7 @@ function performDash() {
   if (inputLocked || !progress.quests.perks.dash || dash.cooldown > 0) return;
   dash.t = QUEST_SKILLS.DASH.time;
   sfx("dash");
+  knightView.playRoll();   // 사람 아바타면 구르기 (Stage 13.34)
   dash.cooldown = QUEST_SKILLS.DASH.cooldown;
   clearMoveTarget();
   hud.setBadge("⚡ Connect Request 돌진!");
@@ -651,6 +654,18 @@ function pushOutOfVillagers() {
 function applyLooks() {
   knightView.setWeapon(weaponById(progress.shop.weapon));
   knightView.setOutfit(outfitById(progress.shop.outfit));
+}
+// 🧑‍🎤 사람 기사 아바타 (Stage 13.34) — 고른 성별의 모델을 불러와 붙인다 (불러오는 동안·실패하면 복셀 기사)
+let avatarGender = null, avatarLoading = null;
+function applyAvatar(gender) {
+  if (avatarGender === gender && avatarLoading) return avatarLoading;
+  avatarGender = gender;
+  avatarLoading = createAvatar(gender).then((av) => {
+    if (avatarGender !== gender) return;
+    knightView.useAvatar(av);
+    applyLooks();
+  }).catch(() => { if (avatarGender === gender) { avatarGender = null; avatarLoading = null; } });
+  return avatarLoading;
 }
 initShop({
   getProgress: () => progress,
@@ -1301,6 +1316,18 @@ initTrial({
   sfx
 });
 initDaily({ getDaily: () => ensureDaily(progress.goals), onClaim: claimDailyChest, onOpenChange: overlayChange });
+// 🪞 나의 기사 (Stage 13.34): 닉네임·성별 — 처음 한 번 저절로, 이후 👤 설정 창에서
+applyAvatar(progress.look.gender);
+initAvatarMaker({
+  getLook: () => progress.look,
+  onGender: (g) => applyAvatar(g),
+  onDone: (look) => {
+    if (look) { progress.look = { ...progress.look, ...look, made: true }; fx.showToast(`🪞 ${look.name ? `${look.name} 기사` : "새 기사"} 준비 완료!`, 3); }
+    else { progress.look = { ...progress.look, made: true }; applyAvatar(progress.look.gender); }
+    persist();
+  },
+  onOpenChange: overlayChange
+});
 // 🌟 특성 고르기 (Stage 13.32)
 initTalent({   // 시작 화면 뒤에 버튼이 보이도록 prestart 목록에도 있다 (index.html)
   getProgress: () => progress,
@@ -1398,7 +1425,9 @@ if (!TEST_MODE) {
       const lag = splash.EMBLEM_FLY_MS - 900;   // 엠블럼이 왼쪽 위에 앉을 즈음 HUD가 차례로
       setTimeout(() => document.body.classList.remove("prestart"), 900 + lag);
       setTimeout(() => document.body.classList.remove("revealing"), 2200 + lag);
-      if (!tutorialSeen()) setTimeout(showTutorial, 2300 + lag);   // 처음 온 사람: 설명서 → UI 투어 (Stage 11.13)
+      // 처음 온 사람: 🪞 나의 기사 만들기 → 설명서 → UI 투어 (Stage 11.13 · 13.34). 옛 세이브도 기사 만들기는 한 번
+      if (!progress.look.made) setTimeout(() => openAvatarMaker(() => { if (!tutorialSeen()) setTimeout(showTutorial, 300); }), 2300 + lag);
+      else if (!tutorialSeen()) setTimeout(showTutorial, 2300 + lag);
       setTimeout(promptLogin, tutorialSeen() ? 2600 : 600);   // 구글 One Tap — 전에 허락했으면 저절로 로그인 (Stage 13)
       if (DEEP_QUEST) setTimeout(() => openDeepLink(DEEP_QUEST, !tutorialSeen()), 2500 + lag);   // 교과서에서 온 링크 (Stage 13.16)
     }
@@ -1425,6 +1454,7 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
+  avatar: { state: () => knightView.avatarState(), ready: () => avatarLoading, maker: { open: () => openAvatarMaker(), isOpen: isAvatarMakerOpen, state: makerState } },
   talent: { open: () => openTalent(), isOpen: isTalentOpen, pending: () => pendingTalents(progress), refresh: () => refreshTalent(),
     set: (xp, talents) => { progress.xp = xp; progress.talents = [...talents]; refreshTalent(); } },   // 테스트용
   trial: { open: (id) => openTrial(id), isOpen: isTrialOpen, state: trialState, taskFor: (vid) => Boolean(taskFor(VILLAGERS.find((v) => v.id === vid))) },

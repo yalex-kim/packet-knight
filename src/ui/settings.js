@@ -4,6 +4,7 @@
 import * as audio from "./audio.js";
 import { fillAccount, onCloudChange, accountInfo, avatarHtml } from "./cloud.js";
 import { openInventory } from "./inventory.js";
+import { openAvatarMaker } from "./avatarMaker.js";
 
 let btn, pop;
 
@@ -37,6 +38,7 @@ function build() {
     <div class="set-btns">
       <button type="button" class="set-guide" data-action="tutorial">📘 설명서 다시 보기</button>
       <button type="button" class="set-bag">🎒 가방 보기 <small>(I)</small></button>
+      <button type="button" class="set-maker">🪞 나의 기사 (닉네임·성별)</button>
     </div>`;
   document.body.append(pop);
   pop.querySelector(".set-mute").addEventListener("change", (e) => { audio.setMuted(!e.target.checked); renderButton(); });
@@ -45,6 +47,7 @@ function build() {
   pop.querySelector(".set-fx").addEventListener("input", (e) => audio.setMix("effects", e.target.value / 100));
   pop.querySelector(".set-guide").addEventListener("click", closeSettings);
   pop.querySelector(".set-bag").addEventListener("click", () => { closeSettings(); openInventory(); });
+  pop.querySelector(".set-maker").addEventListener("click", () => { closeSettings(); openAvatarMaker(); });
   document.addEventListener("pointerdown", (e) => {
     if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) closeSettings();
   }, { capture: true });

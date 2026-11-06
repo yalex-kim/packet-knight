@@ -348,6 +348,7 @@ fanTrail.position.set(0, 0.8, 0.1); fanTrail.rotation.x = -Math.PI / 2; fanTrail
 let curKind = "sword";
 /** 공격 동작 재생 (발사할 때 main.js가 부른다) */
 export function playAttack(kind = curKind) {
+  avatar?.attack(kind);
   attack.kind = kind;
   attack.dur = ATTACK_DUR[kind] ?? 0.3;
   attack.t = attack.dur;
@@ -386,6 +387,50 @@ function applyAttack(dt) {
       break;
   }
   if (attack.t <= 0) { armR.rotation.z = armL.rotation.z = 0; torso.rotation.y = 0; }
+}
+
+// ---------- 🧑‍🎤 사람 아바타 (Stage 13.34) ----------
+// render/avatar.js 가 불러온 남·여 기사 모델을 붙이면 복셀 몸(rig)은 숨기고, 무기·방패는 아바타 손 뼈로 옮긴다.
+// 손 뼈의 +Y는 손가락 방향(팔이 뻗는 방향) — 예전 팔 좌표(아래가 -Y)를 그대로 쓰도록 손잡이(grip)를 뒤집고,
+// 그 안의 armSpace 를 예전 손 위치(-0.34)만큼 올려 둔다. 그래서 무기 모양·위치 코드는 그대로다.
+let avatar = null;
+const GRIP_ROT = { R: [0, Math.PI, Math.PI], L: [0, Math.PI, Math.PI] };   // 렌더로 맞춘 값 (검이 몸 바깥·위로)
+const grips = {};
+for (const side of ["R", "L"]) {
+  const g = new THREE.Group(); g.rotation.set(...GRIP_ROT[side]);
+  const a = pivot(g, 0, 0.34, 0);
+  grips[side] = { g, a };
+}
+/** 무기·방패 조각들 (원래 부모 팔과 함께) */
+const weaponParts = () => [sword, ...weaponSets.dagger, ...weaponSets.bow, shield];
+/** 아바타 붙이기 (null 이면 복셀 기사로 돌아간다) @param {import("./avatar.js").Avatar | null} av */
+export function useAvatar(av) {
+  if (avatar) knight.remove(avatar.root);
+  avatar = av;
+  if (!av) {
+    rig.visible = true;
+    for (const p of weaponParts()) if (p.userData.arm) p.userData.arm.add(p);
+    return;
+  }
+  knight.add(av.root);
+  rig.visible = false;
+  for (const p of weaponParts()) {
+    p.userData.arm ??= p.parent;
+    grips[p.userData.arm === armL ? "L" : "R"].a.add(p);
+  }
+  av.handR.add(grips.R.g); av.handL.add(grips.L.g);
+  knight.updateMatrixWorld(true);
+  const ks = knight.getWorldScale(new THREE.Vector3()).x;
+  for (const [side, hand] of [["R", av.handR], ["L", av.handL]]) grips[side].g.scale.setScalar(ks / hand.getWorldScale(new THREE.Vector3()).x);
+}
+/** 손잡이 회전 조정 (도구·테스트용) */
+export function setGripRotation(side, rot) { grips[side].g.rotation.set(...rot); }
+export const avatarState = () => (avatar ? { gender: avatar.gender, ...avatar.state() } : null);
+/** 돌진(구르기) 동작 */
+export function playRoll() { avatar?.roll(); }
+/** 미리보기용 모델 (가방·랭킹 창) — 아바타가 있으면 뼈째 복제본 + 대기 동작, 없으면 복셀 몸 */
+export function previewSource() {
+  return avatar ? { object: avatar.root, avatar } : { object: rig, avatar: null };
 }
 
 /** 무기 외형 — kind: sword · dagger · bow · fan (core/shop.js WEAPONS[].blade) */
@@ -462,6 +507,12 @@ export function syncKnight(m, isMoving, dt) {
   knight.position.set(m.x, m.y, m.z);
   knight.rotation.y = m.rotY;
   idleTime += dt;
+  if (avatar) {   // 사람 아바타: 동작은 Mixamo 클립, 착지 때만 살짝 눌린다
+    const p = squashTime > 0 ? Math.max(0, (squashTime -= dt) / LAND_SQUASH_TIME) : 0;
+    avatar.root.scale.set(1 + p * 0.12, 1 - p * 0.12, 1 + p * 0.12);
+    avatar.update(dt, { moving: isMoving, grounded: m.grounded });
+    return;
+  }
 
   // 착지 스쿼시 / 체공 스트레치 / 보행 바운스 — 리그 전체에 적용
   let swing = 0;

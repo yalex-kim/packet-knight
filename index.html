@@ -751,7 +751,22 @@
   .acc-row { display: flex; gap: 8px; margin-top: 10px; }
   .acc-row button, #settings-pop .set-guide { flex: 1; min-height: 34px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700; background: rgba(57, 208, 255, .12); border: 1px solid rgba(57, 208, 255, .45); color: #e2f1ff; }
   .acc-row .acc-out { background: none; border-color: #3a4d66; color: #9db4cc; }
-  .set-btns { display: flex; gap: 8px; }
+  .set-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  #settings-pop .set-btns .set-maker { flex-basis: 100%; }
+  /* 🪞 나의 기사 만들기 (Stage 13.34) */
+  #maker .panel.mk { max-width: 520px; }
+  .mk-body { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; }
+  .mk-stage { position: relative; flex: 0 0 180px; border-radius: 14px; background: radial-gradient(circle at 50% 70%, #23476e, #12233a); }
+  .mk-knight { width: 180px; height: 230px; display: block; }
+  .mk-loading { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 12px; margin: 0; }
+  .mk-form { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 8px; }
+  .mk-label { font-weight: 800; font-size: 13px; color: #cfe3f7; }
+  .mk-name { font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px; border: 1px solid #3b6ea5; background: rgba(0,0,0,.3); color: #fff; }
+  .mk-err { min-height: 16px; margin: 0; font-size: 12px; color: #ff9a90; }
+  .mk-genders { display: flex; gap: 8px; }
+  .mk-genders button { flex: 1; padding: 10px; border-radius: 12px; cursor: pointer; font: inherit; font-weight: 800; color: #e2f1ff; background: rgba(20, 40, 70, .75); border: 2px solid #3b6ea5; }
+  .mk-genders button.on { border-color: #ffd76b; background: rgba(255, 215, 107, .15); }
+  .mk-done { margin-top: auto; }
   #settings-pop .set-btns button { flex: 1; min-height: 38px; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700; background: rgba(57, 208, 255, .12); border: 1px solid rgba(57, 208, 255, .45); color: #e2f1ff; }
   .acc-g { display: flex; justify-content: center; min-height: 34px; }
   .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; cursor: pointer; }
@@ -1320,7 +1335,8 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
   }
 }
 </script>
