@@ -1,10 +1,11 @@
 // 🪞 나의 기사 만들기 (Stage 13.34) — 닉네임 + 남·여 기사. 처음 한 번 저절로 뜨고, 계정·설정 창에서 언제든 다시 (DOM)
 // 성별을 누르면 그 기사 모델을 불러와 바로 미리보기. 닉네임은 로그인하면 랭킹·게시판 이름이 된다.
 
-import { GENDERS, NAME_MAX, NAME_MIN, cleanName } from "../core/look.js";
+import { GENDERS, NAME_MAX, NAME_MIN, SKINS, HAIR_COLORS, cleanName } from "../core/look.js";
 import { startPreview, stopPreview } from "../render/knightPreview.js";
 
-let overlay, hooks, picked = "m";
+let overlay, hooks, picked = "m", skin = "base", hairColor = "base";
+const hex = (n) => `#${n.toString(16).padStart(6, "0")}`;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /** @param {{ getLook: () => { name: string, gender: string, made: boolean }, onGender: (g: string) => Promise<void>, onDone: (look: { name: string, gender: string }) => void, onOpenChange: (open: boolean) => void }} h */
@@ -28,6 +29,10 @@ export function initAvatarMaker(h) {
         <p class="mk-err" aria-live="polite"></p>
         <div class="mk-label">기사</div>
         <div class="mk-genders" role="radiogroup" aria-label="기사">${GENDERS.map((g) => `<button type="button" role="radio" data-gender="${g.id}">${g.id === "f" ? "👩" : "👦"} ${esc(g.label)}</button>`).join("")}</div>
+        <div class="mk-label">피부톤</div>
+        <div class="mk-swatches" data-kind="skin" role="radiogroup" aria-label="피부톤">${SKINS.map((s, i) => `<button type="button" role="radio" data-skin="${s.id}" aria-label="${i ? `피부톤 ${i}` : "기본"}" style="background:${hex(s.color ?? s.swatch)}">${i ? "" : "기본"}</button>`).join("")}</div>
+        <div class="mk-label">머리색</div>
+        <div class="mk-swatches" data-kind="hair" role="radiogroup" aria-label="머리색">${HAIR_COLORS.map((s) => `<button type="button" role="radio" data-hair="${s.id}" aria-label="${s.id === "base" ? "기본" : s.id}" ${s.color != null ? `style="background:${hex(s.color)}"` : ""}>${s.color == null ? "기본" : ""}</button>`).join("")}</div>
         <button type="button" class="lib-btn primary mk-done" data-act="done">✅ 이 기사로 할래요</button>
       </div>
     </div>
@@ -41,6 +46,8 @@ export function initAvatarMaker(h) {
     if (b.dataset.act === "close") return closeAvatarMaker();
     if (b.dataset.act === "done") return done();
     if (b.dataset.gender) pick(b.dataset.gender);
+    if (b.dataset.skin) { skin = b.dataset.skin; renderSwatches(); hooks.onColors?.({ skin, hairColor }); }
+    if (b.dataset.hair) { hairColor = b.dataset.hair; renderSwatches(); hooks.onColors?.({ skin, hairColor }); }
   });
   window.addEventListener("keydown", (e) => { if (!overlay.hidden && e.key === "Escape") { e.stopPropagation(); closeAvatarMaker(); } }, { capture: true });
 }
@@ -48,12 +55,16 @@ export function initAvatarMaker(h) {
 function renderGender() {
   overlay.querySelectorAll(".mk-genders button").forEach((b) => { const on = b.dataset.gender === picked; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
 }
+function renderSwatches() {
+  overlay.querySelectorAll("[data-skin]").forEach((b) => { const on = b.dataset.skin === skin; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
+  overlay.querySelectorAll("[data-hair]").forEach((b) => { const on = b.dataset.hair === hairColor; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
+}
 async function pick(g) {
   picked = g === "f" ? "f" : "m";
   renderGender();
   const load = overlay.querySelector(".mk-loading");
   load.hidden = false;
-  try { await hooks.onGender(picked); } catch { /* 못 불러오면 지금 모습 그대로 */ }
+  try { await hooks.onGender(picked); hooks.onColors?.({ skin, hairColor }); } catch { /* 못 불러오면 지금 모습 그대로 */ }
   load.hidden = true;
   if (!overlay.hidden) startPreview(overlay.querySelector(".mk-knight"));
 }
@@ -62,7 +73,7 @@ function done() {
   const name = cleanName(raw);
   const err = overlay.querySelector(".mk-err");
   if (raw.trim() && !name) { err.textContent = `닉네임은 ${NAME_MIN}~${NAME_MAX}자, 기호·나쁜 말 없이 지어 주세요.`; return; }
-  hooks.onDone({ name, gender: picked });
+  hooks.onDone({ name, gender: picked, skin, hairColor });
   closeAvatarMaker(true);
 }
 
@@ -70,11 +81,11 @@ let onClosed = null;
 /** @param {() => void} [after] 창이 닫힌 뒤 (처음 만들기 → 설명서) */
 export function openAvatarMaker(after = null) {
   const look = hooks.getLook();
-  picked = look.gender;
+  picked = look.gender; skin = look.skin ?? "base"; hairColor = look.hairColor ?? "base";
   onClosed = after;
   overlay.querySelector(".mk-name").value = look.name ?? "";
   overlay.querySelector(".mk-err").textContent = "";
-  renderGender();
+  renderGender(); renderSwatches();
   overlay.hidden = false;
   hooks.onOpenChange(true);
   startPreview(overlay.querySelector(".mk-knight"));
@@ -90,4 +101,4 @@ export function closeAvatarMaker(saved = false) {
   const f = onClosed; onClosed = null; f?.();
 }
 export const isAvatarMakerOpen = () => Boolean(overlay && !overlay.hidden);
-export const makerState = () => ({ open: isAvatarMakerOpen(), picked, name: overlay?.querySelector(".mk-name").value ?? "" });
+export const makerState = () => ({ open: isAvatarMakerOpen(), picked, skin, hairColor, name: overlay?.querySelector(".mk-name").value ?? "" });

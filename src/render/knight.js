@@ -419,13 +419,20 @@ export function useAvatar(av) {
     grips[p.userData.arm === armL ? "L" : "R"].a.add(p);
   }
   av.handR.add(grips.R.g); av.handL.add(grips.L.g);
+  av.setPalette({ ...lookPalette, ...outfitPalette });
   knight.updateMatrixWorld(true);
   const ks = knight.getWorldScale(new THREE.Vector3()).x;
   for (const [side, hand] of [["R", av.handR], ["L", av.handL]]) grips[side].g.scale.setScalar(ks / hand.getWorldScale(new THREE.Vector3()).x);
 }
 /** 손잡이 회전 조정 (도구·테스트용) */
 export function setGripRotation(side, rot) { grips[side].g.rotation.set(...rot); }
-export const avatarState = () => (avatar ? { gender: avatar.gender, ...avatar.state() } : null);
+/** 🎨 사람 아바타 색 (머리·피부) — 옷 색은 setOutfit 이 칠한다 */
+let lookPalette = { hair: null, skin: null };
+export function setAvatarLook(p) { lookPalette = { ...lookPalette, ...p }; avatar?.setPalette(lookPalette); }
+/** 회피(백스텝) 동작 */
+export function playDodge() { avatar?.dodge(); }
+let outfitPalette = { cloth: null, metal: null };
+export const avatarState = () => (avatar ? { gender: avatar.gender, ...avatar.state(), palette: avatar.paletteState() } : null);
 /** 돌진(구르기) 동작 */
 export function playRoll() { avatar?.roll(); }
 /** 미리보기용 모델 (가방·랭킹 창) — 아바타가 있으면 뼈째 복제본 + 대기 동작, 없으면 복셀 몸 */
@@ -451,6 +458,9 @@ export function setOutfit(o) {
   helm.visible = plume.visible = !hooded;
   antenna.visible = antennaTip.visible = true;
   MAT.plume.color.setHex(o.plume);
+  // 사람 아바타: 망토·치마는 옷 색, 갑옷은 옷의 쇠 색 (붉은 기사복은 모델 원래 색) — Stage 13.35
+  outfitPalette = o.id === "classic" ? { cloth: null, metal: null } : { cloth: o.tabard, metal: o.id === "gold" ? 0xf2c14e : (o.steel ?? null) };
+  avatar?.setPalette(outfitPalette);
   MAT.tabard.color.setHex(o.tabard);                                 // 방패 색도 옷을 따른다
   MAT.steel.color.setHex(o.id === "gold" ? 0xf2c14e : ["magnetron", "leaudio", "pawr", "retro", "aoa", "hunter"].includes(o.id) ? o.steel : 0xd3dce6);    // 황금 갑옷이면 투구도 금빛, 새 옷은 제 쇠 색
 }

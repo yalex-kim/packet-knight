@@ -2284,10 +2284,13 @@ await page.waitForFunction(() => window.__PK);
     for (let i = 0; i < 100 && P.avatar.state()?.gender !== "f"; i++) await new Promise((res) => setTimeout(res, 100));
     const inp = document.querySelector("#maker .mk-name");
     inp.value = "a"; document.querySelector("#maker .mk-done").click(); r.badKept = P.avatar.maker.isOpen() && /닉네임/.test(document.querySelector("#maker .mk-err").textContent);
+    document.querySelector('#maker [data-skin="s5"]').click(); document.querySelector('#maker [data-hair="blue"]').click();
+    r.livePal = P.avatar.state()?.palette;
     inp.value = "  패킷   용사 "; document.querySelector("#maker .mk-done").click();
     r.closed = !P.avatar.maker.isOpen();
     r.look = P.progress().look; r.gender = P.avatar.state()?.gender;
     r.saved = JSON.parse(localStorage.getItem("packetKnight.save")).look;
+    r.pal = P.avatar.state()?.palette;
     // 되돌리기 (뒤 검사들은 남자 기사 기준)
     P.avatar.maker.open(); document.querySelector('#maker [data-gender="m"]').click();
     for (let i = 0; i < 100 && P.avatar.state()?.gender !== "m"; i++) await new Promise((res) => setTimeout(res, 100));
@@ -2296,9 +2299,10 @@ await page.waitForFunction(() => window.__PK);
   });
   {
     const Lk = await import(pathToFileURL(path.join(ROOT, "src/core/look.js")).href);
-    check("🧑‍🎤 사람 기사: 남자 모델이 대기 동작으로 서 있다가 발사하면 무기별 공격 동작, 끝나면 다시 대기 · 🪞 만들기 창에서 여자 기사 + 닉네임(공백 정리, 너무 짧으면 거부) → 저장 · 닉네임 검사",
+    check("🧑‍🎤 사람 기사: 남자 모델이 대기 동작으로 서 있다가 발사하면 무기별 공격 동작, 끝나면 다시 대기 · 🪞 만들기 창에서 여자 기사 + 피부톤·머리색(바로 칠해짐) + 닉네임(공백 정리, 너무 짧으면 거부) → 저장 · 닉네임 검사",
       av.first?.gender === "m" && av.first.base === "idle" && /^(attack_slash|attack_dualwield|bow_fire|attack_combo)$/.test(av.attack?.oneShot ?? "") && av.after?.oneShot === null && av.open && av.badKept && av.closed
         && av.look.name === "패킷 용사" && av.look.gender === "f" && av.look.made && av.gender === "f" && av.saved?.name === "패킷 용사"
+        && av.look.skin === "s5" && av.look.hairColor === "blue" && av.livePal?.on[1] === 1 && av.livePal.on[2] === 1 && av.pal?.t[1] === "3f7fe0"
         && Lk.cleanName("a") === "" && Lk.cleanName("<b>용사</b>") === "b용사/b" && Lk.cleanName("가".repeat(20)).length === 12 && Lk.cleanName("시발놈") === "" && Lk.validLook({ gender: "x", name: 3 }).gender === "m",
       JSON.stringify(av));
   }

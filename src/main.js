@@ -30,6 +30,7 @@ import { openBoard, isBoardOpen } from "./ui/board.js";
 import { initSettings, isSettingsOpen } from "./ui/settings.js";
 import { createAvatar } from "./render/avatar.js";
 import { initAvatarMaker, openAvatarMaker, isAvatarMakerOpen, makerState } from "./ui/avatarMaker.js";
+import { hairHex, skinHex } from "./core/look.js";
 import { loadSeen as specSeen, markSeen as markSpecSeen } from "./ui/specCard.js";
 import { drawOne } from "./core/specCards.js";
 import { makeTip, itemChapters } from "./core/villagerTips.js";
@@ -527,6 +528,7 @@ function handleBattleEvents(events) {
         break;
       case "dodge":
         fx.floatText(motor.x, motor.y + 0.9, motor.z, e.dash ? "⚡ 돌진 회피!" : e.aoeMiss ? "광역 회피!" : "회피!", "dodge");
+        if (!e.dash) knightView.playDodge();   // 사람 아바타: 백스텝 (Stage 13.35)
         sfx("dodge");
         break;
       case "shieldBlock":
@@ -655,6 +657,8 @@ function applyLooks() {
   knightView.setWeapon(weaponById(progress.shop.weapon));
   knightView.setOutfit(outfitById(progress.shop.outfit));
 }
+/** 🎨 머리색·피부톤 (Stage 13.35) */
+function applyLookColors(look = progress.look) { knightView.setAvatarLook({ hair: hairHex(look.hairColor), skin: skinHex(look.skin) }); }
 // 🧑‍🎤 사람 기사 아바타 (Stage 13.34) — 고른 성별의 모델을 불러와 붙인다 (불러오는 동안·실패하면 복셀 기사)
 let avatarGender = null, avatarLoading = null;
 function applyAvatar(gender) {
@@ -664,6 +668,7 @@ function applyAvatar(gender) {
     if (avatarGender !== gender) return;
     knightView.useAvatar(av);
     applyLooks();
+    applyLookColors();
   }).catch(() => { if (avatarGender === gender) { avatarGender = null; avatarLoading = null; } });
   return avatarLoading;
 }
@@ -1321,9 +1326,11 @@ applyAvatar(progress.look.gender);
 initAvatarMaker({
   getLook: () => progress.look,
   onGender: (g) => applyAvatar(g),
+  onColors: (c) => applyLookColors({ ...progress.look, ...c }),   // 고르는 동안 미리 칠해 보기
   onDone: (look) => {
     if (look) { progress.look = { ...progress.look, ...look, made: true }; fx.showToast(`🪞 ${look.name ? `${look.name} 기사` : "새 기사"} 준비 완료!`, 3); }
     else { progress.look = { ...progress.look, made: true }; applyAvatar(progress.look.gender); }
+    applyLookColors();
     persist();
   },
   onOpenChange: overlayChange
