@@ -1461,7 +1461,7 @@ window.__PK = {
   signs: () => world.signs.map((s) => s.userData.signText),
   openLandmark: (id) => goToLandmark(landmark(id).info),
   deepLink: (id) => openDeepLink(id),
-  avatar: { state: () => knightView.avatarState(), ready: () => avatarLoading, maker: { open: () => openAvatarMaker(), isOpen: isAvatarMakerOpen, state: makerState } },
+  avatar: { state: () => knightView.avatarState(), ready: () => avatarLoading, wear: (id) => knightView.setOutfit(outfitById(id)), restore: () => applyLooks(), maker: { open: () => openAvatarMaker(), isOpen: isAvatarMakerOpen, state: makerState } },
   talent: { open: () => openTalent(), isOpen: isTalentOpen, pending: () => pendingTalents(progress), refresh: () => refreshTalent(),
     set: (xp, talents) => { progress.xp = xp; progress.talents = [...talents]; refreshTalent(); } },   // 테스트용
   trial: { open: (id) => openTrial(id), isOpen: isTrialOpen, state: trialState, taskFor: (vid) => Boolean(taskFor(VILLAGERS.find((v) => v.id === vid))) },

@@ -111,6 +111,9 @@ export async function createAvatar(gender) {
   root.add(model);
   const bones = {};
   model.traverse((o) => { if (o.isBone) bones[o.name] = o; });
+  // 기본 자세의 뼈 회전·크기 (아바타 기준) — 옷 장식을 캐릭터 공간으로 붙일 때 쓴다 (knight.js)
+  root.updateMatrixWorld(true);
+  const bind = Object.fromEntries(Object.entries(bones).map(([n, b]) => [n, { q: b.getWorldQuaternion(new THREE.Quaternion()), s: b.getWorldScale(new THREE.Vector3()).x }]));
   const mixer = new THREE.AnimationMixer(model);
   const actions = {};
   for (const [n, c] of Object.entries(clips)) {
@@ -139,7 +142,7 @@ export async function createAvatar(gender) {
   };
   return {
     gender: gender === "f" ? "f" : "m",
-    root, model, bones, mixer, clips,
+    root, model, bones, bind, mixer, clips,
     /** 🎨 영역 색 — { hair, skin, cloth, metal } 각각 0xRRGGBB 또는 null(원래 색). 같은 성별 복제본(미리보기)이 재질을 함께 쓴다 */
     setPalette(p) { for (const [k, v] of Object.entries(p)) if (REGION[k]) palette.set(REGION[k], v); },
     paletteState: () => palette.get(),

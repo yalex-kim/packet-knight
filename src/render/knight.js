@@ -420,10 +420,91 @@ export function useAvatar(av) {
   }
   av.handR.add(grips.R.g); av.handL.add(grips.L.g);
   av.setPalette({ ...lookPalette, ...outfitPalette });
+  applyAvatarGear(curOutfitId);
   knight.updateMatrixWorld(true);
   const ks = knight.getWorldScale(new THREE.Vector3()).x;
   for (const [side, hand] of [["R", av.handR], ["L", av.handL]]) grips[side].g.scale.setScalar(ks / hand.getWorldScale(new THREE.Vector3()).x);
 }
+// ---------- 👗 사람 아바타 옷 장식 (Stage 13.36) — 옷마다 모양이 다르게: 뼈에 붙는 작은 장식 ----------
+// 장식은 "캐릭터 공간"(x 오른쪽 · y 위 · z 앞, 미터)으로 만든다. 뼈 아래 앵커가 기본 자세의 뼈 회전·크기를 되돌려 그 공간을 맞춘다.
+// 위치는 그 뼈 원점 기준 (Head = 목 위, Spine2 = 가슴 안쪽, LeftShoulder/RightShoulder = 어깨, Hips = 골반). 렌더로 맞춘 값.
+const AV_GEAR = {};
+{
+  const T = (c) => toon(c), G = (c) => glowMat(c);
+  const gear = (id, bone, build) => { const g = new THREE.Group(); build(g); (AV_GEAR[id] ??= []).push({ bone, g }); };
+  // 🎧 LE 오디오: 큰 헤드폰
+  gear("leaudio", "mixamorigHead", (g) => {
+    const band = T(0x1c2430), cup = T(0x0f8f8a), ring = G(0x2ff0e0);
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.035, 8, 24, Math.PI), band); arc.position.set(0, 0.3, 0); arc.castShadow = true; g.add(arc);
+    for (const sx of [-1, 1]) { box(g, 0.1, 0.2, 0.2, cup, sx * 0.33, 0.3, 0); box(g, 0.02, 0.14, 0.14, ring, sx * 0.385, 0.3, 0, false); }
+  });
+  // 🟦 SIG: 가슴의 흰 룬 ᛒ + 깃
+  gear("sig", "mixamorigSpine2", (g) => {
+    const rune = G(0xffffff);
+    box(g, 0.03, 0.2, 0.02, rune, 0, 0.0, 0.2, false);
+    for (const [x, y, r] of [[0.04, 0.06, -0.8], [0.04, -0.06, 0.8], [-0.03, 0.035, 0.8], [-0.03, -0.035, -0.8]]) { const k = box(g, 0.025, 0.1, 0.02, rune, x, y, 0.2, false); k.rotation.z = r; }
+  });
+  // 🟪 오라캐스트: 머리 뒤에 떠 있는 방송 고리
+  gear("auracast", "mixamorigHead", (g) => {
+    for (const [r, o] of [[0.22, 0.9], [0.15, 0.6]]) { const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.016, 6, 36), new THREE.MeshBasicMaterial({ color: 0xd5c6ff, transparent: true, opacity: o })); t.position.set(0, 0.3, -0.36); g.add(t); }
+  });
+  // 🟩 메시: 잎 고리 관 / 🎯 사냥꾼: 같은 관(금빛) + 등 화살통 + 허리 랜턴
+  const leafCrown = (g, ringC, leafC) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 6, 28), T(ringC)); ring.rotation.x = Math.PI / 2; ring.position.set(0, 0.43, 0); g.add(ring);
+    for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; const l = box(g, 0.05, 0.12, 0.02, G(leafC), Math.sin(a) * 0.3, 0.49, Math.cos(a) * 0.3, false); l.rotation.y = a; }
+  };
+  gear("mesh", "mixamorigHead", (g) => leafCrown(g, 0x22704a, 0x7dffb5));
+  gear("hunter", "mixamorigHead", (g) => leafCrown(g, 0x3a2a14, 0xffd76b));
+  gear("hunter", "mixamorigSpine2", (g) => {
+    const qv = new THREE.Group(); qv.position.set(0.1, 0.05, -0.2); qv.rotation.z = -0.4; g.add(qv);
+    box(qv, 0.12, 0.42, 0.12, T(0x5a3a20), 0, 0, 0);
+    for (const dx of [-0.03, 0.03]) box(qv, 0.025, 0.12, 0.025, T(0xd8d0c0), dx, 0.26, 0, false);
+  });
+  gear("hunter", "mixamorigHips", (g) => { box(g, 0.09, 0.13, 0.09, T(0x3a2a14), 0.2, 0.02, 0.1); box(g, 0.06, 0.08, 0.06, G(0xffd76b), 0.2, 0.02, 0.1, false); });
+  // ⬛ RPA 그림자: 하늘색 빛 머리띠 + 목도리
+  gear("stealth", "mixamorigHead", (g) => { const t = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.022, 6, 32), G(0x39d0ff)); t.rotation.x = Math.PI / 2 - 0.2; t.position.set(0, 0.34, 0.02); g.add(t); });
+  gear("stealth", "mixamorigNeck", (g) => { const t = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.06, 8, 20), T(0x16191f)); t.rotation.x = Math.PI / 2; t.position.set(0, 0.0, 0.01); t.castShadow = true; g.add(t); });
+  // 🟨 황금: 가슴의 코인 전지 셋 / 🟧 마그네트론: 가슴 전자레인지 문 + 등 냉각 핀
+  const coin = (g, x, y, z, r, mat, mat2) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.03, 18), mat); c.rotation.x = Math.PI / 2; c.position.set(x, y, z); g.add(c); const c2 = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r * 0.6, 0.035, 18), mat2); c2.rotation.x = Math.PI / 2; c2.position.set(x, y, z + 0.002); g.add(c2); };
+  gear("gold", "mixamorigSpine2", (g) => { for (const [x, y] of [[-0.08, 0.04], [0.08, 0.04], [0, -0.07]]) coin(g, x, y, 0.21, 0.055, MAT.coin, MAT.coinDark); });
+  gear("magnetron", "mixamorigSpine2", (g) => {
+    box(g, 0.24, 0.16, 0.03, T(0xe8ecf0), 0, 0, 0.2); box(g, 0.15, 0.1, 0.02, G(0xff8a2a), -0.03, 0, 0.217, false); box(g, 0.04, 0.1, 0.02, T(0x3a3f4f), 0.08, 0, 0.217, false);
+    for (let i = 0; i < 4; i++) box(g, 0.34, 0.03, 0.05, T(0xb8510a), 0, -0.1 + i * 0.07, -0.21);
+  });
+  // 🏷️ PAwR: 가슴·어깨의 전자 가격표
+  gear("pawr", "mixamorigSpine2", (g) => {
+    for (const [x, y, z, r] of [[-0.1, 0.05, 0.21, 0.2], [0.1, 0.0, 0.21, -0.15], [-0.03, -0.1, 0.21, 0.1]]) { const t = new THREE.Group(); t.position.set(x, y, z); t.rotation.z = r; g.add(t); box(t, 0.09, 0.065, 0.02, T(0xffffff), 0, 0, 0); box(t, 0.06, 0.018, 0.022, G(0xff4a4a), 0, 0.012, 0.002, false); }
+  });
+  // 📻 레트로: 왼쪽 어깨의 굵은 안테나
+  gear("retro", "mixamorigLeftShoulder", (g) => { box(g, 0.045, 0.42, 0.045, T(0x2a2a2a), 0.13, 0.27, -0.06); box(g, 0.09, 0.09, 0.09, G(0xff6a3c), 0.13, 0.5, -0.06); });
+  // 📐 AoA: 양 어깨 2×2 안테나 배열
+  for (const [side, sx] of [["Left", 1], ["Right", -1]]) gear("aoa", `mixamorig${side}Shoulder`, (g) => {
+    box(g, 0.18, 0.03, 0.18, T(0x7e8a98), sx * 0.14, 0.1, 0);
+    for (const ax of [-0.045, 0.045]) for (const az of [-0.045, 0.045]) box(g, 0.05, 0.06, 0.05, G(0x39d0ff), sx * 0.14 + ax, 0.14, az, false);
+  });
+}
+let gearOn = [];
+/** 옷 장식을 아바타 뼈에 붙인다 (옷이 바뀔 때마다) */
+function applyAvatarGear(outfitId) {
+  for (const { g } of gearOn) g.parent?.remove(g);
+  gearOn = [];
+  if (!avatar) return;
+  const ks = 1;
+  for (const item of AV_GEAR[outfitId] ?? []) {
+    const bone = avatar.bones[item.bone];
+    if (!bone) continue;
+    const anchor = item.anchor ??= new THREE.Group();
+    anchor.clear(); anchor.add(item.g);
+    // 기본 자세에서 뼈의 회전·크기를 되돌려 캐릭터 공간으로 (avatar.bind = 기본 자세의 뼈 월드 회전·크기)
+    const bind = avatar.bind[item.bone];
+    anchor.quaternion.copy(bind.q).invert();
+    anchor.scale.setScalar(ks / bind.s);
+    bone.add(anchor);
+    gearOn.push({ g: anchor });
+  }
+}
+let curOutfitId = "classic";
+
 /** 손잡이 회전 조정 (도구·테스트용) */
 export function setGripRotation(side, rot) { grips[side].g.rotation.set(...rot); }
 /** 🎨 사람 아바타 색 (머리·피부) — 옷 색은 setOutfit 이 칠한다 */
@@ -432,7 +513,7 @@ export function setAvatarLook(p) { lookPalette = { ...lookPalette, ...p }; avata
 /** 회피(백스텝) 동작 */
 export function playDodge() { avatar?.dodge(); }
 let outfitPalette = { cloth: null, metal: null };
-export const avatarState = () => (avatar ? { gender: avatar.gender, ...avatar.state(), palette: avatar.paletteState() } : null);
+export const avatarState = () => (avatar ? { gender: avatar.gender, ...avatar.state(), palette: avatar.paletteState(), gear: gearOn.length, outfit: curOutfitId } : null);
 /** 돌진(구르기) 동작 */
 export function playRoll() { avatar?.roll(); }
 /** 미리보기용 모델 (가방·랭킹 창) — 아바타가 있으면 뼈째 복제본 + 대기 동작, 없으면 복셀 몸 */
@@ -461,6 +542,8 @@ export function setOutfit(o) {
   // 사람 아바타: 망토·치마는 옷 색, 갑옷은 옷의 쇠 색 (붉은 기사복은 모델 원래 색) — Stage 13.35
   outfitPalette = o.id === "classic" ? { cloth: null, metal: null } : { cloth: o.tabard, metal: o.id === "gold" ? 0xf2c14e : (o.steel ?? null) };
   avatar?.setPalette(outfitPalette);
+  curOutfitId = o.id;
+  applyAvatarGear(o.id);
   MAT.tabard.color.setHex(o.tabard);                                 // 방패 색도 옷을 따른다
   MAT.steel.color.setHex(o.id === "gold" ? 0xf2c14e : ["magnetron", "leaudio", "pawr", "retro", "aoa", "hunter"].includes(o.id) ? o.steel : 0xd3dce6);    // 황금 갑옷이면 투구도 금빛, 새 옷은 제 쇠 색
 }

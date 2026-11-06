@@ -28,7 +28,9 @@ export function startPreview(canvas) {
     return;
   }
   stopPreview();
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  // 컨텍스트를 이미 놓아 준 캔버스면 새 캔버스로 바꿔 끼운다 (여러 창이 미리보기를 번갈아 쓴다 — Stage 13.36)
+  if (canvas.dataset.pkLost) { const fresh = canvas.cloneNode(); delete fresh.dataset.pkLost; canvas.replaceWith(fresh); canvas = fresh; }
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); } catch { renderer = null; return; }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(canvas.clientWidth || 200, canvas.clientHeight || 240, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -57,5 +59,5 @@ export function startPreview(canvas) {
 export function stopPreview() {
   cancelAnimationFrame(raf);
   mixer = null;
-  if (renderer) { renderer.dispose(); renderer.forceContextLoss?.(); renderer = null; }
+  if (renderer) { renderer.domElement.dataset.pkLost = "1"; renderer.dispose(); renderer.forceContextLoss?.(); renderer = null; }
 }
